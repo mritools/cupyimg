@@ -1,0 +1,6 @@
+scipy>=1.2.0
+scikit-image>=0.16.2
+pytest
+pytest-cov
+flake8
+pre-commit

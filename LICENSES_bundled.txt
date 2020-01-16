@@ -1,0 +1,19 @@
+
+The code in this package is a GPU adaptation of corresponding CPU code from
+NumPy, SciPy and scikit-image. These projects are all licensed under a
+compatible open-source license.
+
+Name: NumPy
+Files: cupyimg/numpy/*,
+License: 3-clause BSD
+    For details, see license/numpy_LICENSE.txt
+
+Name: SciPy
+Files: cupyimg/scipy/*,
+License: 3-clause BSD
+    For details, see license/scipy_LICENSE.txt
+
+Name: scikit-image
+Files: cupyimg/skimage/*,
+License: 3-clause BSD
+    For details, see license/scikit-image_LICENSE.txt

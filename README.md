@@ -1,5 +1,5 @@
 
-# cupyimg: CuPy-based GPU functions for image/signal processing
+# cupyimg: n-dimensional signal and image processing on the GPU
 
 [cupyimg] extends [CuPy] with additional functions for image/signal processing.
 This package implements a subset of functions from [NumPy], [SciPy] and
