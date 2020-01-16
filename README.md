@@ -1,5 +1,5 @@
 
-# cupyimg: n-dimensional signal and image processing on the GPU
+# cupyimg: n-d signal and image processing on the GPU
 
 [cupyimg] extends [CuPy] with additional functions for image/signal processing.
 This package implements a subset of functions from [NumPy], [SciPy] and
@@ -17,6 +17,90 @@ architecture on real GPU hardware and a broader set of maintainers. Currently,
 testing of this package on NVIDIA hardware has been done only on an
 NVIDIA 1080 Ti GPU using CUDA versions 9.2-10.2. However, it should work for
 all CUDA versions supported by the underlying CuPy library.
+
+## Basic Usage
+
+Functions tend to operate in the same manner as those from their upstream
+counterparts. If there are differences in dtype handling, etc. these should be
+noted within the corresponding function's docstring.
+
+Aside from potential dtype differences, the primary difference with their CPU
+counterparts tends to be a requirement for ``cupy.ndarray`` inputs rather than
+allowing array-likes more generally. This behavior is consistent with [CuPy]
+itself where support for such array-likes is generally disallowed due to
+performance considerations. In ``cupyimg`` this ``cupy.ndarray`` rule is not
+yet consistently enforced everywhere, so some functions still accept numpy
+arrays as inputs and will transfer to the GPU automatically internally via
+``cupy.asarray``.
+
+An simple example demonstrating applying of a uniform_filter to an array is:
+
+```Python
+import cupy as cp
+from cupyimg.scipy.ndimage import uniform_filter
+
+x = np.random.randn(128, 128, 128)
+y = uniform_filter(x, size=5)
+```
+
+## Similar Software
+
+The [RAPIDS] project [cuSignal] provides an alternative implementation of
+functions from ``scipy.signal``, including some not currently present here. Like
+[cupyimg], it also depends on [CuPy], but has an additional dependency on
+[Numba]. One other difference is at the time of writing, [cuSignal] does not
+support all of the new ``upfirdn`` and ``resample_poly`` boundary handling
+modes introduced in SciPy 1.4, while these are supported in [cupyimg].
+
+## Documentation
+
+cupyimg supports Python 3.6, 3.7 and 3.8.
+
+**Requires:**
+
+- NumPy (>=1.14)
+- CuPy  (>=7.0)
+- SciPy (>=1.2)
+- scikit-image (>=0.16.2)
+- fast_upfirdn (>=0.2.0)
+
+To run the tests users will also need:
+
+- pytest
+
+Developers should see additional requirements for development in
+``requirements-dev.txt``.
+
+**Installation:**
+
+This package can be obtained from PyPI via
+
+```
+pip install cupyimg
+```
+
+**Example**
+```Python
+import numpy as np
+import cupy
+import scipy.ndimage as ndi
+from cupyimg.scipy.ndimage import uniform_filter
+#from cupy.time import repeat
+
+d = cupy.cuda.Device()
+# separable 5x5x5 convolution kernel on the CPU
+x = np.random.randn(256, 256, 256).astype(np.float32)
+y = ndi.uniform_filter(x, size=5)
+# %timeit y = ndi.uniform_filter(x, size=5)
+#    -> 935 ms ± 69.2 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
+
+# separable 5x5x5 convolution kernel on the GPU
+xg = cupy.asarray(x)
+yg = uniform_filter(xg, size=5)
+# %timeit yg = uniform_filter(xg, size=5); d.synchronize()
+#    -> 26.6 ms ± 45 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+```
+
 
 ## Available Functions
 
@@ -224,89 +308,6 @@ all CUDA versions supported by the underlying CuPy library.
     - crop
     - invert
 
-
-## Basic Usage
-
-Functions tend to operate in the same manner as those from their upstream
-counterparts. If there are differences in dtype handling, etc. these should be
-noted within the corresponding function's docstring.
-
-Aside from potential dtype differences, the primary difference with their CPU
-counterparts tends to be a requirement for ``cupy.ndarray`` inputs rather than
-allowing array-likes more generally. This behavior is consistent with [CuPy]
-itself where support for such array-likes is generally disallowed due to
-performance considerations. In ``cupyimg`` this ``cupy.ndarray`` rule is not
-yet consistently enforced everywhere, so some functions still accept numpy
-arrays as inputs and will transfer to the GPU automatically internally via
-``cupy.asarray``.
-
-An simple example demonstrating applying of a uniform_filter to an array is:
-
-```Python
-import cupy as cp
-from cupyimg.scipy.ndimage import uniform_filter
-
-x = np.random.randn(128, 128, 128)
-y = uniform_filter(x, size=5)
-```
-
-## Similar Software
-
-The [RAPIDS] project [cuSignal] provides an alternative implementation of
-functions from ``scipy.signal``, including some not currently present here. Like
-[cupyimg], it also depends on [CuPy], but has an additional dependency on
-[Numba]. One other difference is at the time of writing, [cuSignal] does not
-support all of the new ``upfirdn`` and ``resample_poly`` boundary handling
-modes introduced in SciPy 1.4, while these are supported in [cupyimg].
-
-## Documentation
-
-cupyimg supports Python 3.6, 3.7 and 3.8.
-
-**Requires:**
-
-- NumPy (>=1.14)
-- CuPy  (>=7.0)
-- SciPy (>=1.2)
-- scikit-image (>=0.16.2)
-- fast_upfirdn (>=0.2.0)
-
-To run the tests users will also need:
-
-- pytest
-
-Developers should see additional requirements for development in
-``requirements-dev.txt``.
-
-**Installation:**
-
-This package can be obtained from PyPI via
-
-```
-pip install cupyimg
-```
-
-**Example**
-```Python
-import numpy as np
-import cupy
-import scipy.ndimage as ndi
-from cupyimg.scipy.ndimage import uniform_filter
-#from cupy.time import repeat
-
-d = cupy.cuda.Device()
-# separable 5x5x5 convolution kernel on the CPU
-x = np.random.randn(256, 256, 256).astype(np.float32)
-y = ndi.uniform_filter(x, size=5)
-# %timeit y = ndi.uniform_filter(x, size=5)
-#    -> 935 ms ± 69.2 ms per loop (mean ± std. dev. of 7 runs, 1 loop each)
-
-# separable 5x5x5 convolution kernel on the GPU
-xg = cupy.asarray(x)
-yg = uniform_filter(xg, size=5)
-# %timeit yg = uniform_filter(xg, size=5); d.synchronize()
-#    -> 26.6 ms ± 45 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
-```
 
 [conda]: https://docs.conda.io/en/latest/
 [CuPy]: https://cupy.chainer.org
