@@ -19,4 +19,5 @@ Additional documentation and usage examples for the functions can be found
 at the main documentation pages of the various packges:
 
 """
+from ._misc import convolve_separable  # noqa
 from .version import __version__  # noqa
