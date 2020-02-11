@@ -267,6 +267,16 @@ yg = uniform_filter(xg, size=5)
 
 - denoise_tv_chambolle
 
+**skimage.segmentation**:
+
+- find_boundaries
+- mark_boundaries
+- morphological_geodesic_active_contour
+- morphological_chan_vese
+- inverse_gaussian_gradient
+- circle_level_set
+- checkerboard_level_set
+
 **skimage.transform**:
 
 - warp
