@@ -4,12 +4,12 @@ map_coordinates that was not present in release 7.0.
 Eventually this file can be removed.
 
 """
-import itertools
 import math
 import warnings
 
 import cupy
-import six
+
+from ._kernels.interp import _get_linear_interp_kernel
 
 
 def _get_output(output, input, shape=None):
@@ -64,6 +64,7 @@ def map_coordinates(
     mode="constant",
     cval=0.0,
     prefilter=True,
+    old_implementation=False,
 ):
     """Map the input array to new coordinates by interpolation.
 
@@ -111,12 +112,13 @@ def map_coordinates(
         mode = "constant"
 
     ret = _get_output(output, input, coordinates.shape[1:])
+    integer_output = ret.dtype.kind in "iu"
 
     if mode == "nearest":
-        for i in six.moves.range(input.ndim):
+        for i in range(input.ndim):
             coordinates[i] = coordinates[i].clip(0, input.shape[i] - 1)
     elif mode == "mirror":
-        for i in six.moves.range(input.ndim):
+        for i in range(input.ndim):
             length = input.shape[i] - 1
             if length == 0:
                 coordinates[i] = 0
@@ -132,46 +134,22 @@ def map_coordinates(
     if order == 0:
         out = input[tuple(cupy.rint(coordinates).astype(cupy.int32))]
     else:
-        coordinates_floor = cupy.floor(coordinates).astype(cupy.int32)
-        coordinates_ceil = coordinates_floor + 1
-
-        sides = []
-        for i in six.moves.range(input.ndim):
-            # TODO(mizuno): Use array_equal after it is implemented
-            if cupy.all(coordinates[i] == coordinates_floor[i]):
-                sides.append([0])
-            else:
-                sides.append([0, 1])
-
-        out = cupy.zeros(coordinates.shape[1:], dtype=input.dtype)
-        if input.dtype in (cupy.float64, cupy.complex128):
-            weight = cupy.empty(coordinates.shape[1:], dtype=cupy.float64)
-        else:
-            weight = cupy.empty(coordinates.shape[1:], dtype=cupy.float32)
-        for side in itertools.product(*sides):
-            weight.fill(1)
-            ind = []
-            for i in six.moves.range(input.ndim):
-                if side[i] == 0:
-                    ind.append(coordinates_floor[i])
-                    weight *= coordinates_ceil[i] - coordinates[i]
-                else:
-                    ind.append(coordinates_ceil[i])
-                    weight *= coordinates[i] - coordinates_floor[i]
-            out += input[ind] * weight
-        del weight
+        kern = _get_linear_interp_kernel(input.shape, integer_output)
+        out = ret
+        kern(input, coordinates, out)
 
     if mode == "constant":
         mask = cupy.zeros(coordinates.shape[1:], dtype=cupy.bool_)
-        for i in six.moves.range(input.ndim):
+        for i in range(input.ndim):
             mask += coordinates[i] < 0
             mask += coordinates[i] > input.shape[i] - 1
         out[mask] = cval
         del mask
 
-    if ret.dtype.kind in "iu":
+    if integer_output and order != 1:
         out = cupy.rint(out)
-    ret[:] = out
+    if ret is not out:
+        ret[:] = out
     return ret
 
 
@@ -265,6 +243,10 @@ def affine_transform(
 
     if output_shape is None:
         output_shape = input.shape
+
+    # cupy.dot becomes slow when matrix is view. (cupy/cupy#1168)
+    if matrix.base is not None:
+        matrix = matrix.copy()
 
     coordinates = cupy.indices(output_shape, dtype=cupy.float64)
     coordinates = cupy.dot(matrix, coordinates.reshape((input.ndim, -1)))

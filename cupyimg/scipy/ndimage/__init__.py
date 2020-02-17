@@ -4,8 +4,8 @@ from .morphology import *  # noqa
 
 from cupyimg.scipy.ndimage.fourier import fourier_shift  # NOQA
 
-from cupyx.scipy.ndimage.interpolation import affine_transform  # NOQA
-from cupyx.scipy.ndimage.interpolation import map_coordinates  # NOQA
-from cupyx.scipy.ndimage.interpolation import rotate  # NOQA
-from cupyx.scipy.ndimage.interpolation import shift  # NOQA
-from cupyx.scipy.ndimage.interpolation import zoom  # NOQA
+from cupyimg.scipy.ndimage.interpolation import affine_transform  # NOQA
+from cupyimg.scipy.ndimage.interpolation import map_coordinates  # NOQA
+from cupyimg.scipy.ndimage.interpolation import rotate  # NOQA
+from cupyimg.scipy.ndimage.interpolation import shift  # NOQA
+from cupyimg.scipy.ndimage.interpolation import zoom  # NOQA

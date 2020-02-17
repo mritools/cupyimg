@@ -1,5 +1,3 @@
-import functools
-import operator
 
 import cupy
 
@@ -68,79 +66,91 @@ def _get_lin_interp_loops(ndim, float_type):
     return ops
 
 
-def _generate_linear_interp_kernel(
-    xshape, coords_shape, double_precision, unsigned_output
-):
-    """Generate a correlation kernel for dense filters.
 
-    Looping is over the pixels of the output with interpolation based on the
-    values in x at the coordinates in coords.
 
-    Notes
-    -----
-    The kernel needs to loop over pixels in the output image, not the input, so
-    the output is set as the first argument here.
+def _generate_linear_interp_kernel(xshape, integer_output=False):
     """
 
-    in_params = "raw Y out, raw I coords, raw X x"
+    Note:
+        The coords array will have shape (ndim, ncoords) where
+        ndim == len(xshape).
+
+        ncoords is determined by the size of the output array, y.
+        y will be indexed by the CIndexer, _ind.
+        Thus ncoords = _ind.size();
+
+    """
+    in_params = 'raw X x, raw W coords'
     out_params = "Y y"
-    # Note: coords.shape = (x.ndim, ) + y.shape
 
     ndim = len(xshape)
-    if coords_shape[0] != ndim:
-        raise ValueError("invalid coordinate shape")
-    if len(coords_shape) != ndim + 1:
-        raise ValueError("invalid coordinate shape")
-    ncoords = functools.reduce(operator.mul, coords_shape[1:])
 
     ops = []
-    ops += _get_init_loop_vars(xshape)
+    ops.append("double out = 0.0;")
 
-    float_type = "double" if double_precision else "float"
+    ops.append("ptrdiff_t ncoords = _ind.size();")
 
-    ops.append(
-        "{float_type} out = ({float_type})0;".format(float_type=float_type)
-    )
-
-    # extract coordinates corresponding to the current output point
-    for j in range(ndim):
+    # determine stride along each axis
+    ops.append("const int sx_{} = 1;".format(ndim - 1))
+    for j in range(ndim - 1, 0, -1):
         ops.append(
-            """
-        I c_{0} = coords[i + {0} * {ncoords}]
-        """.format(
-                j, ncoords=ncoords
+            "int sx_{jm} = sx_{j} * {xsize_j};".format(
+                jm=j - 1, j=j, xsize_j=xshape[j]
             )
         )
 
-    ops += _get_lin_interp_loops(ndim, float_type)
+    # for each coordinate, determine its floor and ceil and whether 1 or 2
+    # values are needed for linear interpolation
+    for j in range(ndim):
+        ops.append("""
+        W c_{j} = coords[i + {j} * ncoords];
+        W cf_{j} = (W)floor((double)c_{j});
+        W cc_{j} = cf_{j} + 1;
+        int n_{j} = (c_{j} == cf_{j}) ? 1 : 2;  // 1 or 2 points needed?
+        """.format(j=j))
 
-    _weight = " * ".join(["w_{0}".format(j) for j in range(ndim)])
-    _coord_idx = " + ".join(["ic_{0}".format(j) for j in range(ndim)])
-    ops.append(
-        """
-        {float_type} val = ({float_type})x[{coord_idx}];
-        out += val * ({weight});""".format(
-            float_type=float_type, coord_idx=_coord_idx, weight=_weight
-        )
-    )
+    for j in range(ndim):
+        ops.append("""
+        for (int s_{j} = 0; s_{j} < n_{j}; s_{j}++)
+            {{
+                W w_{j};
+                int ic_{j};
+                if (s_{j} == 0)
+                {{
+                    w_{j} = cc_{j} - c_{j};
+                    ic_{j} = cf_{j} * sx_{j};
+                }} else
+                {{
+                    w_{j} = c_{j} - cf_{j};
+                    ic_{j} = cc_{j} * sx_{j};
+                }}""".format(j=j))
+
+    _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
+    _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
+    ops.append("""
+        X val = x[{coord_idx}];
+        out += val * ({weight});""".format(coord_idx=_coord_idx, weight=_weight))
     ops.append("}" * ndim)
-    if unsigned_output:
-        # Avoid undefined behaviour of float -> unsigned conversions
-        ops.append("y = (out > -1) ? (Y)out : -(Y)(-out);")
+
+    if integer_output:
+        ops.append("y = (Y)rint((double)out);")
     else:
         ops.append("y = (Y)out;")
     operation = "\n".join(ops)
 
-    name = "cupy_ndimage_linear_interp_{}d_x{}".format(
-        ndim, "_".join(["{}".format(j) for j in xshape])
+    name = "linear_interpolate_{}d_x{}".format(
+        ndim,
+        "_".join(["{}".format(j) for j in xshape]),
     )
     return in_params, out_params, operation, name
 
 
-def _get_linear_interp_kernel(
-    xshape, coords_shape, double_precision, unsigned_output
-):
+# @util.memoize.memoize()
+def _get_linear_interp_kernel(xshape, integer_output):
+    # weights is always casted to float64 in order to get an output compatible
+    # with SciPy, thought float32 might be sufficient when input dtype is low
+    # precision.
     in_params, out_params, operation, name = _generate_linear_interp_kernel(
-        xshape, coords_shape, double_precision, unsigned_output
-    )
+        xshape, integer_output)
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
+
