@@ -10,7 +10,8 @@ floating type.
 """
 
 from .core.fromnumeric import ndim
+from .core.multiarray import ravel_multi_index
 from .core.numeric import convolve, correlate
 from .lib import gradient
 
-__all__ = ["convolve", "correlate", "gradient", "ndim"]
+__all__ = ["convolve", "correlate", "gradient", "ndim", "ravel_multi_index"]
