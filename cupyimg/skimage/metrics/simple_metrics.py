@@ -199,10 +199,11 @@ def _pad_to(arr, shape):
     array([[1, 0, 0]])
     """
     if not all(s >= i for s, i in zip(shape, arr.shape)):
-        raise ValueError("Target shape must be strictly greater "
-                         "than input shape.")
+        raise ValueError(
+            "Target shape must be strictly greater " "than input shape."
+        )
     padding = [(0, s - i) for s, i in zip(shape, arr.shape)]
-    return cupy.pad(arr, pad_width=padding, mode='constant', constant_values=0)
+    return cupy.pad(arr, pad_width=padding, mode="constant", constant_values=0)
 
 
 def normalized_mutual_information(im_true, im_test, *, bins=100):
@@ -253,9 +254,12 @@ def normalized_mutual_information(im_true, im_test, *, bins=100):
            :DOI:`10.1016/S0031-3203(98)00091-0`
     """
     if im_true.ndim != im_test.ndim:
-        raise ValueError('NMI requires images of same number of dimensions. '
-                         'Got {}D for `im_true` and {}D for `im_test`.'
-                         .format(im_true.ndim, im_test.ndim))
+        raise ValueError(
+            "NMI requires images of same number of dimensions. "
+            "Got {}D for `im_true` and {}D for `im_test`.".format(
+                im_true.ndim, im_test.ndim
+            )
+        )
     if im_true.shape != im_test.shape:
         max_shape = tuple(
             [max(s1, s2) for s1, s2 in zip(im_true.shape, im_test.shape)]
@@ -265,9 +269,11 @@ def normalized_mutual_information(im_true, im_test, *, bins=100):
     else:
         padded_true, padded_test = im_true, im_test
 
-    hist, bin_edges = cnp.histogramdd([cupy.ravel(padded_true),
-                                       cupy.ravel(padded_test)],
-                                      bins=bins, density=True)
+    hist, bin_edges = cnp.histogramdd(
+        [cupy.ravel(padded_true), cupy.ravel(padded_test)],
+        bins=bins,
+        density=True,
+    )
 
     H_im_true = entropy(cupy.sum(hist, axis=0))
     H_im_test = entropy(cupy.sum(hist, axis=1))

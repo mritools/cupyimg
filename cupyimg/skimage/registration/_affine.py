@@ -9,7 +9,7 @@ from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage.transform.pyramids import pyramid_gaussian
 from cupyimg.skimage.metrics import normalized_mutual_information
 
-__all__ = ['affine']
+__all__ = ["affine"]
 
 
 def _parameter_vector_to_matrix(parameter_vector):
@@ -61,27 +61,49 @@ def cost_nmi(image0, image1, *, bins=100):
     return -float(normalized_mutual_information(image0, image1, bins=bins))
 
 
-def _param_cost(reference_image, moving_image, parameter_vector, *,
-                vector_to_matrix, cost, multichannel):
+def _param_cost(
+    reference_image,
+    moving_image,
+    parameter_vector,
+    *,
+    vector_to_matrix,
+    cost,
+    multichannel,
+):
     transformation = vector_to_matrix(parameter_vector)
     if not multichannel:
-        transformed = ndi.affine_transform(moving_image, transformation,
-                                           order=1, mode='mirror')
+        transformed = ndi.affine_transform(
+            moving_image, transformation, order=1, mode="mirror"
+        )
     else:
         transformed = cp.zeros_like(moving_image)
         for ch in range(moving_image.shape[-1]):
-            ndi.affine_transform(moving_image[..., ch], transformation,
-                                 order=1, output=transformed[..., ch],
-                                 mode='mirror')
+            ndi.affine_transform(
+                moving_image[..., ch],
+                transformation,
+                order=1,
+                output=transformed[..., ch],
+                mode="mirror",
+            )
     return cost(reference_image, transformed)
 
 
-def affine(reference_image, moving_image, *,
-           cost=cost_nmi, initial_vector=None,
-           translation_indices=None, vector_to_matrix=None,
-           pyramid_scale=2, pyramid_minimum_size=8, multichannel=False,
-           inverse=True, level_callback=None, method='Powell',
-           **kwargs):
+def affine(
+    reference_image,
+    moving_image,
+    *,
+    cost=cost_nmi,
+    initial_vector=None,
+    translation_indices=None,
+    vector_to_matrix=None,
+    pyramid_scale=2,
+    pyramid_minimum_size=8,
+    multichannel=False,
+    inverse=True,
+    level_callback=None,
+    method="Powell",
+    **kwargs,
+):
     """Find a transformation matrix to register a moving image to a reference.
 
     Parameters
@@ -158,21 +180,27 @@ def affine(reference_image, moving_image, *,
     """
 
     # ignore the channels if present
-    ndim = reference_image.ndim if not multichannel else reference_image.ndim - 1
+    ndim = (
+        reference_image.ndim if not multichannel else reference_image.ndim - 1
+    )
     if ndim == 0:
-        raise ValueError(
-            'Input images must have at least 1 spatial dimension.'
-        )
+        raise ValueError("Input images must have at least 1 spatial dimension.")
 
     min_dim = min(reference_image.shape[:ndim])
     nlevels = int(np.floor(np.log2(min_dim) - np.log2(pyramid_minimum_size)))
 
-    pyramid_ref = pyramid_gaussian(reference_image, downscale=pyramid_scale,
-                                   max_layer=nlevels,
-                                   multichannel=multichannel)
-    pyramid_mvg = pyramid_gaussian(moving_image, downscale=pyramid_scale,
-                                   max_layer=nlevels,
-                                   multichannel=multichannel)
+    pyramid_ref = pyramid_gaussian(
+        reference_image,
+        downscale=pyramid_scale,
+        max_layer=nlevels,
+        multichannel=multichannel,
+    )
+    pyramid_mvg = pyramid_gaussian(
+        moving_image,
+        downscale=pyramid_scale,
+        max_layer=nlevels,
+        multichannel=multichannel,
+    )
     image_pairs = reversed(list(zip(pyramid_ref, pyramid_mvg)))
 
     if initial_vector is None:
@@ -183,20 +211,25 @@ def affine(reference_image, moving_image, *,
         vector_to_matrix = _parameter_vector_to_matrix
 
     if translation_indices is None:
-        translation_indices = slice(ndim, ndim**2 - 1, ndim)
+        translation_indices = slice(ndim, ndim ** 2 - 1, ndim)
 
     for ref, mvg in image_pairs:
         parameter_vector[translation_indices] *= pyramid_scale
-        _cost = functools.partial(_param_cost, ref, mvg,
-                                  vector_to_matrix=vector_to_matrix,
-                                  cost=cost, multichannel=multichannel)
-        result = minimize(_cost, x0=cp.asnumpy(parameter_vector), method=method, **kwargs)
+        _cost = functools.partial(
+            _param_cost,
+            ref,
+            mvg,
+            vector_to_matrix=vector_to_matrix,
+            cost=cost,
+            multichannel=multichannel,
+        )
+        result = minimize(
+            _cost, x0=cp.asnumpy(parameter_vector), method=method, **kwargs
+        )
         parameter_vector = result.x
         if level_callback is not None:
             level_callback(
-                (mvg,
-                 vector_to_matrix(parameter_vector),
-                 result.fun)
+                (mvg, vector_to_matrix(parameter_vector), result.fun)
             )
 
     matrix = vector_to_matrix(parameter_vector)
