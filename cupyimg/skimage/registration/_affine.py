@@ -66,12 +66,13 @@ def _param_cost(reference_image, moving_image, parameter_vector, *,
     transformation = vector_to_matrix(parameter_vector)
     if not multichannel:
         transformed = ndi.affine_transform(moving_image, transformation,
-                                           order=1)
+                                           order=1, mode='mirror')
     else:
         transformed = cp.zeros_like(moving_image)
         for ch in range(moving_image.shape[-1]):
             ndi.affine_transform(moving_image[..., ch], transformation,
-                                 order=1, output=transformed[..., ch])
+                                 order=1, output=transformed[..., ch],
+                                 mode='mirror')
     return cost(reference_image, transformed)
 
 
