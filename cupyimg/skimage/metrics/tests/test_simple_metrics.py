@@ -8,6 +8,7 @@ from cupyimg.skimage.metrics import (
     peak_signal_noise_ratio,
     normalized_root_mse,
     mean_squared_error,
+    normalized_mutual_information,
 )
 
 np.random.seed(
@@ -99,3 +100,23 @@ def test_NRMSE_errors():
     # invalid normalization name
     with pytest.raises(ValueError):
         normalized_root_mse(x, x, normalization="foo")
+
+
+def test_nmi():
+    assert_almost_equal(normalized_mutual_information(cam, cam), 2)
+    assert (normalized_mutual_information(cam, cam_noisy)
+            < normalized_mutual_information(cam, cam))
+
+
+def test_nmi_different_sizes():
+    assert normalized_mutual_information(cam[:, :400], cam[:400, :]) > 1
+
+
+def test_nmi_random():
+    random1 = cupy.random.random((100, 100))
+    random2 = cupy.random.random((100, 100))
+    assert_almost_equal(
+        normalized_mutual_information(random1, random2, bins=10),
+        1,
+        decimal=2
+    )
