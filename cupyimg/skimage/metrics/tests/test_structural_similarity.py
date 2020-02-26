@@ -28,18 +28,20 @@ assert_array_almost_equal = cupy.testing.assert_array_almost_equal
 
 def test_structural_similarity_patch_range():
     N = 51
-    X = (cupy.random.rand(N, N) * 255).astype(cupy.uint8)
-    Y = (cupy.random.rand(N, N) * 255).astype(cupy.uint8)
+    rstate = cupy.random.RandomState(1234)
+    X = (rstate.rand(N, N) * 255).astype(cupy.uint8)
+    Y = (rstate.rand(N, N) * 255).astype(cupy.uint8)
 
     # grlee77: increase value from 0.1 to 0.15
-    assert structural_similarity(X, Y, win_size=N) < 0.15
+    assert structural_similarity(X, Y, win_size=N) < 0.1
     assert_equal(structural_similarity(X, X, win_size=N), 1)
 
 
 def test_structural_similarity_image():
     N = 100
-    X = (cupy.random.rand(N, N) * 255).astype(cupy.uint8)
-    Y = (cupy.random.rand(N, N) * 255).astype(cupy.uint8)
+    rstate = cupy.random.RandomState(1234)
+    X = (rstate.rand(N, N) * 255).astype(cupy.uint8)
+    Y = (rstate.rand(N, N) * 255).astype(cupy.uint8)
 
     S0 = structural_similarity(X, X, win_size=3)
     assert_equal(S0, 1)
