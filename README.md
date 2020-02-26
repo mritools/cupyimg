@@ -109,7 +109,10 @@ yg = uniform_filter(xg, size=5)
 - convolve
 - correlate
 - gradient
-- ndim
+- histogram  (upstream PR: [3124](https://github.com/cupy/cupy/pull/3124))
+- histogramdd
+- ndim (upstream PR: [3060](https://github.com/cupy/cupy/pull/3060))
+- ravel_multi_index (upstream PR: [3104](https://github.com/cupy/cupy/pull/3104))
 
 **cupyimg.scipy.interpolate**:
 
@@ -118,65 +121,64 @@ yg = uniform_filter(xg, size=5)
 
 **cupyimg.scipy.ndimage**:
 
-- convolve1d
-- correlate1d
-- convolve
-- correlate
-- gaussian_filter1d
-- gaussian_filter
-- uniform_filter1d
-- uniform_filter
-- prewitt
-- sobel
-- generic_laplace
-- laplace
-- gaussian_laplace
-- generic_gradient_magnitude
-- gaussian_gradient_magnitude
-- maximum_filter1d
-- maximum_filter
-- minimum_filter1d
-- minimum_filter
-- rank_filter
-- median_filter
-- percentile_filter
-- generate_binary_structure
-- iterate_structure'
 - binary_erosion
 - binary_dilation
 - binary_opening
 - binary_closing
 - binary_hit_or_miss
 - binary_propagation
-- binary_fill_holes
+- binary_fill_holes- convolve
+- black_tophat
+- convolve1d
+- correlate
+- correlate1d
+- gaussian_filter
+- gaussian_filter1d
+- gaussian_laplace
+- gaussian_gradient_magnitude
+- generate_binary_structure
+- generic_laplace
+- generic_gradient_magnitude
+- iterate_structure
+- laplace
+- prewitt
+- sobel
+- uniform_filter
+- uniform_filter1d
+- maximum_filter
+- maximum_filter1d
+- median_filter
+- minimum_filter
+- minimum_filter1d
 - morphological_gradient
 - morphological_laplace
+- percentile_filter
+- rank_filter
 - white_tophat
-- black_tophat
 
 **cupyimg.scipy.signal**:
 
-- upfirdn
 - choose_conv_method
 - convolve
 - convolve2d
 - correlate
 - correlate2d
 - fftconvolve
-- oaconvolve
 - hilbert
 - hilbert2
+- oaconvolve
 - resample
 - resample_poly
+- upfirdn
 - wiener
 
 **cupyimg.scipy.special**:
 
-- entr
-- kl_div
-- rel_entr
-- huber
-- pseudo_huber
+- entr  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
+- kl_div  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
+- rel_entr  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
+- huber  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
+- pseudo_huber  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
 
 **cupyimg.scipy.stats**:
 
@@ -192,8 +194,8 @@ yg = uniform_filter(xg, size=5)
 - adjust_log
 - adjust_sigmoid
 - cumulative_distribution
-- equalize_hist
 - equalize_adapthist
+- equalize_hist
 - histogram
 - is_low_contrast
 - match_histograms
@@ -201,35 +203,35 @@ yg = uniform_filter(xg, size=5)
 
 **skimage.filters**:
 
-- inverse
-- wiener
-- LPIFilter2D
-- gaussian
-- median (ndimage mode only)
 - farid
 - farid_h
 - farid_v
+- frangi
+- gabor_kernel
+- gabor
+- gaussian
+- hessian
+- inverse
+- laplace
+- LPIFilter2D
+- median (ndimage mode only)
+- meijering
 - prewitt
 - prewitt_h
 - prewitt_v
+- rank_filter
 - roberts
 - roberts_pos_diag
 - roberts_neg_diag
+- sato
 - scharr
 - scharr_h
 - scharr_v
 - sobel
 - sobel_h
 - sobel_v
-- laplace
-- rank_filter
-- gabor_kernel
-- gabor
-- meijering
-- sato
-- frangi
-- hessian
 - unsharp_mask
+- wiener
 - window
 
 **skimage.measure**:
@@ -237,86 +239,121 @@ yg = uniform_filter(xg, size=5)
 - approximate_polygon
 - subdivide_polygon
 - block_reduce
+- compare_mse
+- compare_nrmse
+- compare_psnr
+- compare_ssim
+- inertia_tensor
+- inertia_tensor_eigenvals
+- moments
+- moments_central
+- moments_coords
+- moments_coords_central
+- moments_hu
+- moments_normalized
+- perimeter
 - profile_line
+- regionprops
+- regionprops_table
 - shannon_entropy
+- subdivide_polygon
 
 **skimage.metrics**:
 
 - mean_squared_error
 - normalized_root_mse
+- normalized_mutual_information
 - peak_signal_noise_ratio
 - structural_similarity
 
+**skimage.morphology**:
+
+- ball
+- binary_erosion
+- binary_dilation
+- binary_opening
+- binary_closing
+- black_tophat
+- closing
+- cube
+- diamond
+- dilation
+- disk
+- erosion
+- octagon
+- octahedron
+- opening
+- rectangle
+- remove_small_holes
+- remove_small_objects
+- square
+- star
+- white_tophat
+
 **skimage.registration**:
 
+- affine
 - optical_flow_tvl1
 
 **skimage.restoration**:
 
-- square
-- rectangle
-- diamond
-- disk
-- cube
-- octahedron
-- ball
-- octagon
-- star
-
-**skimage.restoration**:
-
 - denoise_tv_chambolle
+- richardson_lucy
+- unsupervised_wiener
+- wiener
 
 **skimage.segmentation**:
 
-- find_boundaries
-- mark_boundaries
-- morphological_geodesic_active_contour
-- morphological_chan_vese
-- inverse_gaussian_gradient
-- circle_level_set
 - checkerboard_level_set
+- circle_level_set
+- clear_border
+- disk_level_set
+- find_boundaries
+- inverse_gaussian_gradient
+- mark_boundaries
+- morphological_chan_vese
+- morphological_geodesic_active_contour
 
 **skimage.transform**:
 
-- warp
-- warp_coords
-- warp_polar
-- swirl
-- resize
-- rotate
-- rescale
-- downscale_local_mean
-- estimate_transform
-- matrix_transform
-- EuclideanTransform
-- SimilarityTransform
 - AffineTransform
-- ProjectiveTransform
+- downscale_local_mean
 - EssentialMatrixTransform
+- estimate_transform
+- EuclideanTransform
 - FundamentalMatrixTransform
-- PolynomialTransform
 - integral_image
 - integrate
-- pyramid_reduce
+- matrix_transform
+- PolynomialTransform
+- ProjectiveTransform
 - pyramid_expand
 - pyramid_gaussian
 - pyramid_laplacian
+- pyramid_reduce
+- rescale
+- resize
+- rotate
+- SimilarityTransform
+- swirl
+- warp
+- warp_coords
+- warp_polar
 
 **skimage.util**:
 
+- crop
+- dtype_limits
+- img_as_bool
+- img_as_float
 - img_as_float32
 - img_as_float64
-- img_as_float
 - img_as_int
-- img_as_uint
 - img_as_ubyte
-- img_as_bool
-- dtype_limits
+- img_as_uint
+- invert
 - view_as_blocks
 - view_as_windows
-- crop
-- invert
 
 
 [conda]: https://docs.conda.io/en/latest/
