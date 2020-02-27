@@ -12,13 +12,14 @@ floating type.
 from .core.fromnumeric import ndim
 from .core.multiarray import ravel_multi_index
 from .core.numeric import convolve, correlate
-from .lib import gradient, histogram, histogramdd
+from .lib import gradient, histogram, histogram2d, histogramdd
 
 __all__ = [
     "convolve",
     "correlate",
     "gradient",
     "histogram",
+    "histogram2d",
     "histogramdd",
     "ndim",
     "ravel_multi_index",

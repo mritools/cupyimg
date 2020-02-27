@@ -110,6 +110,7 @@ yg = uniform_filter(xg, size=5)
 - correlate
 - gradient
 - histogram  (upstream PR: [3124](https://github.com/cupy/cupy/pull/3124))
+- histogram2d
 - histogramdd
 - ndim (upstream PR: [3060](https://github.com/cupy/cupy/pull/3060))
 - ravel_multi_index (upstream PR: [3104](https://github.com/cupy/cupy/pull/3104))
