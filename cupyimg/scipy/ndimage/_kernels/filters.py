@@ -11,7 +11,7 @@ from .support import (
 )
 
 
-def _generate_correlete_kernel(
+def _generate_correlate_kernel(
     ndim, mode, cval, xshape, wshape, origin, unsigned_output
 ):
     """Generate a correlation kernel for dense filters.
@@ -79,7 +79,7 @@ def _generate_correlete_kernel(
     return in_params, out_params, operation, name
 
 
-def _generate_correlete_kernel_masked(
+def _generate_correlate_kernel_masked(
     mode, cval, xshape, fshape, nnz, origin, unsigned_output
 ):
     """Generate a correlation kernel for sparse filters.
@@ -623,20 +623,20 @@ def _generate_rank_kernel_masked(mode, cval, xshape, fshape, nnz, origin, rank):
 
 
 @cupy.util.memoize()
-def _get_correlete_kernel(
+def _get_correlate_kernel(
     ndim, mode, cval, xshape, fshape, origin, unsigned_output
 ):
-    in_params, out_params, operation, name = _generate_correlete_kernel(
+    in_params, out_params, operation, name = _generate_correlate_kernel(
         ndim, mode, cval, xshape, fshape, origin, unsigned_output
     )
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
 # @cupy.util.memoize()
-def _get_correlete_kernel_masked(
+def _get_correlate_kernel_masked(
     mode, cval, xshape, fshape, nnz, origin, unsigned_output
 ):
-    in_params, out_params, operation, name = _generate_correlete_kernel_masked(
+    in_params, out_params, operation, name = _generate_correlate_kernel_masked(
         mode, cval, xshape, fshape, nnz, origin, unsigned_output
     )
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)

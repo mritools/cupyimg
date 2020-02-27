@@ -7,7 +7,7 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
     if mode == "reflect":
         ops = """
         if ({ix} < 0) {{
-            {ix} = - 1 - {ix};
+            {ix} = -1 - {ix};
         }}
         {ix} %= {xsize} * 2;
         {ix} = min({ix}, 2 * {xsize} - 1 - {ix});""".format(
@@ -16,7 +16,7 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
     elif mode == "mirror":
         ops = """
         if ({ix} < 0) {{
-            {ix} = - {ix};
+            {ix} = -{ix};
         }}
         if ({xsize} == 1) {{
             {ix} = 0;

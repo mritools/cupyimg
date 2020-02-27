@@ -22,8 +22,8 @@ import cupy
 import numpy
 
 from ._kernels.filters import (
-    _get_correlete_kernel,
-    _get_correlete_kernel_masked,
+    _get_correlate_kernel,
+    _get_correlate_kernel_masked,
     _get_min_or_max_kernel,
     _get_min_or_max_kernel_masked,
     _get_min_or_max_kernel_masked_v2,
@@ -657,7 +657,7 @@ def _correlate_or_convolve(
             wlocs
         )  # (ndim, nnz) array of indices for these values
 
-        return _get_correlete_kernel_masked(
+        return _get_correlate_kernel_masked(
             mode,
             cval,
             input.shape,
@@ -667,7 +667,7 @@ def _correlate_or_convolve(
             unsigned_output,
         )(input, wlocs, wvals, output)
     else:
-        return _get_correlete_kernel(
+        return _get_correlate_kernel(
             input.ndim,
             mode,
             cval,
