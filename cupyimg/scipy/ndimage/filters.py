@@ -530,39 +530,6 @@ def gaussian_gradient_magnitude(
     )
 
 
-def _get_output_v2(output, input, weights_dtype, shape=None):
-    if shape is None:
-        shape = input.shape
-    if isinstance(output, cupy.ndarray):
-        if output.shape != tuple(shape):
-            raise RuntimeError("output shape is not correct")
-        if output is input:
-            raise RuntimeError("in-place convolution not supported")
-        if (
-            input.dtype.kind == "c" or weights_dtype.kind == "c"
-        ) and output.dtype.kind != "c":
-            raise RuntimeError(
-                "output must have complex dtype if either the input or "
-                "weights are complex-valued."
-            )
-    else:
-        dtype = output
-        if dtype is None:
-            if weights_dtype.kind == "c":
-                dtype = cupy.promote_types(input.dtype, cupy.complex64)
-            else:
-                dtype = input.dtype
-        elif (
-            input.dtype.kind == "c" or weights_dtype.kind == "c"
-        ) and output.dtype.kind != "c":
-            raise RuntimeError(
-                "output must have complex dtype if either the input or "
-                "weights are complex-valued."
-            )
-        output = cupy.zeros(shape, dtype)
-    return output
-
-
 def _correlate_or_convolve(
     input,
     weights,
@@ -638,7 +605,7 @@ def _correlate_or_convolve(
 
         #    if output is input:
         #        input = input.copy()
-        output = _get_output_v2(output, input, weights_dtype)
+        output = _ni_support._get_output(output, input, input.shape, weights_dtype)
     if weights.size == 0:
         return output
 

@@ -13,20 +13,43 @@ def _invalid_origin(origin, lenw):
     return (origin < -(lenw // 2)) or (origin > (lenw - 1) // 2)
 
 
-def _get_output(output, arr, shape=None):
+def _get_output(
+    output, input, shape=None, weights_dtype=None, allow_inplace=True
+):
     if shape is None:
-        shape = arr.shape
-    if output is None:
-        output = cupy.zeros(shape, dtype=arr.dtype.name)
-    elif isinstance(output, (type, cupy.dtype)):
-        output = cupy.zeros(shape, dtype=output)
-    elif isinstance(output, str):
-        output = cupy.typeDict[output]
-        output = cupy.zeros(shape, dtype=output)
-    elif output.shape != shape:
-        raise RuntimeError("output shape not correct")
-    elif output is input:
-        raise RuntimeError("in-place filtering is not supported")
+        shape = input.shape
+    if isinstance(output, cupy.ndarray):
+        if output.shape != tuple(shape):
+            raise ValueError("output shape is not correct")
+        if weights_dtype is None:
+            complex_out = input.dtype.kind == "c"
+        else:
+            complex_out = input.dtype.kind == "c" or weights_dtype.kind == "c"
+        if complex_out and output.dtype.kind != "c":
+            raise RuntimeError(
+                "output must have complex dtype if either the input or "
+                "weights are complex-valued."
+            )
+        if not allow_inplace and output is input:
+            raise RuntimeError("in-place filtering is not supported")
+    else:
+        if weights_dtype is not None:
+            dtype = output
+            if dtype is None:
+                if weights_dtype.kind == "c":
+                    dtype = cupy.promote_types(input.dtype, cupy.complex64)
+                else:
+                    dtype = input.dtype
+            elif (
+                input.dtype.kind == "c" or weights_dtype.kind == "c"
+            ) and output.dtype.kind != "c":
+                raise RuntimeError(
+                    "output must have complex dtype if either the input or "
+                    "weights are complex-valued."
+                )
+        else:
+            dtype = input.dtype if output is None else output
+        output = cupy.zeros(shape, dtype)
     return output
 
 
