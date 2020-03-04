@@ -4,12 +4,18 @@ map_coordinates that was not present in release 7.0.
 Eventually this file can be removed.
 
 """
+import itertools
 import math
 import warnings
 
 import cupy
+import numpy
 
-from ._kernels.interp import _get_linear_interp_kernel
+from ._kernels.interp import (
+    _get_interp_kernel,
+    _get_interp_shift_kernel,
+    _get_interp_zoom_kernel,
+    _get_interp_affine_kernel)
 
 
 def _get_output(output, input, shape=None):
@@ -114,29 +120,30 @@ def map_coordinates(
     ret = _get_output(output, input, coordinates.shape[1:])
     integer_output = ret.dtype.kind in "iu"
 
-    if mode == "nearest":
-        for i in range(input.ndim):
-            coordinates[i] = coordinates[i].clip(0, input.shape[i] - 1)
-    elif mode == "mirror":
-        for i in range(input.ndim):
-            length = input.shape[i] - 1
-            if length == 0:
-                coordinates[i] = 0
-            else:
-                coordinates[i] = cupy.remainder(coordinates[i], 2 * length)
-                coordinates[i] = (
-                    2 * cupy.minimum(coordinates[i], length) - coordinates[i]
-                )
+    # if order != 1:
+    #     if mode == "nearest":
+    #         for i in range(input.ndim):
+    #             coordinates[i] = coordinates[i].clip(0, input.shape[i] - 1)
+    #     elif mode == "mirror":
+    #         for i in range(input.ndim):
+    #             length = input.shape[i] - 1
+    #             if length == 0:
+    #                 coordinates[i] = 0
+    #             else:
+    #                 coordinates[i] = cupy.remainder(coordinates[i], 2 * length)
+    #                 coordinates[i] = (
+    #                     2 * cupy.minimum(coordinates[i], length) - coordinates[i]
+    #                 )
 
     if input.dtype.kind in "iu":
         input = input.astype(cupy.float32)
 
-    if order == 0:
-        out = input[tuple(cupy.rint(coordinates).astype(cupy.int32))]
-    else:
-        kern = _get_linear_interp_kernel(input.shape, integer_output)
-        out = ret
-        kern(input, coordinates, out)
+    # if order == 0:
+    #     out = input[tuple(cupy.rint(coordinates).astype(cupy.int32))]
+    # else:
+    kern = _get_interp_kernel(input.shape, mode, cval, order, integer_output)
+    out = ret
+    kern(input, coordinates, out)
 
     if mode == "constant":
         mask = cupy.zeros(coordinates.shape[1:], dtype=cupy.bool_)
@@ -244,6 +251,24 @@ def affine_transform(
     if output_shape is None:
         output_shape = input.shape
 
+    if True:
+        if order is None:
+            order = 1
+        ndim = input.ndim
+        output = _get_output(output, input, shape=output_shape)
+        if input.dtype.kind in "iu":
+            input = input.astype(cupy.float32)
+        integer_output = output.dtype.kind in "iu"
+        k = _get_interp_affine_kernel(
+            input.shape, output_shape, mode, cval=cval, order=order,
+            integer_output=integer_output,
+        )
+        m = cupy.zeros((ndim, ndim + 1), dtype=float)
+        m[:, :-1] = matrix
+        m[:, -1] = cupy.asarray(offset, dtype=float)
+        k(input, m, output)
+        return output
+
     # cupy.dot becomes slow when matrix is view. (cupy/cupy#1168)
     if matrix.base is not None:
         matrix = matrix.copy()
@@ -320,56 +345,69 @@ def rotate(
     if mode == "opencv":
         mode = "_opencv_edge"
 
+    input_arr = input
     axes = list(axes)
     if axes[0] < 0:
-        axes[0] += input.ndim
+        axes[0] += input_arr.ndim
     if axes[1] < 0:
-        axes[1] += input.ndim
+        axes[1] += input_arr.ndim
     if axes[0] > axes[1]:
-        axes = axes[1], axes[0]
-    if axes[0] < 0 or input.ndim <= axes[1]:
-        raise IndexError
+        axes = [axes[1], axes[0]]
+    if axes[0] < 0 or input_arr.ndim <= axes[1]:
+        raise ValueError('invalid rotation plane specified')
 
-    rad = cupy.deg2rad(angle)
+    ndim = input_arr.ndim
+    rad = numpy.deg2rad(angle)
     sin = math.sin(rad)
     cos = math.cos(rad)
 
-    matrix = cupy.identity(input.ndim)
+    # determine offsets and output shape as in scipy.ndimage.rotate
+    rot_matrix = numpy.array([[cos, sin],
+                              [-sin, cos]])
+
+    img_shape = numpy.asarray(input_arr.shape)
+    in_plane_shape = img_shape[axes]
+    if reshape:
+        # Compute transformed input bounds
+        iy, ix = in_plane_shape
+        out_bounds = rot_matrix @ [[0, 0, iy, iy],
+                                   [0, ix, 0, ix]]
+        # Compute the shape of the transformed input plane
+        out_plane_shape = (out_bounds.ptp(axis=1) + 0.5).astype(int)
+    else:
+        out_plane_shape = img_shape[axes]
+
+    out_center = rot_matrix @ ((out_plane_shape - 1) / 2)
+    in_center = (in_plane_shape - 1) / 2
+    offset = cupy.asarray(in_center - out_center, dtype=float)
+
+    output_shape = img_shape
+    output_shape[axes] = out_plane_shape
+    output_shape = tuple(output_shape)
+
+    matrix = numpy.identity(ndim)
     matrix[axes[0], axes[0]] = cos
     matrix[axes[0], axes[1]] = sin
     matrix[axes[1], axes[0]] = -sin
     matrix[axes[1], axes[1]] = cos
+    matrix = cupy.asarray(matrix)
 
-    iy = input.shape[axes[0]]
-    ix = input.shape[axes[1]]
-    if reshape:
-        mtrx = cupy.array([[cos, sin], [-sin, cos]])
-        minc = [0, 0]
-        maxc = [0, 0]
-        coor = cupy.dot(mtrx, cupy.array([0, ix]))
-        minc, maxc = _minmax(coor, minc, maxc)
-        coor = cupy.dot(mtrx, cupy.array([iy, 0]))
-        minc, maxc = _minmax(coor, minc, maxc)
-        coor = cupy.dot(mtrx, cupy.array([iy, ix]))
-        minc, maxc = _minmax(coor, minc, maxc)
-        oy = int(maxc[0] - minc[0] + 0.5)
-        ox = int(maxc[1] - minc[1] + 0.5)
-    else:
-        oy = input.shape[axes[0]]
-        ox = input.shape[axes[1]]
-
-    offset = cupy.zeros(input.ndim)
-    offset[axes[0]] = oy / 2.0 - 0.5
-    offset[axes[1]] = ox / 2.0 - 0.5
-    offset = cupy.dot(matrix, offset)
-    tmp = cupy.zeros(input.ndim)
-    tmp[axes[0]] = iy / 2.0 - 0.5
-    tmp[axes[1]] = ix / 2.0 - 0.5
-    offset = tmp - offset
-
-    output_shape = list(input.shape)
-    output_shape[axes[0]] = oy
-    output_shape[axes[1]] = ox
+    if True:
+        if order is None:
+            order = 1
+        output = _get_output(output, input_arr, shape=output_shape)
+        if input_arr.dtype.kind in "iu":
+            input_arr = input_arr.astype(cupy.float32)
+        integer_output = output.dtype.kind in "iu"
+        k = _get_interp_affine_kernel(
+            input_arr.shape, output_shape, mode, cval=cval, order=order,
+            integer_output=integer_output,
+        )
+        m = cupy.zeros((ndim, ndim + 1), dtype=float)
+        m[:, :-1] = matrix
+        m[axes, -1] = offset
+        k(input, m, output)
+        return output
 
     return affine_transform(
         input,
@@ -382,6 +420,101 @@ def rotate(
         cval,
         prefilter,
     )
+
+
+def rotate_new(input, angle, axes=(1, 0), reshape=True, output=None, order=1,
+           mode='constant', cval=0.0, prefilter=True):
+    """
+    Rotate an array.
+
+
+    """
+    import numpy
+    input_arr = cupy.asarray(input)
+    ndim = input_arr.ndim
+
+    if ndim < 2:
+        raise ValueError('input array should be at least 2D')
+
+    axes = list(axes)
+
+    if len(axes) != 2:
+        raise ValueError('axes should contain exactly two values')
+
+    if not all([float(ax).is_integer() for ax in axes]):
+        raise ValueError('axes should contain only integer values')
+
+    if axes[0] < 0:
+        axes[0] += ndim
+    if axes[1] < 0:
+        axes[1] += ndim
+    if axes[0] < 0 or axes[1] < 0 or axes[0] >= ndim or axes[1] >= ndim:
+        raise ValueError('invalid rotation plane specified')
+
+    axes.sort()
+
+    angle_rad = numpy.deg2rad(angle)
+    c, s = numpy.cos(angle_rad), numpy.sin(angle_rad)
+
+    rot_matrix = numpy.array([[c, s],
+                              [-s, c]])
+
+    img_shape = numpy.asarray(input_arr.shape)
+    in_plane_shape = img_shape[axes]
+    if reshape:
+        # Compute transformed input bounds
+        iy, ix = in_plane_shape
+        out_bounds = rot_matrix @ [[0, 0, iy, iy],
+                                   [0, ix, 0, ix]]
+        # Compute the shape of the transformed input plane
+        out_plane_shape = (out_bounds.ptp(axis=1) + 0.5).astype(int)
+    else:
+        out_plane_shape = img_shape[axes]
+
+    out_center = rot_matrix @ ((out_plane_shape - 1) / 2)
+    in_center = (in_plane_shape - 1) / 2
+    offset = in_center - out_center
+
+    output_shape = img_shape
+    output_shape[axes] = out_plane_shape
+    output_shape = tuple(output_shape)
+
+    if order is None:
+        order = 1
+    output = _get_output(output, input, shape=output_shape)
+    if input.dtype.kind in "iu":
+        input = input.astype(cupy.float32)
+    integer_output = output.dtype.kind in "iu"
+    k = _get_interp_affine_kernel(
+        input.shape, output_shape, mode, cval=cval, order=order,
+        integer_output=integer_output,
+    )
+    m = cupy.zeros((input.ndim, input.ndim + 1), dtype=float)
+    m[:, :-1] = cupy.asarray(rot_matrix)
+    m[:, -1] = cupy.asarray(offset, dtype=float)
+
+    if ndim <= 2:
+        k(input, m, output)
+        return output
+    else:
+
+        # If ndim > 2, the rotation is applied over all the planes
+        # parallel to axes
+        planes_coord = itertools.product(
+            *[[slice(None)] if ax in axes else range(img_shape[ax])
+              for ax in range(ndim)])
+
+        out_plane_shape = tuple(out_plane_shape)
+
+        for coordinates in planes_coord:
+            ia = input_arr[coordinates]
+            oa = cupy.zeros_like(output[coordinates])
+            k(input, m, oa)
+            output[coordinates] = oa
+            #affine_transform(ia, rot_matrix, offset, out_plane_shape,
+            #                 oa, order, mode, cval, prefilter)
+
+    return output
 
 
 def shift(
@@ -427,23 +560,37 @@ def shift(
 
     _check_parameter("shift", order, mode)
 
-    if mode == "opencv":
-        mode = "_opencv_edge"
-
     if not hasattr(shift, "__iter__") and type(shift) is not cupy.ndarray:
         shift = [shift] * input.ndim
 
-    return affine_transform(
-        input,
-        cupy.ones(input.ndim, input.dtype),
-        cupy.negative(cupy.asarray(shift)),
-        None,
-        output,
-        order,
-        mode,
-        cval,
-        prefilter,
-    )
+    if mode == "opencv":
+        mode = "_opencv_edge"
+
+        output = affine_transform(
+            input,
+            cupy.ones(input.ndim, input.dtype),
+            cupy.negative(cupy.asarray(shift)),
+            None,
+            output,
+            order,
+            mode,
+            cval,
+            prefilter,
+        )
+    else:
+        if order is None:
+            order = 1
+        output = _get_output(output, input)
+        if input.dtype.kind in "iu":
+            input = input.astype(cupy.float32)
+        integer_output = output.dtype.kind in "iu"
+        k = _get_interp_shift_kernel(
+            input.shape, input.shape, mode, cval=cval, order=order,
+            integer_output=integer_output,
+        )
+        shift = cupy.asarray(shift, dtype=float)
+        k(input, shift, output)
+    return output
 
 
 def zoom(
@@ -504,23 +651,37 @@ def zoom(
                 zoom.append(0)
                 offset.append(0)
         mode = "nearest"
+
+        output = affine_transform(
+            input,
+            cupy.asarray(zoom),
+            offset,
+            output_shape,
+            output,
+            order,
+            mode,
+            cval,
+            prefilter,
+        )
     else:
+        if order is None:
+            order = 1
+
         zoom = []
         for in_size, out_size in zip(input.shape, output_shape):
             if out_size > 1:
                 zoom.append(float(in_size - 1) / (out_size - 1))
             else:
                 zoom.append(0)
-        offset = 0.0
 
-    return affine_transform(
-        input,
-        cupy.asarray(zoom),
-        offset,
-        output_shape,
-        output,
-        order,
-        mode,
-        cval,
-        prefilter,
-    )
+        output = _get_output(output, input, shape=output_shape)
+        if input.dtype.kind in "iu":
+            input = input.astype(cupy.float32)
+        integer_output = output.dtype.kind in "iu"
+        k = _get_interp_zoom_kernel(
+            input.shape, output_shape, mode, order=order,
+            integer_output=integer_output,
+        )
+        zoom = cupy.asarray(zoom, dtype=float)
+        k(input, zoom, output)
+    return output

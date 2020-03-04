@@ -11,7 +11,7 @@ def _check_axis(axis, rank):
 
 def _invalid_origin(origin, lenw):
     return (origin < -(lenw // 2)) or (origin > (lenw - 1) // 2)
-
+#        if (lenw // 2 + _origin < 0) or (lenw // 2 + _origin >= lenw):
 
 def _get_output(
     output, input, shape=None, weights_dtype=None, allow_inplace=True
