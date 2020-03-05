@@ -141,11 +141,18 @@ def map_coordinates(
     # if order == 0:
     #     out = input[tuple(cupy.rint(coordinates).astype(cupy.int32))]
     # else:
-    kern = _get_interp_kernel(input.shape, mode, cval, order, integer_output)
-    out = ret
-    kern(input, coordinates, out)
+    if mode == "constant":
+        # TODO: fix mode = 'constant' in CUDA kernel
+        # for now run with a different mode and then set values to cval after
+        # the kernel completes
+        mode_tmp = "nearest"
+    else:
+        mode_tmp = mode
+    kern = _get_interp_kernel(input.shape, mode=mode_tmp, cval=cval, order=order, integer_output=integer_output)
+    kern(input, coordinates, ret)
 
     if mode == "constant":
+        out = ret
         mask = cupy.zeros(coordinates.shape[1:], dtype=cupy.bool_)
         for i in range(input.ndim):
             mask += coordinates[i] < 0
@@ -153,10 +160,10 @@ def map_coordinates(
         out[mask] = cval
         del mask
 
-    if integer_output and order != 1:
-        out = cupy.rint(out)
-    if ret is not out:
-        ret[:] = out
+    # if integer_output and order != 1:
+    #     out = cupy.rint(out)
+    # if ret is not out:
+    #     ret[:] = out
     return ret
 
 
@@ -251,7 +258,7 @@ def affine_transform(
     if output_shape is None:
         output_shape = input.shape
 
-    if True:
+    if mode != 'constant':
         if order is None:
             order = 1
         ndim = input.ndim
@@ -379,7 +386,6 @@ def rotate(
 
     out_center = rot_matrix @ ((out_plane_shape - 1) / 2)
     in_center = (in_plane_shape - 1) / 2
-    offset = cupy.asarray(in_center - out_center, dtype=float)
 
     output_shape = img_shape
     output_shape[axes] = out_plane_shape
@@ -390,24 +396,12 @@ def rotate(
     matrix[axes[0], axes[1]] = sin
     matrix[axes[1], axes[0]] = -sin
     matrix[axes[1], axes[1]] = cos
-    matrix = cupy.asarray(matrix)
 
-    if True:
-        if order is None:
-            order = 1
-        output = _get_output(output, input_arr, shape=output_shape)
-        if input_arr.dtype.kind in "iu":
-            input_arr = input_arr.astype(cupy.float32)
-        integer_output = output.dtype.kind in "iu"
-        k = _get_interp_affine_kernel(
-            input_arr.shape, output_shape, mode, cval=cval, order=order,
-            integer_output=integer_output,
-        )
-        m = cupy.zeros((ndim, ndim + 1), dtype=float)
-        m[:, :-1] = matrix
-        m[axes, -1] = offset
-        k(input, m, output)
-        return output
+    offset = numpy.zeros(ndim, dtype=float)
+    offset[axes] = in_center - out_center
+
+    matrix = cupy.asarray(matrix)
+    offset = cupy.asarray(offset)
 
     return affine_transform(
         input,
@@ -420,101 +414,6 @@ def rotate(
         cval,
         prefilter,
     )
-
-
-def rotate_new(input, angle, axes=(1, 0), reshape=True, output=None, order=1,
-           mode='constant', cval=0.0, prefilter=True):
-    """
-    Rotate an array.
-
-
-    """
-    import numpy
-    input_arr = cupy.asarray(input)
-    ndim = input_arr.ndim
-
-    if ndim < 2:
-        raise ValueError('input array should be at least 2D')
-
-    axes = list(axes)
-
-    if len(axes) != 2:
-        raise ValueError('axes should contain exactly two values')
-
-    if not all([float(ax).is_integer() for ax in axes]):
-        raise ValueError('axes should contain only integer values')
-
-    if axes[0] < 0:
-        axes[0] += ndim
-    if axes[1] < 0:
-        axes[1] += ndim
-    if axes[0] < 0 or axes[1] < 0 or axes[0] >= ndim or axes[1] >= ndim:
-        raise ValueError('invalid rotation plane specified')
-
-    axes.sort()
-
-    angle_rad = numpy.deg2rad(angle)
-    c, s = numpy.cos(angle_rad), numpy.sin(angle_rad)
-
-    rot_matrix = numpy.array([[c, s],
-                              [-s, c]])
-
-    img_shape = numpy.asarray(input_arr.shape)
-    in_plane_shape = img_shape[axes]
-    if reshape:
-        # Compute transformed input bounds
-        iy, ix = in_plane_shape
-        out_bounds = rot_matrix @ [[0, 0, iy, iy],
-                                   [0, ix, 0, ix]]
-        # Compute the shape of the transformed input plane
-        out_plane_shape = (out_bounds.ptp(axis=1) + 0.5).astype(int)
-    else:
-        out_plane_shape = img_shape[axes]
-
-    out_center = rot_matrix @ ((out_plane_shape - 1) / 2)
-    in_center = (in_plane_shape - 1) / 2
-    offset = in_center - out_center
-
-    output_shape = img_shape
-    output_shape[axes] = out_plane_shape
-    output_shape = tuple(output_shape)
-
-    if order is None:
-        order = 1
-    output = _get_output(output, input, shape=output_shape)
-    if input.dtype.kind in "iu":
-        input = input.astype(cupy.float32)
-    integer_output = output.dtype.kind in "iu"
-    k = _get_interp_affine_kernel(
-        input.shape, output_shape, mode, cval=cval, order=order,
-        integer_output=integer_output,
-    )
-    m = cupy.zeros((input.ndim, input.ndim + 1), dtype=float)
-    m[:, :-1] = cupy.asarray(rot_matrix)
-    m[:, -1] = cupy.asarray(offset, dtype=float)
-
-    if ndim <= 2:
-        k(input, m, output)
-        return output
-    else:
-
-        # If ndim > 2, the rotation is applied over all the planes
-        # parallel to axes
-        planes_coord = itertools.product(
-            *[[slice(None)] if ax in axes else range(img_shape[ax])
-              for ax in range(ndim)])
-
-        out_plane_shape = tuple(out_plane_shape)
-
-        for coordinates in planes_coord:
-            ia = input_arr[coordinates]
-            oa = cupy.zeros_like(output[coordinates])
-            k(input, m, oa)
-            output[coordinates] = oa
-            #affine_transform(ia, rot_matrix, offset, out_plane_shape,
-            #                 oa, order, mode, cval, prefilter)
-
-    return output
 
 
 def shift(
