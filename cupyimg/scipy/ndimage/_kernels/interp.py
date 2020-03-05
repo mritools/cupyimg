@@ -252,6 +252,16 @@ def _generate_interp_custom(
                         mode, ixvar, xshape[j]))
         return ops
 
+    if mode == 'constant':
+        _cond = " || ".join(["(c_{j} < 0) || (c_{j} > (int){cmax})".format(j=j, cmax=xshape[j] - 1) for j in range(ndim)])
+        ops.append("""
+            if ({cond})
+            {{
+                out = (double){cval};
+            }}
+            else
+            {{""".format(conda=_cond, cval=cval))
+
     ops += _init_coords(order, mode)
     if order == 0:
         for j in range(ndim):
@@ -259,67 +269,37 @@ def _generate_interp_custom(
             int ic_{j} = cf_bounded_{j} * sx_{j};
             """.format(j=j))
         _coord_idx = " + ".join(["ic_{}".format(j) for j in range(ndim)])
-        if mode == 'constant':
-            _cond = " || ".join(["(c_{j} < 0) || (c_{j} >= {xsizej})".format(j=j, xsizej=xshape[j]) for j in range(ndim)])
-            ops.append("""
-                if ({cond})
-                {{
-                    out = (double){cval};
-                }}
-                else
-                {{
-                    out = x[{coord_idx}];
-                }}
-                """.format(cond=_cond, cval=cval, coord_idx=_coord_idx))
-        else:
-            ops.append("""
-                out = x[{coord_idx}];
-                """.format(coord_idx=_coord_idx))
+        ops.append("""
+            out = x[{coord_idx}];
+            """.format(coord_idx=_coord_idx))
 
     elif order == 1:
-        if mode == 'constant':
-            _cond = " || ".join(["(c_{j} < 0) || (c_{j} >= {xsizej})".format(j=j, xsizej=xshape[j]) for j in range(ndim)])
+        for j in range(ndim):
             ops.append("""
-                if ({cond})
+            for (int s_{j} = 0; s_{j} < n_{j}; s_{j}++)
                 {{
-                    out = (double){cval};
-                }} else
-                {{
-                """.format(cond=_cond, cval=cval))
-        else:
-            for j in range(ndim):
-                ops.append("""
-                for (int s_{j} = 0; s_{j} < n_{j}; s_{j}++)
+                    W w_{j};
+                    int ic_{j};
+                    if (s_{j} == 0)
                     {{
-                        W w_{j};
-                        int ic_{j};
-                        if (s_{j} == 0)
-                        {{
-                            w_{j} = (W)cc_{j} - c_{j};
-                            ic_{j} = cf_bounded_{j} * sx_{j};
-                        }} else
-                        {{
-                            w_{j} = c_{j} - (W)cf_{j};
-                            ic_{j} = cc_bounded_{j} * sx_{j};
-                        }}""".format(j=j))
+                        w_{j} = (W)cc_{j} - c_{j};
+                        ic_{j} = cf_bounded_{j} * sx_{j};
+                    }} else
+                    {{
+                        w_{j} = c_{j} - (W)cf_{j};
+                        ic_{j} = cc_bounded_{j} * sx_{j};
+                    }}""".format(j=j))
 
-            _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
-            _cond = " || ".join(["(ic_{} < 0)".format(j) for j in range(ndim)])
-            _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
-            ops.append("""
-                if ({cond})
-                {{
-                    out += (double){cval};
-                }} else
-                {{
-                    X val = x[{coord_idx}];
-                    out += val * ({weight});
-                }}""".format(cond=_cond, cval=cval, coord_idx=_coord_idx,
-                             weight=_weight))
-            ops.append("}" * ndim)
+        _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
+        _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
+        ops.append("""
+            X val = x[{coord_idx}];
+            out += val * ({weight});
+            """.format(coord_idx=_coord_idx, weight=_weight))
+        ops.append("}" * ndim)
 
-        if mode == "constant":
-            ops.append("}")
+    if mode == "constant":
+        ops.append("}")
 
     if integer_output:
         ops.append("y = (Y)rint((double)out);")

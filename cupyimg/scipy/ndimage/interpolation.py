@@ -18,6 +18,11 @@ from ._kernels.interp import (
     _get_interp_affine_kernel)
 
 
+# more efficient to set this False, but some test cases fail due to isolated
+# instances where the pixels that get set to "cval" differ slightly.
+use_external_constant_masking = True
+
+
 def _get_output(output, input, shape=None):
     if shape is None:
         shape = input.shape
@@ -138,32 +143,21 @@ def map_coordinates(
     if input.dtype.kind in "iu":
         input = input.astype(cupy.float32)
 
-    # if order == 0:
-    #     out = input[tuple(cupy.rint(coordinates).astype(cupy.int32))]
-    # else:
-    if mode == "constant":
-        # TODO: fix mode = 'constant' in CUDA kernel
-        # for now run with a different mode and then set values to cval after
-        # the kernel completes
-        mode_tmp = "nearest"
-    else:
-        mode_tmp = mode
-    kern = _get_interp_kernel(input.shape, mode=mode_tmp, cval=cval, order=order, integer_output=integer_output)
+    kern = _get_interp_kernel(input.shape, mode=mode, cval=cval, order=order, integer_output=integer_output)
     kern(input, coordinates, ret)
 
-    if mode == "constant":
-        out = ret
+    if use_external_constant_masking and mode == "constant":
+        # TODO: why is this special case still needed.
+        # The equivalent masking should already be done within the kernel, but
+        # for some reason (numerical precision difference?) there are
+        # occasionally a handful of locations that did not get masked out.
         mask = cupy.zeros(coordinates.shape[1:], dtype=cupy.bool_)
         for i in range(input.ndim):
             mask += coordinates[i] < 0
             mask += coordinates[i] > input.shape[i] - 1
-        out[mask] = cval
+        ret[mask] = cval
         del mask
 
-    # if integer_output and order != 1:
-    #     out = cupy.rint(out)
-    # if ret is not out:
-    #     ret[:] = out
     return ret
 
 
@@ -258,7 +252,7 @@ def affine_transform(
     if output_shape is None:
         output_shape = input.shape
 
-    if mode != 'constant':
+    if mode != 'constant' and use_external_constant_masking:  # TODO: fix for mode == 'constant' too
         if order is None:
             order = 1
         ndim = input.ndim
