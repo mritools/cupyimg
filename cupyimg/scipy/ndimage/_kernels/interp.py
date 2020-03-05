@@ -212,9 +212,6 @@ def _generate_interp_custom(
     # compute the transformed (target) coordinates, c_j
     ops = ops + coord_func(ndim)
 
-    # if mode == 'constant':
-    #     mode = 'constant2'  # not sure if this is necessary
-
     def _init_coords(order, mode):
         ops = []
         if order == 0:
@@ -379,9 +376,6 @@ def _generate_interp_custom(
 
     # compute the transformed (target) coordinates, c_j
     ops = ops + coord_func(ndim)
-
-    # if mode == 'constant':
-    #     mode = 'constant2'  # not sure if this is necessary
 
     def _init_coords(order, mode):
         ops = []
