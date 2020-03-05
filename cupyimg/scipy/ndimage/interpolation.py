@@ -15,12 +15,8 @@ from ._kernels.interp import (
     _get_interp_kernel,
     _get_interp_shift_kernel,
     _get_interp_zoom_kernel,
+    _get_interp_zoom_shift_kernel,
     _get_interp_affine_kernel)
-
-
-# more efficient to set this False, but some test cases fail due to isolated
-# instances where the pixels that get set to "cval" differ slightly.
-use_external_constant_masking = True
 
 
 def _get_output(output, input, shape=None):
@@ -146,18 +142,6 @@ def map_coordinates(
     kern = _get_interp_kernel(input.shape, mode=mode, cval=cval, order=order, integer_output=integer_output)
     kern(input, coordinates, ret)
 
-    if use_external_constant_masking and mode == "constant":
-        # TODO: why is this special case still needed.
-        # The equivalent masking should already be done within the kernel, but
-        # for some reason (numerical precision difference?) there are
-        # occasionally a handful of locations that did not get masked out.
-        mask = cupy.zeros(coordinates.shape[1:], dtype=cupy.bool_)
-        for i in range(input.ndim):
-            mask += coordinates[i] < 0
-            mask += coordinates[i] > input.shape[i] - 1
-        ret[mask] = cval
-        del mask
-
     return ret
 
 
@@ -228,15 +212,16 @@ def affine_transform(
     if not hasattr(offset, "__iter__") and type(offset) is not cupy.ndarray:
         offset = [offset] * input.ndim
 
-    if matrix.ndim == 1:
+    if matrix.ndim not in [1, 2]:
         # TODO(mizuno): Implement zoom_shift
-        matrix = cupy.diag(matrix)
-    elif matrix.shape[0] == matrix.shape[1] - 1:
-        offset = matrix[:, -1]
-        matrix = matrix[:, :-1]
-    elif matrix.shape[0] == input.ndim + 1:
-        offset = matrix[:-1, -1]
-        matrix = matrix[:-1, :-1]
+        raise RuntimeError('no proper affine matrix provided')
+    if matrix.ndim == 2:
+        if matrix.shape[0] == matrix.shape[1] - 1:
+            offset = matrix[:, -1]
+            matrix = matrix[:, :-1]
+        elif matrix.shape[0] == input.ndim + 1:
+            offset = matrix[:-1, -1]
+            matrix = matrix[:-1, :-1]
 
     if mode == "opencv":
         m = cupy.zeros((input.ndim + 1, input.ndim + 1))
@@ -252,14 +237,23 @@ def affine_transform(
     if output_shape is None:
         output_shape = input.shape
 
-    if mode != 'constant' and use_external_constant_masking:  # TODO: fix for mode == 'constant' too
-        if order is None:
-            order = 1
-        ndim = input.ndim
-        output = _get_output(output, input, shape=output_shape)
-        if input.dtype.kind in "iu":
-            input = input.astype(cupy.float32)
-        integer_output = output.dtype.kind in "iu"
+    matrix = matrix.astype(float, copy=False)
+    if order is None:
+        order = 1
+    ndim = input.ndim
+    output = _get_output(output, input, shape=output_shape)
+    if input.dtype.kind in "iu":
+        input = input.astype(cupy.float32)
+    integer_output = output.dtype.kind in "iu"
+    if matrix.ndim == 1:
+        offset = cupy.asarray(offset, dtype=float)
+        offset = -offset / matrix
+        k = _get_interp_zoom_shift_kernel(
+            input.shape, output_shape, mode, cval=cval, order=order,
+            integer_output=integer_output,
+        )
+        k(input, offset, matrix, output)
+    else:
         k = _get_interp_affine_kernel(
             input.shape, output_shape, mode, cval=cval, order=order,
             integer_output=integer_output,
@@ -268,20 +262,7 @@ def affine_transform(
         m[:, :-1] = matrix
         m[:, -1] = cupy.asarray(offset, dtype=float)
         k(input, m, output)
-        return output
-
-    # cupy.dot becomes slow when matrix is view. (cupy/cupy#1168)
-    if matrix.base is not None:
-        matrix = matrix.copy()
-
-    coordinates = cupy.indices(output_shape, dtype=cupy.float64)
-    coordinates = cupy.dot(matrix, coordinates.reshape((input.ndim, -1)))
-    coordinates += cupy.expand_dims(cupy.asarray(offset), -1)
-    ret = _get_output(output, input, output_shape)
-    ret[:] = map_coordinates(
-        input, coordinates, ret.dtype, order, mode, cval, prefilter
-    ).reshape(output_shape)
-    return ret
+    return output
 
 
 def _minmax(coor, minc, maxc):
@@ -356,6 +337,7 @@ def rotate(
         axes = [axes[1], axes[0]]
     if axes[0] < 0 or input_arr.ndim <= axes[1]:
         raise ValueError('invalid rotation plane specified')
+    axes = list(axes)
 
     ndim = input_arr.ndim
     rad = numpy.deg2rad(angle)
