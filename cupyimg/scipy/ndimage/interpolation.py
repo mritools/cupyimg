@@ -514,6 +514,7 @@ def zoom(
     output_shape = []
     for s, z in zip(input.shape, zoom):
         output_shape.append(int(round(s * z)))
+    output_shape = tuple(output_shape)
 
     if mode == "opencv":
         zoom = []

@@ -314,6 +314,7 @@ def _generate_interp_custom(
     return in_params, out_params, operation, name
 
 
+@cupy.util.memoize()
 def _get_interp_kernel(xshape, mode, cval=0.0, order=1, integer_output=False):
     # weights is always casted to float64 in order to get an output compatible
     # with SciPy, thought float32 might be sufficient when input dtype is low
@@ -332,6 +333,7 @@ def _get_interp_kernel(xshape, mode, cval=0.0, order=1, integer_output=False):
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
+@cupy.util.memoize()
 def _get_interp_shift_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_output=False):
     # weights is always casted to float64 in order to get an output compatible
     # with SciPy, thought float32 might be sufficient when input dtype is low
@@ -350,6 +352,7 @@ def _get_interp_shift_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_ou
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
+@cupy.util.memoize()
 def _get_interp_zoom_shift_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_output=False):
     # weights is always casted to float64 in order to get an output compatible
     # with SciPy, thought float32 might be sufficient when input dtype is low
@@ -368,6 +371,7 @@ def _get_interp_zoom_shift_kernel(xshape, yshape, mode, cval=0.0, order=1, integ
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
+@cupy.util.memoize()
 def _get_interp_zoom_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_output=False):
     # weights is always casted to float64 in order to get an output compatible
     # with SciPy, thought float32 might be sufficient when input dtype is low
@@ -386,6 +390,7 @@ def _get_interp_zoom_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_out
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
+@cupy.util.memoize()
 def _get_interp_affine_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_output=False):
     # weights is always casted to float64 in order to get an output compatible
     # with SciPy, thought float32 might be sufficient when input dtype is low
