@@ -32,7 +32,6 @@ from ._kernels.filters import (
 )
 from . import _ni_support
 
-
 _partial = functools.partial
 
 
@@ -556,8 +555,8 @@ def _correlate_or_convolve(
             origin[ii] = -origin[ii]
             if weights.shape[ii] % 2 == 0:
                 origin[ii] -= 1
-    elif cupy.iscomplexobj(weights):
-        # numpy.correlate conjugates weights rather than input. Do the same here
+    elif weights.dtype.kind == 'c':
+        # numpy.correlate conjugates weights rather than input.
         weights = weights.conj()
 
     for _origin, lenw in zip(origin, wshape):

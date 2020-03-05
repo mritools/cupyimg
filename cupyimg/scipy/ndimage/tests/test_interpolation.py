@@ -163,7 +163,7 @@ class TestAffineTransformOpenCV(unittest.TestCase):
 
 
 @testing.parameterize(*testing.product({
-    'angle': [-10, 1000],
+    'angle': [-10, 30, 1000],
     'axes': [(1, 0)],
     'reshape': [False, True],
     'output': [None, numpy.float64, 'empty'],
@@ -198,6 +198,15 @@ class TestRotate(unittest.TestCase):
     @numpy_cupyimg_allclose(atol=1e-5, scipy_name='scp')
     def test_rotate_float(self, xp, scp, dtype):
         a = testing.shaped_random((10, 10), xp, dtype)
+        return self._rotate(xp, scp, a)
+
+    @testing.for_float_dtypes(no_float16=True)
+    @numpy_cupyimg_allclose(atol=1e-5, scipy_name='scp')
+    def test_rotate_float_larger(self, xp, scp, dtype):
+        if self.order == 0:
+            # skip, known failures due to rounding with order=0
+            return xp.asarray(0)
+        a = testing.shaped_random((32, 32), xp, dtype)
         return self._rotate(xp, scp, a)
 
     @testing.for_int_dtypes(no_bool=True)
