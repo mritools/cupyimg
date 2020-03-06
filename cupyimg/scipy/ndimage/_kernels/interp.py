@@ -1,10 +1,14 @@
 
 import cupy
+import cupy.core.internal
 
 from .support import _generate_boundary_condition_ops
 
 
-def _get_map_coord(ndim):
+_prod = cupy.core.internal.prod
+
+
+def _get_coord_map(ndim):
     """Extract target coordinate from coords array (for map_coordinates).
 
     Notes
@@ -44,7 +48,6 @@ def _get_coord_zoom_and_shift(ndim):
         in_coord[ndim]: array containing the source coordinate
         zoom[ndim]: array containing the zoom for each axis
         shift[ndim]: array containing the zoom for each axis
-        c_j: values of the zoomed and shifted coordinates
 
     computes::
 
@@ -69,7 +72,6 @@ def _get_coord_zoom(ndim):
 
         in_coord[ndim]: array containing the source coordinate
         zoom[ndim]: array containing the zoom for each axis
-        c_j: values of the zoomed and shifted coordinates
 
     computes::
 
@@ -94,7 +96,6 @@ def _get_coord_shift(ndim):
 
         in_coord[ndim]: array containing the source coordinate
         shift[ndim]: array containing the zoom for each axis
-        c_j: values of the zoomed and shifted coordinates
 
     computes::
 
@@ -111,7 +112,7 @@ def _get_coord_shift(ndim):
 
 
 def _get_coord_affine(ndim):
-    """Compute target coordinate based on a homogeneous tranfsormation matrix.
+    """Compute target coordinate based on a homogeneous transformation matrix.
 
     The homogeneous matrix has shape (ndim, ndim + 1). It corresponds to
     affine matrix where the last row of the affine is assumed to be:
@@ -121,8 +122,8 @@ def _get_coord_affine(ndim):
     -----
     Assumes the following variables have been initialized on the device::
 
-        mat(ndarray): array containing the (ndim, ndim + 1) transform matrix.
-        c_j: values of the zoomed and shifted coordinates
+        mat(array): array containing the (ndim, ndim + 1) transform matrix.
+        in_coords(array): coordinates of the input
 
     For example, in 2D:
 
@@ -149,96 +150,119 @@ def _get_coord_affine(ndim):
     return ops
 
 
-def _generate_interp_custom(
-    in_params,
-    coord_func,
-    xshape,
-    yshape,
-    mode,
-    cval,
-    order,
-    name="",
-    integer_output=False,
-):
+def _generate_interp_custom(coord_func, xshape, yshape, mode, cval, order,
+                            name="", integer_output=False):
     """
     Args:
-        in_params (str): Input arrays. The first must be raw X x. The rest will
-            depend on the parameters needed by `coord_func`.
         coord_func (function): generates code to do the coordinate
-            transformation. See for example, `_get_coord_zoom_and_shift`.
+            transformation. See for example, `_get_coord_shift`.
         xshape (tuple): Shape of the array to be transformed.
         yshape (tuple): Shape of the output array.
         mode (str): Signal extension mode to use at the array boundaries
         cval (float): constant value used when `mode == 'constant'`.
+        name (str): base name for the interpolation kernel
         integer_output (bool): boolean indicating whether the output has an
             integer type.
 
+    Returns:
+        operation (str): code body for the ElementwiseKernel
+        name (str): name for the ElementwiseKernel
     """
-    out_params = "Y y"
 
     ndim = len(xshape)
 
     ops = []
     ops.append("double out = 0.0;")
-    # ops.append("const ptrdiff_t *in_coord2 = _ind.get();".format(ndim=ndim))
-    int_type = "unsigned int"  # TODO: finish converting to use inttype
-    ops.append("{int_type} in_coord[{ndim}];".format(int_type=int_type, ndim=ndim))
+
+    size = max(_prod(xshape), _prod(yshape))
+    if (size > 1 << 31):
+        uint_t = "size_t"
+        int_t = "ptrdiff_t"
+    else:
+        uint_t = "unsigned int"
+        int_t = "int"
+    ops.append("{uint_t} in_coord[{ndim}];".format(
+        uint_t=uint_t, ndim=ndim))
 
     # determine strides for x along each axis
-    ops.append("const int sx_{} = 1;".format(ndim - 1))
+    ops.append(
+        "const {uint_t} sx_{j} = 1;".format(uint_t=uint_t, j=ndim - 1))
     for j in range(ndim - 1, 0, -1):
         ops.append(
-            "int sx_{jm} = sx_{j} * {xsize_j};".format(
-                jm=j - 1, j=j, xsize_j=xshape[j]
+            "const {uint_t} sx_{jm} = sx_{j} * {xsize_j};".format(
+                uint_t=uint_t, jm=j - 1, j=j, xsize_j=xshape[j]
             )
         )
 
     # determine nd coordinate in x corresponding to a given raveled coordinate,
     # i, in y.
-    ops.append(
-        """
-        {int_type} idx = i;
-        {int_type} s, t;
-    """.format(int_type=int_type))
+    ops.append("""
+        {uint_t} idx = i;
+        {uint_t} s, t;
+        """.format(uint_t=uint_t))
     for j in range(ndim - 1, 0, -1):
         ops.append("""
-            s = {zsize_j};
-            t = idx / s;
-            in_coord[{j}] = idx - t * s;
-            idx = t;
+        s = {zsize_j};
+        t = idx / s;
+        in_coord[{j}] = idx - t * s;
+        idx = t;
         """.format(j=j, zsize_j=yshape[j]))
     ops.append("in_coord[0] = idx;")
 
     # compute the transformed (target) coordinates, c_j
     ops = ops + coord_func(ndim)
 
-    def _init_coords(order, mode):
-        ops = []
-        if order == 0:
-            for j in range(ndim):
-                ops.append("""
-                int cf_{j} = (int)lrint((double)c_{j});
-                """.format(j=j))
-            for j in range(ndim):
-                ops.append("int cf_bounded_{j} = cf_{j};".format(j=j))
+    if mode == 'constant':
+        # use cval if coordinate is outside the bounds of x
+        _cond = " || ".join(
+            ["(c_{j} < 0) || (c_{j} > {cmax})".format(j=j, cmax=xshape[j] - 1)
+             for j in range(ndim)])
+        ops.append("""
+        if ({cond})
+        {{
+            out = (double){cval};
+        }}
+        else
+        {{""".format(cond=_cond, cval=cval))
 
-                # handle boundaries for extension modes.
-                ixvar = "cf_bounded_{j}".format(j=j)
+    if order == 0:
+        for j in range(ndim):
+            # determine nearest neighbor
+            ops.append("""
+            {int_t} cf_{j} = ({int_t})lrint((double)c_{j});
+            """.format(int_t=int_t, j=j))
+
+            # handle boundary
+            if mode != 'constant':
+                ixvar = "cf_{j}".format(j=j)
                 ops.append(
                     _generate_boundary_condition_ops(
                         mode, ixvar, xshape[j]))
-        else:
-            for j in range(ndim):
-                ops.append("""
-                int cf_{j} = (int)floor((double)c_{j});
-                int cc_{j} = cf_{j} + 1;
-                int n_{j} = (c_{j} == cf_{j}) ? 1 : 2;  // 1 or 2 points needed?
-                """.format(j=j))
 
-            for j in range(ndim):
-                ops.append("int cf_bounded_{j} = cf_{j};".format(j=j))
-                ops.append("int cc_bounded_{j} = cc_{j};".format(j=j))
-                # handle boundaries for extension modes.
+            # sum over ic_j will give the raveled coordinate in the input
+            ops.append("""
+            {int_t} ic_{j} = cf_{j} * sx_{j};
+            """.format(int_t=int_t, j=j))
+        _coord_idx = " + ".join(["ic_{}".format(j) for j in range(ndim)])
+        ops.append("""
+            out = x[{coord_idx}];
+            """.format(coord_idx=_coord_idx))
+
+    elif order == 1:
+        for j in range(ndim):
+            # get coordinates for linear interpolation along axis j
+            ops.append("""
+            {int_t} cf_{j} = ({int_t})floor((double)c_{j});
+            {int_t} cc_{j} = cf_{j} + 1;
+            {int_t} n_{j} = (c_{j} == cf_{j}) ? 1 : 2;  // points needed
+            """.format(int_t=int_t, j=j))
+
+            # handle boundaries for extension modes.
+            ops.append("""
+            {int_t} cf_bounded_{j} = cf_{j};
+            {int_t} cc_bounded_{j} = cc_{j};
+            """.format(int_t=int_t, j=j))
+            if mode != 'constant':
                 ixvar = "cf_bounded_{j}".format(j=j)
                 ops.append(
                     _generate_boundary_condition_ops(
@@ -247,36 +271,12 @@ def _generate_interp_custom(
                 ops.append(
                     _generate_boundary_condition_ops(
                         mode, ixvar, xshape[j]))
-        return ops
 
-    if mode == 'constant':
-        _cond = " || ".join(["(c_{j} < 0) || (c_{j} > (int){cmax})".format(j=j, cmax=xshape[j] - 1) for j in range(ndim)])
-        ops.append("""
-            if ({cond})
-            {{
-                out = (double){cval};
-            }}
-            else
-            {{""".format(cond=_cond, cval=cval))
-
-    ops += _init_coords(order, mode)
-    if order == 0:
-        for j in range(ndim):
-            ops.append("""
-            int ic_{j} = cf_bounded_{j} * sx_{j};
-            """.format(j=j))
-        _coord_idx = " + ".join(["ic_{}".format(j) for j in range(ndim)])
-        ops.append("""
-            out = x[{coord_idx}];
-            """.format(coord_idx=_coord_idx))
-
-    elif order == 1:
-        for j in range(ndim):
             ops.append("""
             for (int s_{j} = 0; s_{j} < n_{j}; s_{j}++)
                 {{
                     W w_{j};
-                    int ic_{j};
+                    {int_t} ic_{j};
                     if (s_{j} == 0)
                     {{
                         w_{j} = (W)cc_{j} - c_{j};
@@ -285,14 +285,14 @@ def _generate_interp_custom(
                     {{
                         w_{j} = c_{j} - (W)cf_{j};
                         ic_{j} = cc_bounded_{j} * sx_{j};
-                    }}""".format(j=j))
+                    }}""".format(int_t=int_t, j=j))
 
         _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
         _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
         ops.append("""
-            X val = x[{coord_idx}];
-            out += val * ({weight});
-            """.format(coord_idx=_coord_idx, weight=_weight))
+        X val = x[{coord_idx}];
+        out += val * ({weight});
+        """.format(coord_idx=_coord_idx, weight=_weight))
         ops.append("}" * ndim)
 
     if mode == "constant":
@@ -311,17 +311,15 @@ def _generate_interp_custom(
         "_".join(["{}".format(j) for j in xshape]),
         "_".join(["{}".format(j) for j in yshape]),
     )
-    return in_params, out_params, operation, name
+    return operation, name
 
 
 @cupy.util.memoize()
-def _get_interp_kernel(xshape, mode, cval=0.0, order=1, integer_output=False):
-    # weights is always casted to float64 in order to get an output compatible
-    # with SciPy, thought float32 might be sufficient when input dtype is low
-    # precision.
-    in_params, out_params, operation, name = _generate_interp_custom(
-        in_params="raw X x, raw W coords",
-        coord_func=_get_map_coord,
+def _get_map_kernel(xshape, mode, cval=0.0, order=1, integer_output=False):
+    in_params = "raw X x, raw W coords"
+    out_params = "Y y"
+    operation, name = _generate_interp_custom(
+        coord_func=_get_coord_map,
         xshape=xshape,
         yshape=xshape,
         mode=mode,
@@ -334,12 +332,11 @@ def _get_interp_kernel(xshape, mode, cval=0.0, order=1, integer_output=False):
 
 
 @cupy.util.memoize()
-def _get_interp_shift_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_output=False):
-    # weights is always casted to float64 in order to get an output compatible
-    # with SciPy, thought float32 might be sufficient when input dtype is low
-    # precision.
-    in_params, out_params, operation, name = _generate_interp_custom(
-        in_params="raw X x, raw W shift",
+def _get_shift_kernel(xshape, yshape, mode, cval=0.0, order=1,
+                      integer_output=False):
+    in_params = "raw X x, raw W shift"
+    out_params = "Y y"
+    operation, name = _generate_interp_custom(
         coord_func=_get_coord_shift,
         xshape=xshape,
         yshape=yshape,
@@ -353,12 +350,11 @@ def _get_interp_shift_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_ou
 
 
 @cupy.util.memoize()
-def _get_interp_zoom_shift_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_output=False):
-    # weights is always casted to float64 in order to get an output compatible
-    # with SciPy, thought float32 might be sufficient when input dtype is low
-    # precision.
-    in_params, out_params, operation, name = _generate_interp_custom(
-        in_params="raw X x, raw W shift, raw W zoom",
+def _get_zoom_shift_kernel(xshape, yshape, mode, cval=0.0, order=1,
+                           integer_output=False):
+    in_params = "raw X x, raw W shift, raw W zoom"
+    out_params = "Y y"
+    operation, name = _generate_interp_custom(
         coord_func=_get_coord_zoom_and_shift,
         xshape=xshape,
         yshape=yshape,
@@ -372,12 +368,11 @@ def _get_interp_zoom_shift_kernel(xshape, yshape, mode, cval=0.0, order=1, integ
 
 
 @cupy.util.memoize()
-def _get_interp_zoom_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_output=False):
-    # weights is always casted to float64 in order to get an output compatible
-    # with SciPy, thought float32 might be sufficient when input dtype is low
-    # precision.
-    in_params, out_params, operation, name = _generate_interp_custom(
-        in_params="raw X x, raw W zoom",
+def _get_zoom_kernel(xshape, yshape, mode, cval=0.0, order=1,
+                     integer_output=False):
+    in_params = "raw X x, raw W zoom"
+    out_params = "Y y"
+    operation, name = _generate_interp_custom(
         coord_func=_get_coord_zoom,
         xshape=xshape,
         yshape=yshape,
@@ -391,12 +386,11 @@ def _get_interp_zoom_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_out
 
 
 @cupy.util.memoize()
-def _get_interp_affine_kernel(xshape, yshape, mode, cval=0.0, order=1, integer_output=False):
-    # weights is always casted to float64 in order to get an output compatible
-    # with SciPy, thought float32 might be sufficient when input dtype is low
-    # precision.
-    in_params, out_params, operation, name = _generate_interp_custom(
-        in_params="raw X x, raw W mat",
+def _get_affine_kernel(xshape, yshape, mode, cval=0.0, order=1,
+                       integer_output=False):
+    in_params = "raw X x, raw W mat"
+    out_params = "Y y"
+    operation, name = _generate_interp_custom(
         coord_func=_get_coord_affine,
         xshape=xshape,
         yshape=yshape,
