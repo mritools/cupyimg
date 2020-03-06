@@ -12,11 +12,11 @@ import cupy
 import numpy
 
 from ._kernels.interp import (
-    _get_interp_kernel,
-    _get_interp_shift_kernel,
-    _get_interp_zoom_kernel,
-    _get_interp_zoom_shift_kernel,
-    _get_interp_affine_kernel)
+    _get_map_kernel,
+    _get_shift_kernel,
+    _get_zoom_kernel,
+    _get_zoom_shift_kernel,
+    _get_affine_kernel)
 
 
 def _get_output(output, input, shape=None):
@@ -121,27 +121,12 @@ def map_coordinates(
     ret = _get_output(output, input, coordinates.shape[1:])
     integer_output = ret.dtype.kind in "iu"
 
-    # if order != 1:
-    #     if mode == "nearest":
-    #         for i in range(input.ndim):
-    #             coordinates[i] = coordinates[i].clip(0, input.shape[i] - 1)
-    #     elif mode == "mirror":
-    #         for i in range(input.ndim):
-    #             length = input.shape[i] - 1
-    #             if length == 0:
-    #                 coordinates[i] = 0
-    #             else:
-    #                 coordinates[i] = cupy.remainder(coordinates[i], 2 * length)
-    #                 coordinates[i] = (
-    #                     2 * cupy.minimum(coordinates[i], length) - coordinates[i]
-    #                 )
-
     if input.dtype.kind in "iu":
         input = input.astype(cupy.float32)
 
-    kern = _get_interp_kernel(input.shape, mode=mode, cval=cval, order=order, integer_output=integer_output)
+    kern = _get_map_kernel(input.shape, mode=mode, cval=cval, order=order,
+                           integer_output=integer_output)
     kern(input, coordinates, ret)
-
     return ret
 
 
@@ -248,20 +233,18 @@ def affine_transform(
     if matrix.ndim == 1:
         offset = cupy.asarray(offset, dtype=float)
         offset = -offset / matrix
-        k = _get_interp_zoom_shift_kernel(
+        kern = _get_zoom_shift_kernel(
             input.shape, output_shape, mode, cval=cval, order=order,
-            integer_output=integer_output,
-        )
-        k(input, offset, matrix, output)
+            integer_output=integer_output)
+        kern(input, offset, matrix, output)
     else:
-        k = _get_interp_affine_kernel(
+        kern = _get_affine_kernel(
             input.shape, output_shape, mode, cval=cval, order=order,
-            integer_output=integer_output,
-        )
+            integer_output=integer_output)
         m = cupy.zeros((ndim, ndim + 1), dtype=float)
         m[:, :-1] = matrix
         m[:, -1] = cupy.asarray(offset, dtype=float)
-        k(input, m, output)
+        kern(input, m, output)
     return output
 
 
@@ -459,12 +442,11 @@ def shift(
         if input.dtype.kind in "iu":
             input = input.astype(cupy.float32)
         integer_output = output.dtype.kind in "iu"
-        k = _get_interp_shift_kernel(
+        kern = _get_shift_kernel(
             input.shape, input.shape, mode, cval=cval, order=order,
-            integer_output=integer_output,
-        )
+            integer_output=integer_output)
         shift = cupy.asarray(shift, dtype=float)
-        k(input, shift, output)
+        kern(input, shift, output)
     return output
 
 
@@ -554,10 +536,9 @@ def zoom(
         if input.dtype.kind in "iu":
             input = input.astype(cupy.float32)
         integer_output = output.dtype.kind in "iu"
-        k = _get_interp_zoom_kernel(
+        kern = _get_zoom_kernel(
             input.shape, output_shape, mode, order=order,
-            integer_output=integer_output,
-        )
+            integer_output=integer_output)
         zoom = cupy.asarray(zoom, dtype=float)
-        k(input, zoom, output)
+        kern(input, zoom, output)
     return output
