@@ -1,9 +1,3 @@
-"""This is a copy of interpolation.py from CuPy, but with a bug fix to
-map_coordinates that was not present in release 7.0.
-
-Eventually this file can be removed.
-
-"""
 import itertools
 import math
 import warnings
@@ -198,7 +192,6 @@ def affine_transform(
         offset = [offset] * input.ndim
 
     if matrix.ndim not in [1, 2]:
-        # TODO(mizuno): Implement zoom_shift
         raise RuntimeError('no proper affine matrix provided')
     if matrix.ndim == 2:
         if matrix.shape[0] == matrix.shape[1] - 1:
@@ -320,7 +313,6 @@ def rotate(
         axes = [axes[1], axes[0]]
     if axes[0] < 0 or input_arr.ndim <= axes[1]:
         raise ValueError('invalid rotation plane specified')
-    axes = list(axes)
 
     ndim = input_arr.ndim
     rad = numpy.deg2rad(angle)

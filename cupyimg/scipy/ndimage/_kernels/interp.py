@@ -1,7 +1,11 @@
 
 import cupy
+import cupy.core.internal
 
 from .support import _generate_boundary_condition_ops
+
+
+_prod = cupy.core.internal.prod
 
 
 def _get_coord_map(ndim):
@@ -44,7 +48,6 @@ def _get_coord_zoom_and_shift(ndim):
         in_coord[ndim]: array containing the source coordinate
         zoom[ndim]: array containing the zoom for each axis
         shift[ndim]: array containing the zoom for each axis
-        c_j: values of the zoomed and shifted coordinates
 
     computes::
 
@@ -69,7 +72,6 @@ def _get_coord_zoom(ndim):
 
         in_coord[ndim]: array containing the source coordinate
         zoom[ndim]: array containing the zoom for each axis
-        c_j: values of the zoomed and shifted coordinates
 
     computes::
 
@@ -94,7 +96,6 @@ def _get_coord_shift(ndim):
 
         in_coord[ndim]: array containing the source coordinate
         shift[ndim]: array containing the zoom for each axis
-        c_j: values of the zoomed and shifted coordinates
 
     computes::
 
@@ -111,7 +112,7 @@ def _get_coord_shift(ndim):
 
 
 def _get_coord_affine(ndim):
-    """Compute target coordinate based on a homogeneous tranfsormation matrix.
+    """Compute target coordinate based on a homogeneous transformation matrix.
 
     The homogeneous matrix has shape (ndim, ndim + 1). It corresponds to
     affine matrix where the last row of the affine is assumed to be:
@@ -121,8 +122,8 @@ def _get_coord_affine(ndim):
     -----
     Assumes the following variables have been initialized on the device::
 
-        mat(ndarray): array containing the (ndim, ndim + 1) transform matrix.
-        c_j: values of the zoomed and shifted coordinates
+        mat(array): array containing the (ndim, ndim + 1) transform matrix.
+        in_coords(array): coordinates of the input
 
     For example, in 2D:
 
@@ -173,25 +174,32 @@ def _generate_interp_custom(coord_func, xshape, yshape, mode, cval, order,
     ops = []
     ops.append("double out = 0.0;")
 
-    int_type = "unsigned int"  # TODO: finish converting to use inttype
-    ops.append("{int_type} in_coord[{ndim}];".format(
-        int_type=int_type, ndim=ndim))
+    size = max(_prod(xshape), _prod(yshape))
+    if (size > 1 << 31):
+        uint_t = "size_t"
+        int_t = "ptrdiff_t"
+    else:
+        uint_t = "unsigned int"
+        int_t = "int"
+    ops.append("{uint_t} in_coord[{ndim}];".format(
+        uint_t=uint_t, ndim=ndim))
 
     # determine strides for x along each axis
-    ops.append("const int sx_{} = 1;".format(ndim - 1))
+    ops.append(
+        "const {uint_t} sx_{j} = 1;".format(uint_t=uint_t, j=ndim - 1))
     for j in range(ndim - 1, 0, -1):
         ops.append(
-            "int sx_{jm} = sx_{j} * {xsize_j};".format(
-                jm=j - 1, j=j, xsize_j=xshape[j]
+            "const {uint_t} sx_{jm} = sx_{j} * {xsize_j};".format(
+                uint_t=uint_t, jm=j - 1, j=j, xsize_j=xshape[j]
             )
         )
 
     # determine nd coordinate in x corresponding to a given raveled coordinate,
     # i, in y.
     ops.append("""
-        {int_type} idx = i;
-        {int_type} s, t;
-        """.format(int_type=int_type))
+        {uint_t} idx = i;
+        {uint_t} s, t;
+        """.format(uint_t=uint_t))
     for j in range(ndim - 1, 0, -1):
         ops.append("""
         s = {zsize_j};
@@ -221,8 +229,8 @@ def _generate_interp_custom(coord_func, xshape, yshape, mode, cval, order,
         for j in range(ndim):
             # determine nearest neighbor
             ops.append("""
-            int cf_{j} = (int)lrint((double)c_{j});
-            """.format(j=j))
+            {int_t} cf_{j} = ({int_t})lrint((double)c_{j});
+            """.format(int_t=int_t, j=j))
 
             # handle boundary
             if mode != 'constant':
@@ -233,8 +241,8 @@ def _generate_interp_custom(coord_func, xshape, yshape, mode, cval, order,
 
             # sum over ic_j will give the raveled coordinate in the input
             ops.append("""
-            int ic_{j} = cf_{j} * sx_{j};
-            """.format(j=j))
+            {int_t} ic_{j} = cf_{j} * sx_{j};
+            """.format(int_t=int_t, j=j))
         _coord_idx = " + ".join(["ic_{}".format(j) for j in range(ndim)])
         ops.append("""
             out = x[{coord_idx}];
@@ -244,16 +252,16 @@ def _generate_interp_custom(coord_func, xshape, yshape, mode, cval, order,
         for j in range(ndim):
             # get coordinates for linear interpolation along axis j
             ops.append("""
-            int cf_{j} = (int)floor((double)c_{j});
-            int cc_{j} = cf_{j} + 1;
-            int n_{j} = (c_{j} == cf_{j}) ? 1 : 2;  // points needed
-            """.format(j=j))
+            {int_t} cf_{j} = ({int_t})floor((double)c_{j});
+            {int_t} cc_{j} = cf_{j} + 1;
+            {int_t} n_{j} = (c_{j} == cf_{j}) ? 1 : 2;  // points needed
+            """.format(int_t=int_t, j=j))
 
             # handle boundaries for extension modes.
             ops.append("""
-            int cf_bounded_{j} = cf_{j};
-            int cc_bounded_{j} = cc_{j};
-            """.format(j=j))
+            {int_t} cf_bounded_{j} = cf_{j};
+            {int_t} cc_bounded_{j} = cc_{j};
+            """.format(int_t=int_t, j=j))
             if mode != 'constant':
                 ixvar = "cf_bounded_{j}".format(j=j)
                 ops.append(
@@ -268,7 +276,7 @@ def _generate_interp_custom(coord_func, xshape, yshape, mode, cval, order,
             for (int s_{j} = 0; s_{j} < n_{j}; s_{j}++)
                 {{
                     W w_{j};
-                    int ic_{j};
+                    {int_t} ic_{j};
                     if (s_{j} == 0)
                     {{
                         w_{j} = (W)cc_{j} - c_{j};
@@ -277,7 +285,7 @@ def _generate_interp_custom(coord_func, xshape, yshape, mode, cval, order,
                     {{
                         w_{j} = c_{j} - (W)cf_{j};
                         ic_{j} = cc_bounded_{j} * sx_{j};
-                    }}""".format(j=j))
+                    }}""".format(int_t=int_t, j=j))
 
         _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
         _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
