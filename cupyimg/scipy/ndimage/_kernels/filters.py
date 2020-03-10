@@ -8,6 +8,7 @@ from .support import (
     _masked_loop_init,
     _pixelregion_to_buffer,
     _pixelmask_to_buffer,
+    _raw_ptr_ops,
 )
 
 
@@ -24,6 +25,7 @@ def _generate_correlate_kernel(
     out_params = "Y y"
 
     ops = []
+    ops = ops + _raw_ptr_ops(in_params)
     ops.append("W sum = (W)0;")
     trim_unit_dims = False  # doesn't work correctly if set to True
     ops += _nested_loops_init(
@@ -32,7 +34,7 @@ def _generate_correlate_kernel(
 
     ops.append(
         """
-        W wval = w[iw];
+        W wval = _w[iw];
         if (wval == (W)0) {{
             iw += 1;
             continue;
@@ -50,7 +52,7 @@ def _generate_correlate_kernel(
             sum += (W){cval} * wval;
         }} else {{
             int ix = {expr};
-            sum += (W)x[ix] * wval;
+            sum += (W)_x[ix] * wval;
         }}
         iw += 1;""".format(
             cond=_cond, expr=_expr, cval=cval
@@ -95,6 +97,7 @@ def _generate_correlate_kernel_masked(
 
     # any declarations outside the mask loop go here
     ops = []
+    ops = ops + _raw_ptr_ops(in_params)
     ops.append("W sum = (W)0;")
 
     # declare the loop and intialize image indices, ix_0, etc.
@@ -106,10 +109,10 @@ def _generate_correlate_kernel_masked(
     ops.append(
         """
         if ({cond}) {{
-            sum += (W){cval} * wvals[iw];
+            sum += (W){cval} * _wvals[iw];
         }} else {{
             int ix = {expr};
-            sum += (W)x[ix] * wvals[iw];
+            sum += (W)_x[ix] * _wvals[iw];
         }}
         """.format(
             cond=_cond, expr=_expr, cval=cval
@@ -144,6 +147,7 @@ def _generate_min_or_max_kernel(
     ndim = len(wshape)
 
     ops = []
+    ops = ops + _raw_ptr_ops(in_params)
     # any declarations outside the mask loop go here
     ops.append("double result, val;")
     ops.append("size_t mask_count = 0;")
@@ -167,7 +171,7 @@ def _generate_min_or_max_kernel(
                 val = (X){cval};
             }} else {{
                 int ix = {expr};
-                val = (X)x[ix];
+                val = (X)_x[ix];
             }}
             if ((mask_count == 0) || (val {comp_op} result)) {{
                 result = val;
@@ -211,6 +215,7 @@ def _generate_min_or_max_kernel_masked(
     ndim = len(fshape)
 
     ops = []
+    ops = ops + _raw_ptr_ops(in_params)
     # any declarations outside the mask loop go here
     ops.append("double result, val;")
     ops.append("Y _po;")
@@ -233,7 +238,7 @@ def _generate_min_or_max_kernel_masked(
             val = (X){cval};
         }} else {{
             int ix = {expr};
-            val = (X)x[ix];
+            val = (X)_x[ix];
         }}
         if ((iw == 0) || (val {comp_op} result)) {{
             result = val;
@@ -277,6 +282,7 @@ def _generate_min_or_max_kernel_masked_v2(
     ndim = len(fshape)
 
     ops = []
+    ops = ops + _raw_ptr_ops(in_params)
     # any declarations outside the mask loop go here
     ops.append("double result;")
     ops.append("Y _po;")
@@ -302,9 +308,9 @@ def _generate_min_or_max_kernel_masked_v2(
                 result = _cval;
             }} else {{
                 int ix = {expr};
-                result = (X)x[ix];
+                result = (X)_x[ix];
             }}
-            result += wvals[0];
+            result += _wvals[0];
             continue;
         }} else {{
             X _tmp;
@@ -312,9 +318,9 @@ def _generate_min_or_max_kernel_masked_v2(
                 _tmp = _cval;
             }} else {{
                 int ix = {expr};
-                _tmp = (X)x[ix];
+                _tmp = (X)_x[ix];
             }}
-            _tmp += wvals[iw];
+            _tmp += _wvals[iw];
 
             if ((_tmp {comp_op} result)) {{
                 result = _tmp;
@@ -539,6 +545,7 @@ def _generate_rank_kernel(mode, cval, xshape, fshape, origin, rank):
     ndim = len(fshape)
 
     ops = []
+    ops = ops + _raw_ptr_ops(in_params)
     # declare the loop and intialize image indices, ix_0, etc.
     nnz = functools.reduce(operator.mul, fshape)
     ops += _pixelregion_to_buffer(mode, cval, xshape, fshape, origin, nnz)
@@ -584,6 +591,7 @@ def _generate_rank_kernel_masked(mode, cval, xshape, fshape, nnz, origin, rank):
     ndim = len(fshape)
 
     ops = []
+    ops = ops + _raw_ptr_ops(in_params)
     # declare the loop and intialize image indices, ix_0, etc.
     ops += _pixelmask_to_buffer(mode, cval, xshape, fshape, origin, nnz)
 

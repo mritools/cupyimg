@@ -1,7 +1,7 @@
 
 import cupy
 
-from .support import _generate_boundary_condition_ops
+from .support import _generate_boundary_condition_ops, _raw_ptr_ops
 
 
 def _get_map_coord(ndim):
@@ -29,7 +29,7 @@ def _get_map_coord(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = coords[i + {j} * ncoords];
+    W c_{j} = _coords[i + {j} * ncoords];
             """.format(j=j))
     return ops
 
@@ -55,7 +55,7 @@ def _get_coord_zoom_and_shift(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = zoom[{j}] * ((W)in_coord[{j}] - shift[{j}]);
+    W c_{j} = _zoom[{j}] * ((W)in_coord[{j}] - _shift[{j}]);
             """.format(j=j))
     return ops
 
@@ -80,7 +80,7 @@ def _get_coord_zoom(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = zoom[{j}] * (W)in_coord[{j}];
+    W c_{j} = _zoom[{j}] * (W)in_coord[{j}];
             """.format(j=j))
     return ops
 
@@ -105,7 +105,7 @@ def _get_coord_shift(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = (W)in_coord[{j}] - shift[{j}];
+    W c_{j} = (W)in_coord[{j}] - _shift[{j}];
             """.format(j=j))
     return ops
 
@@ -140,11 +140,11 @@ def _get_coord_affine(ndim):
             m_index = ncol * j + k
             ops.append(
                 """
-            c_{j} += mat[{m_index}] * (W)in_coord[{k}];
+            c_{j} += _mat[{m_index}] * (W)in_coord[{k}];
                 """.format(j=j, k=k, m_index=m_index))
         ops.append(
             """
-            c_{j} += mat[{m_index}];
+            c_{j} += _mat[{m_index}];
             """.format(j=j, m_index=ncol * j + ndim))
     return ops
 
@@ -179,6 +179,7 @@ def _generate_interp_custom(
     ndim = len(xshape)
 
     ops = []
+    ops = ops + _raw_ptr_ops(in_params)
     ops.append("double out = 0.0;")
     # ops.append("const ptrdiff_t *in_coord2 = _ind.get();".format(ndim=ndim))
     int_type = "unsigned int"  # TODO: finish converting to use inttype
