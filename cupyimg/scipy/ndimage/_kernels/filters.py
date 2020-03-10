@@ -166,7 +166,7 @@ def _generate_min_or_max_kernel(
 
     ops.append(
         """
-        if (w[iw]) {{
+        if (_w[iw]) {{
             if ({cond}) {{
                 val = (X){cval};
             }} else {{
