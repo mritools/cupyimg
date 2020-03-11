@@ -278,6 +278,13 @@ def _binary_erosion(
         masked,
     )
 
+    # TODO: grlee77: current indexing via x_data, etc. requires
+    #       C contiguous input arrays.
+    input = cupy.ascontiguousarray(input)
+    structure = cupy.ascontiguousarray(structure)
+    if masked:
+        mask = cupy.ascontiguousarray(mask)
+
     if iterations == 1:
         if masked:
             return erode_kernel(input, structure, mask, output)

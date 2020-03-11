@@ -608,6 +608,8 @@ def _correlate_or_convolve(
     if weights.size == 0:
         return output
 
+    # TODO: grlee77: current indexing via x_data, etc. requires
+    #       C contiguous input arrays.
     input = cupy.ascontiguousarray(input)
     weights = cupy.ascontiguousarray(weights, weights_dtype)
 

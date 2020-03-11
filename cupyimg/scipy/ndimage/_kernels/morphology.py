@@ -71,6 +71,8 @@ def _generate_erode_kernel(
         ops.append("bool mv = (bool)mask_data[i];")
     else:
         ops.append("bool mv = true;")
+    # TODO: grlee77: x_data[i] indexing only works on C-contiguous x_data. x[i]
+    # indexing worked on strided arrays as well.
     ops.append(
         """
     int _in = x_data[i] ? 1 : 0;
