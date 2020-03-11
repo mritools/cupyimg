@@ -1,12 +1,15 @@
 import math
+from warnings import warn
 
 import cupy as cp
 import numpy as np
 from cupyx.scipy import ndimage as ndi
+import cupyimg.numpy as cnp
 
 
 def profile_line(
-    image, src, dst, linewidth=1, order=1, mode="constant", cval=0.0
+    image, src, dst, linewidth=1, order=None, mode="constant", cval=0.0, *,
+    reduce_func=cp.mean,
 ):
     """Return the intensity profile of an image measured along a scan line.
 
@@ -24,8 +27,9 @@ def profile_line(
     linewidth : int, optional
         Width of the scan, perpendicular to the line
     order : int in {0, 1, 2, 3, 4, 5}, optional
-        The order of the spline interpolation to compute image values at
-        non-integer coordinates. 0 means nearest-neighbor interpolation.
+        The order of the spline interpolation, default is 0 if
+        image.dtype is bool and 1 otherwise. The order has to be in
+        the range 0-5. See `skimage.transform.warp` for detail.
     mode : {'constant', 'nearest', 'reflect', 'mirror', 'wrap'}, optional
         How to compute any values falling outside of the image.
     cval : float, optional
@@ -61,20 +65,50 @@ def profile_line(
     >>> profile_line(img, (1, 0), (1, 5))  # This accesses the full first row
     array([ 1.,  1.,  1.,  2.,  2.,  2.])
     """
+    if order is None:
+        order = 0 if image.dtype == bool else 1
+
+    if image.dtype == bool and order != 0:
+        warn("Input image dtype is bool. Interpolation is not defined "
+             "with bool data type. Please set order to 0 or explicitely "
+             "cast input image to another data type. Starting from version "
+             "0.19 a ValueError will be raised instead of this warning.",
+             FutureWarning, stacklevel=2)
+
     perp_lines = _line_profile_coordinates(src, dst, linewidth=linewidth)
     if image.ndim == 3:
         pixels = [
             ndi.map_coordinates(
-                image[..., i], perp_lines, order=order, mode=mode, cval=cval
+                image[..., i],
+                perp_lines,
+                prefilter=order > 1,
+                order=order,
+                mode=mode,
+                cval=cval,
             )
             for i in range(image.shape[2])
         ]
         pixels = cp.transpose(cp.asarray(pixels), (1, 2, 0))
     else:
         pixels = ndi.map_coordinates(
-            image, perp_lines, order=order, mode=mode, cval=cval
+            image,
+            perp_lines,
+            prefilter=order > 1,
+            order=order,
+            mode=mode,
+            cval=cval,
         )
-    intensities = pixels.mean(axis=1)
+    # The outputted array with reduce_func=None gives an array where the
+    # row values (axis=1) are flipped. Here, we make this consistent.
+    pixels = np.flip(pixels, axis=1)
+
+    if reduce_func is None:
+        intensities = pixels
+    else:
+        try:
+            intensities = reduce_func(pixels, axis=1)
+        except TypeError:  # function doesn't allow axis kwarg
+            intensities = cnp.apply_along_axis(reduce_func, arr=pixels, axis=1)
 
     return intensities
 

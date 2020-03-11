@@ -109,3 +109,104 @@ def test_pythagorean_triangle_transpose_left_down_linewidth():
     )
     expected_prof = cp.ones(6)
     assert_array_almost_equal(prof, expected_prof)
+
+
+def test_reduce_func_mean():
+    prof = profile_line(pyth_image, (0, 1), (3, 1), linewidth=3, order=0,
+                        reduce_func=cp.mean)
+    expected_prof = cp.asarray([0, 0.8, 1, 0.2])
+    assert_array_almost_equal(prof, expected_prof)
+
+
+def test_reduce_func_max():
+    prof = profile_line(pyth_image, (0, 1), (3, 1), linewidth=3, order=0,
+                        reduce_func=cp.max)
+    expected_prof = cp.asarray([0, 1.8, 1.8, 0.6])
+    assert_array_almost_equal(prof, expected_prof)
+
+
+def test_reduce_func_sum():
+    prof = profile_line(pyth_image, (0, 1), (3, 1), linewidth=3, order=0,
+                        reduce_func=cp.sum)
+    expected_prof = cp.asarray([0, 2.4, 3, 0.6])
+    assert_array_almost_equal(prof, expected_prof)
+
+
+def test_reduce_func_mean_linewidth_1():
+    prof = profile_line(pyth_image, (0, 1), (3, 1), linewidth=1, order=0,
+                        reduce_func=cp.mean)
+    expected_prof = cp.asarray([0, 1.8, 0.6, 0.])
+    assert_array_almost_equal(prof, expected_prof)
+
+
+def test_reduce_func_None_linewidth_1():
+    prof = profile_line(pyth_image, (1, 2), (4, 2),
+                        linewidth=1, order=0, reduce_func=None)
+    expected_prof = cp.asarray([[0.6], [1.8], [0.6], [0.]])
+    assert_array_almost_equal(prof, expected_prof)
+
+
+def test_reduce_func_None_linewidth_3():
+    prof = profile_line(pyth_image, (1, 2), (4, 2),
+                        linewidth=3, order=0, reduce_func=None)
+    # fmt: off
+    expected_prof = cp.asarray([[1.8, 0.6, 0.6],
+                                [0.6, 1.8, 1.8],
+                                [0., 0.6, 1.8],
+                                [0., 0., 0.6]])
+    # fmt: on
+    assert_array_almost_equal(prof, expected_prof)
+
+
+def test_reduce_func_lambda_linewidth_3():
+    prof = profile_line(pyth_image, (1, 2), (4, 2), linewidth=3, order=0,
+                        reduce_func=lambda x: x + x**2)
+    # fmt: off
+    expected_prof = cp.asarray([[5.04, 0.96, 0.96],
+                                [0.96, 5.04, 5.04],
+                                [0., 0.96, 5.04],
+                                [0., 0., 0.96]])
+    # fmt: on
+    # The lambda function acts on each pixel value individually.
+    assert_array_almost_equal(prof, expected_prof)
+
+
+def test_reduce_func_sqrt_linewidth_3():
+    prof = profile_line(pyth_image, (1, 2), (4, 2),
+                        linewidth=3, order=0, reduce_func=lambda x: x**0.5)
+    # fmt: off
+    expected_prof = cp.asarray([[1.34164079, 0.77459667, 0.77459667],
+                                [0.77459667, 1.34164079, 1.34164079],
+                                [0., 0.77459667, 1.34164079],
+                                [0., 0., 0.77459667]])
+    # fmt: on
+    assert_array_almost_equal(prof, expected_prof)
+
+
+def test_reduce_func_sumofsqrt_linewidth_3():
+    prof = profile_line(pyth_image, (1, 2), (4, 2), linewidth=3, order=0,
+                        reduce_func=lambda x: cp.sum(x**0.5))
+    expected_prof = cp.asarray([2.89083412, 3.45787824, 2.11623746, 0.77459667])
+    assert_array_almost_equal(prof, expected_prof)
+
+
+def test_bool_array_input():
+
+    shape = (200, 200)
+    center_x, center_y = (140, 150)
+    radius = 20
+    x, y = cp.meshgrid(cp.arange(shape[1]), cp.arange(shape[0]))
+    mask = (y - center_y) ** 2 + (x - center_x) ** 2 < radius ** 2
+    src = (center_y, center_x)
+    phi = 4 * np.pi / 9.
+    dy = 31 * np.cos(phi)
+    dx = 31 * np.sin(phi)
+    dst = (center_y + dy, center_x + dx)
+
+    profile_u8 = profile_line(mask.astype(cp.uint8), src, dst)
+    assert cp.all(profile_u8[:radius] == 1).item()
+
+    profile_b = profile_line(mask, src, dst)
+    assert cp.all(profile_b[:radius] == 1).item()
+
+    assert cp.all(profile_b == profile_u8).item()
