@@ -46,6 +46,13 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
         }}""".format(
             ix=ix, xsize=xsize
         )
+    elif mode == "constant2":
+        ops = """
+        if (({ix} < 0) || ({ix} > ({xsize} - 1))) {{
+            {ix} = -1;
+        }}""".format(
+            ix=ix, xsize=xsize
+        )
     else:
         raise ValueError("unrecognized mode: {}".format(mode))
     return ops

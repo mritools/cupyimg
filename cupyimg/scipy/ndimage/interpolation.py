@@ -10,7 +10,8 @@ from ._kernels.interp import (
     _get_shift_kernel,
     _get_zoom_kernel,
     _get_zoom_shift_kernel,
-    _get_affine_kernel)
+    _get_affine_kernel,
+)
 
 
 def _get_output(output, input, shape=None):
@@ -42,15 +43,17 @@ def _check_parameter(func_name, order, mode):
         # instead of ValueError.
         raise NotImplementedError("spline order is not supported")
 
-    if mode in ("reflect", "wrap"):
-        raise NotImplementedError(
-            "'{}' mode is not supported. See "
-            "https://github.com/scipy/scipy/issues/8465".format(mode)
-        )
-    elif mode not in (
+    # if mode in ("reflect", "wrap"):
+    #     raise NotImplementedError(
+    #         "'{}' mode is not supported. See "
+    #         "https://github.com/scipy/scipy/issues/8465".format(mode)
+    #     )
+    if mode not in (
         "constant",
         "nearest",
         "mirror",
+        "reflect",
+        "wrap",
         "opencv",
         "_opencv_edge",
     ):
@@ -118,8 +121,13 @@ def map_coordinates(
     if input.dtype.kind in "iu":
         input = input.astype(cupy.float32)
 
-    kern = _get_map_kernel(input.shape, mode=mode, cval=cval, order=order,
-                           integer_output=integer_output)
+    kern = _get_map_kernel(
+        input.shape,
+        mode=mode,
+        cval=cval,
+        order=order,
+        integer_output=integer_output,
+    )
     kern(input, coordinates, ret)
     return ret
 
@@ -192,7 +200,7 @@ def affine_transform(
         offset = [offset] * input.ndim
 
     if matrix.ndim not in [1, 2]:
-        raise RuntimeError('no proper affine matrix provided')
+        raise RuntimeError("no proper affine matrix provided")
     if matrix.ndim == 2:
         if matrix.shape[0] == matrix.shape[1] - 1:
             offset = matrix[:, -1]
@@ -227,13 +235,23 @@ def affine_transform(
         offset = cupy.asarray(offset, dtype=float)
         offset = -offset / matrix
         kern = _get_zoom_shift_kernel(
-            input.shape, output_shape, mode, cval=cval, order=order,
-            integer_output=integer_output)
+            input.shape,
+            output_shape,
+            mode,
+            cval=cval,
+            order=order,
+            integer_output=integer_output,
+        )
         kern(input, offset, matrix, output)
     else:
         kern = _get_affine_kernel(
-            input.shape, output_shape, mode, cval=cval, order=order,
-            integer_output=integer_output)
+            input.shape,
+            output_shape,
+            mode,
+            cval=cval,
+            order=order,
+            integer_output=integer_output,
+        )
         m = cupy.zeros((ndim, ndim + 1), dtype=float)
         m[:, :-1] = matrix
         m[:, -1] = cupy.asarray(offset, dtype=float)
@@ -312,7 +330,7 @@ def rotate(
     if axes[0] > axes[1]:
         axes = [axes[1], axes[0]]
     if axes[0] < 0 or input_arr.ndim <= axes[1]:
-        raise ValueError('invalid rotation plane specified')
+        raise ValueError("invalid rotation plane specified")
 
     ndim = input_arr.ndim
     rad = numpy.deg2rad(angle)
@@ -320,16 +338,14 @@ def rotate(
     cos = math.cos(rad)
 
     # determine offsets and output shape as in scipy.ndimage.rotate
-    rot_matrix = numpy.array([[cos, sin],
-                              [-sin, cos]])
+    rot_matrix = numpy.array([[cos, sin], [-sin, cos]])
 
     img_shape = numpy.asarray(input_arr.shape)
     in_plane_shape = img_shape[axes]
     if reshape:
         # Compute transformed input bounds
         iy, ix = in_plane_shape
-        out_bounds = rot_matrix @ [[0, 0, iy, iy],
-                                   [0, ix, 0, ix]]
+        out_bounds = rot_matrix @ [[0, 0, iy, iy], [0, ix, 0, ix]]
         # Compute the shape of the transformed input plane
         out_plane_shape = (out_bounds.ptp(axis=1) + 0.5).astype(int)
     else:
@@ -435,8 +451,13 @@ def shift(
             input = input.astype(cupy.float32)
         integer_output = output.dtype.kind in "iu"
         kern = _get_shift_kernel(
-            input.shape, input.shape, mode, cval=cval, order=order,
-            integer_output=integer_output)
+            input.shape,
+            input.shape,
+            mode,
+            cval=cval,
+            order=order,
+            integer_output=integer_output,
+        )
         shift = cupy.asarray(shift, dtype=float)
         kern(input, shift, output)
     return output
@@ -529,8 +550,12 @@ def zoom(
             input = input.astype(cupy.float32)
         integer_output = output.dtype.kind in "iu"
         kern = _get_zoom_kernel(
-            input.shape, output_shape, mode, order=order,
-            integer_output=integer_output)
+            input.shape,
+            output_shape,
+            mode,
+            order=order,
+            integer_output=integer_output,
+        )
         zoom = cupy.asarray(zoom, dtype=float)
         kern(input, zoom, output)
     return output
