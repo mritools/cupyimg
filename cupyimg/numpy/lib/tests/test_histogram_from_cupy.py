@@ -62,7 +62,7 @@ class TestHistogram(unittest.TestCase):
     @numpy_cupyimg_array_list_equal()
     def test_histogram_range_lower_outliers(self, xp, dtype):
         # Check that lower outliers are not tallied
-        a = xp.arange(10, dtype=dtype) + .5
+        a = xp.arange(10, dtype=dtype) + 0.5
         h, b = xp.histogram(a, range=[0, 9])
         assert int(h.sum()) == 9
         return h, b
@@ -71,7 +71,7 @@ class TestHistogram(unittest.TestCase):
     @numpy_cupyimg_array_list_equal()
     def test_histogram_range_upper_outliers(self, xp, dtype):
         # Check that upper outliers are not tallied
-        a = xp.arange(10, dtype=dtype) + .5
+        a = xp.arange(10, dtype=dtype) + 0.5
         h, b = xp.histogram(a, range=[1, 10])
         assert int(h.sum()) == 9
         return h, b
@@ -79,7 +79,7 @@ class TestHistogram(unittest.TestCase):
     @testing.for_float_dtypes()
     @numpy_cupyimg_allclose()
     def test_histogram_range_with_density(self, xp, dtype):
-        a = xp.arange(10, dtype=dtype) + .5
+        a = xp.arange(10, dtype=dtype) + 0.5
         h, b = xp.histogram(a, range=[1, 9], density=True)
         # check normalization
         testing.assert_allclose(float((h * xp.diff(b)).sum()), 1)
@@ -88,8 +88,8 @@ class TestHistogram(unittest.TestCase):
     @testing.for_float_dtypes()
     @numpy_cupyimg_allclose()
     def test_histogram_range_with_weights_and_density(self, xp, dtype):
-        a = xp.arange(10, dtype=dtype) + .5
-        w = xp.arange(10, dtype=dtype) + .5
+        a = xp.arange(10, dtype=dtype) + 0.5
+        w = xp.arange(10, dtype=dtype) + 0.5
         h, b = xp.histogram(a, range=[1, 9], weights=w, density=True)
         testing.assert_allclose(float((h * xp.diff(b)).sum()), 1)
         return h
@@ -108,8 +108,8 @@ class TestHistogram(unittest.TestCase):
     @testing.for_all_dtypes(no_bool=True, no_complex=True)
     @testing.numpy_cupy_raises(accept_error=ValueError)
     def test_histogram_weights_mismatch(self, xp, dtype):
-        a = xp.arange(10, dtype=dtype) + .5
-        w = xp.arange(11, dtype=dtype) + .5
+        a = xp.arange(10, dtype=dtype) + 0.5
+        w = xp.arange(11, dtype=dtype) + 0.5
         h, b = xp.histogram(a, range=[1, 9], weights=w, density=True)
 
     @testing.for_all_dtypes(no_bool=True, no_complex=True)
@@ -167,7 +167,8 @@ class TestHistogram(unittest.TestCase):
         w = xp.asarray([4, 3, 2, 1], dtype=dtype)
         wa, wb = xp.histogram(v, bins=4, weights=w, density=True)
         testing.assert_array_almost_equal(
-            wa, xp.asarray([4, 5, 0, 1]) / 10. / 3. * 4)
+            wa, xp.asarray([4, 5, 0, 1]) / 10.0 / 3.0 * 4
+        )
         return wb
 
     @testing.for_int_dtypes(no_bool=True)
@@ -178,8 +179,9 @@ class TestHistogram(unittest.TestCase):
             xp.arange(9, dtype=dtype),
             xp.asarray([0, 1, 3, 6, 10], dtype=dtype),
             weights=xp.asarray([2, 1, 1, 1, 1, 1, 1, 1, 1], dtype=dtype),
-            density=True)
-        testing.assert_array_almost_equal(a, [.2, .1, .1, .075])
+            density=True,
+        )
+        testing.assert_array_almost_equal(a, [0.2, 0.1, 0.1, 0.075])
         return a, b
 
     @testing.for_complex_dtypes()
@@ -188,8 +190,7 @@ class TestHistogram(unittest.TestCase):
         values = xp.asarray([1.3, 2.5, 2.3])
         weights = xp.asarray([1, -1, 2]) + 1j * xp.asarray([2, 1, 2])
         weights = weights.astype(dtype)
-        a, b = xp.histogram(
-            values, bins=2, weights=weights)
+        a, b = xp.histogram(values, bins=2, weights=weights)
         return a, b
 
     @testing.for_complex_dtypes()
@@ -198,9 +199,9 @@ class TestHistogram(unittest.TestCase):
         values = xp.asarray([1.3, 2.5, 2.3])
         weights = xp.asarray([1, -1, 2]) + 1j * xp.asarray([2, 1, 2])
         weights = weights.astype(dtype)
-        a, b = xp.histogram(
-            values, bins=xp.asarray([0, 2, 3]), weights=weights)
+        a, b = xp.histogram(values, bins=xp.asarray([0, 2, 3]), weights=weights)
         return a, b
+
     @testing.for_all_dtypes(no_bool=True, no_complex=True)
     @numpy_cupyimg_array_list_equal()
     def test_histogram_empty(self, xp, dtype):

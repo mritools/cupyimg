@@ -14,17 +14,17 @@ __all__ = ["histogram", "histogram2d", "histogramdd"]
 # rename range for use in functions that take a range argument
 _range = range
 
-_preamble = '''
+_preamble = """
 __device__ long long atomicAdd(long long *address, long long val) {
     return atomicAdd(reinterpret_cast<unsigned long long*>(address),
                      static_cast<unsigned long long>(val));
-}'''
+}"""
 
 # TODO(unno): use searchsorted
 _histogram_kernel = core.ElementwiseKernel(
-    'S x, raw T bins, int32 n_bins',
-    'raw U y',
-    '''
+    "S x, raw T bins, int32 n_bins",
+    "raw U y",
+    """
     if (x < bins[0] or bins[n_bins - 1] < x) {
         return;
     }
@@ -40,14 +40,15 @@ _histogram_kernel = core.ElementwiseKernel(
         }
     }
     atomicAdd(&y[low], U(1));
-    ''',
-    preamble=_preamble)
+    """,
+    preamble=_preamble,
+)
 
 
 _weighted_histogram_kernel = core.ElementwiseKernel(
-    'S x, raw T bins, int32 n_bins, raw W weights',
-    'raw Y y',
-    '''
+    "S x, raw T bins, int32 n_bins, raw W weights",
+    "raw Y y",
+    """
     if (x < bins[0] or bins[n_bins - 1] < x) {
         return;
     }
@@ -63,8 +64,9 @@ _weighted_histogram_kernel = core.ElementwiseKernel(
         }
     }
     atomicAdd(&y[low], (Y)weights[i]);
-    ''',
-    preamble=_preamble)
+    """,
+    preamble=_preamble,
+)
 
 
 def _ravel_and_check_weights(a, weights):
@@ -72,17 +74,20 @@ def _ravel_and_check_weights(a, weights):
 
     # Ensure that the array is a "subtractable" dtype
     if a.dtype == cupy.bool_:
-        warnings.warn("Converting input from {} to {} for compatibility."
-                      .format(a.dtype, cupy.uint8),
-                      RuntimeWarning, stacklevel=3)
+        warnings.warn(
+            "Converting input from {} to {} for compatibility.".format(
+                a.dtype, cupy.uint8
+            ),
+            RuntimeWarning,
+            stacklevel=3,
+        )
         a = a.astype(cupy.uint8)
 
     if weights is not None:
         if not isinstance(weights, cupy.ndarray):
             raise ValueError("weights must be a cupy.ndarray")
         if weights.shape != a.shape:
-            raise ValueError(
-                'weights should have the same shape as a.')
+            raise ValueError("weights should have the same shape as a.")
         weights = weights.ravel()
     a = a.ravel()
     return a, weights
@@ -96,12 +101,13 @@ def _get_outer_edges(a, range):
     if range is not None:
         first_edge, last_edge = range
         if first_edge > last_edge:
-            raise ValueError(
-                'max must be larger than min in range parameter.')
+            raise ValueError("max must be larger than min in range parameter.")
         if not (numpy.isfinite(first_edge) and numpy.isfinite(last_edge)):
             raise ValueError(
                 "supplied range of [{}, {}] is not finite".format(
-                    first_edge, last_edge))
+                    first_edge, last_edge
+                )
+            )
     elif a.size == 0:
         first_edge = 0.0
         last_edge = 1.0
@@ -111,7 +117,9 @@ def _get_outer_edges(a, range):
         if not (cupy.isfinite(first_edge) and cupy.isfinite(last_edge)):
             raise ValueError(
                 "autodetected range of [{}, {}] is not finite".format(
-                    first_edge, last_edge))
+                    first_edge, last_edge
+                )
+            )
 
     # expand empty range to avoid divide by zero
     if first_edge == last_edge:
@@ -144,23 +152,22 @@ def _get_bin_edges(a, bins, range):
         try:
             n_equal_bins = operator.index(bins)
         except TypeError:
-            raise TypeError(
-                '`bins` must be an integer, a string, or an array')
+            raise TypeError("`bins` must be an integer, a string, or an array")
         if n_equal_bins < 1:
-            raise ValueError('`bins` must be positive, when an integer')
+            raise ValueError("`bins` must be positive, when an integer")
 
         first_edge, last_edge = _get_outer_edges(a, range)
 
     elif isinstance(bins, cupy.ndarray):
-        if bins.ndim == 1:    # cupy.ndim(bins) == 0:
+        if bins.ndim == 1:  # cupy.ndim(bins) == 0:
             bin_edges = cupy.asarray(bins)
             if (bin_edges[:-1] > bin_edges[1:]).any():  # synchronize!
                 raise ValueError(
-                    '`bins` must increase monotonically, when an array')
+                    "`bins` must increase monotonically, when an array"
+                )
 
     elif isinstance(bins, str):
-        raise NotImplementedError(
-            "only integer and array bins are implemented")
+        raise NotImplementedError("only integer and array bins are implemented")
 
     if n_equal_bins is not None:
         # numpy's gh-10322 means that type resolution rules are dependent on
@@ -172,8 +179,12 @@ def _get_bin_edges(a, bins, range):
 
         # bin edges must be computed
         bin_edges = cupy.linspace(
-            first_edge, last_edge, n_equal_bins + 1,
-            endpoint=True, dtype=bin_type)
+            first_edge,
+            last_edge,
+            n_equal_bins + 1,
+            endpoint=True,
+            dtype=bin_type,
+        )
         return bin_edges, (first_edge, last_edge, n_equal_bins)
     else:
         return bin_edges, None
@@ -212,9 +223,9 @@ def histogram(x, bins=10, range=None, weights=None, density=False):
     .. seealso:: :func:`numpy.histogram`
     """
 
-    if x.dtype.kind == 'c':
+    if x.dtype.kind == "c":
         # TODO(unno): comparison between complex numbers is not implemented
-        raise NotImplementedError('complex number is not supported')
+        raise NotImplementedError("complex number is not supported")
 
     if not isinstance(x, cupy.ndarray):
         raise ValueError("x must be a cupy.ndarray")
@@ -223,35 +234,36 @@ def histogram(x, bins=10, range=None, weights=None, density=False):
     bin_edges, uniform_bins = _get_bin_edges(x, bins, range)
 
     if weights is None:
-        y = cupy.zeros(bin_edges.size - 1, dtype='l')
+        y = cupy.zeros(bin_edges.size - 1, dtype="l")
         _histogram_kernel(x, bin_edges, bin_edges.size, y)
     else:
-        simple_weights = (
-            cupy.can_cast(weights.dtype, cupy.double) or
-            cupy.can_cast(weights.dtype, complex)
-        )
+        simple_weights = cupy.can_cast(
+            weights.dtype, cupy.double
+        ) or cupy.can_cast(weights.dtype, complex)
         if not simple_weights:
             # object dtype such as Decimal are supported in NumPy, but not here
             raise NotImplementedError(
                 "only weights with dtype that can be cast to float or complex "
-                "are supported")
-        if weights.dtype.kind == 'c':
+                "are supported"
+            )
+        if weights.dtype.kind == "c":
             y = cupy.zeros(bin_edges.size - 1, dtype=complex)
             _weighted_histogram_kernel(
-                x, bin_edges, bin_edges.size, weights.real, y.real)
+                x, bin_edges, bin_edges.size, weights.real, y.real
+            )
             _weighted_histogram_kernel(
-                x, bin_edges, bin_edges.size, weights.imag, y.imag)
+                x, bin_edges, bin_edges.size, weights.imag, y.imag
+            )
         else:
-            if weights.dtype.kind in 'bui':
+            if weights.dtype.kind in "bui":
                 y = cupy.zeros(bin_edges.size - 1, dtype=int)
             else:
                 y = cupy.zeros(bin_edges.size - 1, dtype=float)
-            _weighted_histogram_kernel(
-                x, bin_edges, bin_edges.size, weights, y)
+            _weighted_histogram_kernel(x, bin_edges, bin_edges.size, weights, y)
 
     if density:
         db = cupy.array(cupy.diff(bin_edges), float)
-        return y/db/y.sum(), bin_edges
+        return y / db / y.sum(), bin_edges
     return y, bin_edges
 
 
