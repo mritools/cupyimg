@@ -68,12 +68,12 @@ def _generate_erode_kernel(
     ops = []
     ops = ops + _raw_ptr_ops(in_params)
     if masked:
-        ops.append("bool mv = (bool)_mask[i];")
+        ops.append("bool mv = (bool)mask_data[i];")
     else:
         ops.append("bool mv = true;")
     ops.append(
         """
-    int _in = _x[i] ? 1 : 0;
+    int _in = x_data[i] ? 1 : 0;
     if (!mv) {{
         y = (Y)_in;
         return;
@@ -100,7 +100,7 @@ def _generate_erode_kernel(
 
     ops.append(
         """
-        if (_w[iw]) {{
+        if (w_data[iw]) {{
             int ix = {expr};
             if ({cond}) {{
                 if (!{border_value}) {{
@@ -108,7 +108,7 @@ def _generate_erode_kernel(
                     return;
                 }}
             }} else {{
-                bool nn = _x[ix] ? {true_val} : {false_val};
+                bool nn = x_data[ix] ? {true_val} : {false_val};
                 if (!nn) {{
                     y = (Y){false_val};
                     return;
@@ -161,13 +161,12 @@ def _generate_erode_kernel_masked(
     ops = []
     ops = ops + _raw_ptr_ops(in_params)
     if masked:
-        ops.append('M* _mask = (M*)&(mask[0]);')
-        ops.append("bool mv = (bool)_mask[i];")
+        ops.append("bool mv = (bool)mask_data[i];")
     else:
         ops.append("bool mv = true;")
     ops.append(
         """
-    int _in = _x[i] ? 1 : 0;
+    int _in = x_data[i] ? 1 : 0;
     if (!mv) {{
         y = (Y)_in;
         return;
@@ -192,7 +191,7 @@ def _generate_erode_kernel_masked(
 
     ops.append(
         """
-        if (_wvals[iw]) {{
+        if (wvals_data[iw]) {{
             int ix = {expr};
             if ({cond}) {{
                 if (!{border_value}) {{
@@ -200,7 +199,7 @@ def _generate_erode_kernel_masked(
                     return;
                 }}
             }} else {{
-                bool nn = _x[ix] ? {true_val} : {false_val};
+                bool nn = x_data[ix] ? {true_val} : {false_val};
                 if (!nn) {{
                     y = (Y){false_val};
                     return;

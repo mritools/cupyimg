@@ -27,24 +27,27 @@ def _generate_correlate_kernel(
     ops = []
     ops = ops + _raw_ptr_ops(in_params)
     ops.append("W sum = (W)0;")
-    trim_unit_dims = False  # doesn't work correctly if set to True
+    trim_unit_dims = True  # timing seems the same with either True or False
     ops += _nested_loops_init(
         mode, xshape, wshape, origin, trim_unit_dims=trim_unit_dims
     )
 
     ops.append(
         """
-        W wval = _w[iw];
+        W wval = w_data[iw];
         if (wval == (W)0) {{
             iw += 1;
             continue;
         }}"""
     )
-    # # for cond: only need to check bounds on axes where filter shape is > 1
-    # _cond = " || ".join(
-    #     ["(ix_{0} < 0)".format(j) for j in range(ndim) if wshape[j] > 1]
-    # )
-    _cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
+    # for cond: only need to check bounds on axes where filter shape is > 1
+    _cond = " || ".join(
+        ["(ix_{0} < 0)".format(j) for j in range(ndim) if wshape[j] > 1]
+    )
+    if _cond == "":
+        _cond = "0"
+
+    # _cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
     _expr = " + ".join(["ix_{0}".format(j) for j in range(ndim)])
     ops.append(
         """
@@ -52,7 +55,7 @@ def _generate_correlate_kernel(
             sum += (W){cval} * wval;
         }} else {{
             int ix = {expr};
-            sum += (W)_x[ix] * wval;
+            sum += (W)x_data[ix] * wval;
         }}
         iw += 1;""".format(
             cond=_cond, expr=_expr, cval=cval
@@ -109,10 +112,10 @@ def _generate_correlate_kernel_masked(
     ops.append(
         """
         if ({cond}) {{
-            sum += (W){cval} * _wvals[iw];
+            sum += (W){cval} * wvals_data[iw];
         }} else {{
             int ix = {expr};
-            sum += (W)_x[ix] * _wvals[iw];
+            sum += (W)x_data[ix] * wvals_data[iw];
         }}
         """.format(
             cond=_cond, expr=_expr, cval=cval
@@ -149,14 +152,21 @@ def _generate_min_or_max_kernel(
     ops = []
     ops = ops + _raw_ptr_ops(in_params)
     # any declarations outside the mask loop go here
-    ops.append("double result, val;")
+    ops.append("double result = 0, val;")
     ops.append("size_t mask_count = 0;")
 
     # declare the loop and intialize image indices, ix_0, etc.
-    ops += _nested_loops_init(mode, xshape, wshape, origin)
+    trim_unit_dims = True  # timing seems equivalent either way, so could remove
+    ops += _nested_loops_init(mode, xshape, wshape, origin, trim_unit_dims=trim_unit_dims)
 
     # Add code that is executed for each pixel in the footprint
-    _cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
+    #_cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
+    # for cond: only need to check bounds on axes where filter shape is > 1
+    _cond = " || ".join(
+        ["(ix_{0} < 0)".format(j) for j in range(ndim) if wshape[j] > 1]
+    )
+    if _cond == "":
+        _cond = "0"
     _expr = " + ".join(["ix_{0}".format(j) for j in range(ndim)])
 
     if minimum:
@@ -166,12 +176,12 @@ def _generate_min_or_max_kernel(
 
     ops.append(
         """
-        if (_w[iw]) {{
+        if (w_data[iw]) {{
             if ({cond}) {{
                 val = (X){cval};
             }} else {{
                 int ix = {expr};
-                val = (X)_x[ix];
+                val = (X)x_data[ix];
             }}
             if ((mask_count == 0) || (val {comp_op} result)) {{
                 result = val;
@@ -183,8 +193,13 @@ def _generate_min_or_max_kernel(
             cond=_cond, expr=_expr, cval=cval, comp_op=comp_op
         )
     )
+    if trim_unit_dims:
+        ops.append(
+            "} " * functools.reduce(operator.add, [s > 1 for s in wshape])
+        )
+    else:
+        ops.append("}" * ndim)  # end of loop over footprint
 
-    ops.append("}" * ndim)  # end of loop over footprint
     if unsigned_output:
         # Avoid undefined behaviour of float -> unsigned conversions
         # TODO: fix this
@@ -238,7 +253,7 @@ def _generate_min_or_max_kernel_masked(
             val = (X){cval};
         }} else {{
             int ix = {expr};
-            val = (X)_x[ix];
+            val = (X)x_data[ix];
         }}
         if ((iw == 0) || (val {comp_op} result)) {{
             result = val;
@@ -308,9 +323,9 @@ def _generate_min_or_max_kernel_masked_v2(
                 result = _cval;
             }} else {{
                 int ix = {expr};
-                result = (X)_x[ix];
+                result = (X)x_data[ix];
             }}
-            result += _wvals[0];
+            result += wvals_data[0];
             continue;
         }} else {{
             X _tmp;
@@ -318,9 +333,9 @@ def _generate_min_or_max_kernel_masked_v2(
                 _tmp = _cval;
             }} else {{
                 int ix = {expr};
-                _tmp = (X)_x[ix];
+                _tmp = (X)x_data[ix];
             }}
-            _tmp += _wvals[iw];
+            _tmp += wvals_data[iw];
 
             if ((_tmp {comp_op} result)) {{
                 result = _tmp;

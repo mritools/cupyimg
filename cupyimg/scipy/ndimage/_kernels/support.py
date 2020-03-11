@@ -106,7 +106,7 @@ def _nested_loops_init(
             # checking of the boundary conditions on this axis
             ops.append(
                 """
-        int ix_{j} = cx_{j};""".format(
+        int ix_{j} = cx_{j} * sx_{j};""".format(
                     j=j
                 )
             )
@@ -156,7 +156,7 @@ def _masked_loop_init(mode, xshape, fshape, origin, nnz):
     for j in range(ndim):
         ops.append(
             """
-                int iw_{j} = _wlocs[iw + {j} * {nnz}];
+                int iw_{j} = wlocs_data[iw + {j} * {nnz}];
                 int ix_{j} = cx_{j} + iw_{j};""".format(
                 j=j, nnz=nnz
             )
@@ -197,7 +197,7 @@ def _pixelmask_to_buffer(mode, cval, xshape, fshape, origin, nnz):
             selected[iw] = (X){cval};
         }} else {{
             int ix = {expr};
-            selected[iw] = (X)_x[ix];
+            selected[iw] = (X)x_data[ix];
         }}
         """.format(
             cond=_cond, expr=_expr, cval=cval
@@ -239,7 +239,7 @@ def _pixelregion_to_buffer(mode, cval, xshape, fshape, origin, nnz):
             selected[iw] = (X){cval};
         }} else {{
             int ix = {expr};
-            selected[iw] = (X)_x[ix];
+            selected[iw] = (X)x_data[ix];
         }}
         iw += 1;
         """.format(
@@ -255,12 +255,12 @@ def _pixelregion_to_buffer(mode, cval, xshape, fshape, origin, nnz):
 def _raw_ptr_ops(in_params):
     """Generate pointers to an array to use in place of CArray indexing.
 
-    The ptr will have a name matching the input variable, but will be prefixed
-    with an underscore.
+    The ptr will have a name matching the input variable, but will have
+    _data appended to the name.
 
     As a concrete example, `_raw_ptr_ops('raw X x, raw W w')` would return:
 
-        ['X _x = (X*)&(x[0]);', 'W _w = (W*)&(w[0]);']
+        ['X x_data = (X*)&(x[0]);', 'W w_data = (W*)&(w[0]);']
 
     """
     ops = []
@@ -268,5 +268,5 @@ def _raw_ptr_ops(in_params):
         in_p = in_p.strip()
         if in_p.startswith('raw '):
             _, typ, name = in_p.split(' ')
-            ops.append(f'{typ}* _{name} = ({typ}*)&({name}[0]);')
+            ops.append(f'{typ}* {name}_data = ({typ}*)&({name}[0]);')
     return ops

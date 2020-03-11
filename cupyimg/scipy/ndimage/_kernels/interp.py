@@ -34,7 +34,7 @@ def _get_coord_map(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = _coords[i + {j} * ncoords];
+    W c_{j} = coords_data[i + {j} * ncoords];
             """.format(
                 j=j
             )
@@ -62,7 +62,7 @@ def _get_coord_zoom_and_shift(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = _zoom[{j}] * ((W)in_coord[{j}] - _shift[{j}]);
+    W c_{j} = zoom_data[{j}] * ((W)in_coord[{j}] - shift_data[{j}]);
             """.format(
                 j=j
             )
@@ -89,7 +89,7 @@ def _get_coord_zoom(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = _zoom[{j}] * (W)in_coord[{j}];
+    W c_{j} = zoom_data[{j}] * (W)in_coord[{j}];
             """.format(
                 j=j
             )
@@ -116,7 +116,7 @@ def _get_coord_shift(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = (W)in_coord[{j}] - _shift[{j}];
+    W c_{j} = (W)in_coord[{j}] - shift_data[{j}];
             """.format(
                 j=j
             )
@@ -158,14 +158,14 @@ def _get_coord_affine(ndim):
             m_index = ncol * j + k
             ops.append(
                 """
-            c_{j} += _mat[{m_index}] * (W)in_coord[{k}];
+            c_{j} += mat_data[{m_index}] * (W)in_coord[{k}];
                 """.format(
                     j=j, k=k, m_index=m_index
                 )
             )
         ops.append(
             """
-            c_{j} += _mat[{m_index}];
+            c_{j} += mat_data[{m_index}];
             """.format(
                 j=j, m_index=ncol * j + ndim
             )
@@ -302,7 +302,7 @@ def _generate_interp_custom(
             if ({cond}) {{
                 out = (double){cval};
             }} else {{
-                out = _x[{coord_idx}];
+                out = x_data[{coord_idx}];
             }}
             """.format(
                     cond=_cond, cval=cval, coord_idx=_coord_idx
@@ -311,7 +311,7 @@ def _generate_interp_custom(
         else:
             ops.append(
                 """
-                out = _x[{coord_idx}];
+                out = x_data[{coord_idx}];
                 """.format(
                     coord_idx=_coord_idx
                 )
@@ -377,7 +377,7 @@ def _generate_interp_custom(
             if ({cond}) {{
                 out += (double){cval} * ({weight});
             }} else {{
-                X val = _x[{coord_idx}];
+                X val = x_data[{coord_idx}];
                 out += val * ({weight});
             }}
             """.format(
@@ -387,7 +387,7 @@ def _generate_interp_custom(
         else:
             ops.append(
                 """
-            X val = _x[{coord_idx}];
+            X val = x_data[{coord_idx}];
             out += val * ({weight});
             """.format(
                     coord_idx=_coord_idx, weight=_weight
