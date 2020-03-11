@@ -1,8 +1,11 @@
+import numpy as np
 import cupy as cp
 import pytest
+
 from cupyimg.skimage.filters._gaussian import (
     gaussian,
     _guess_spatial_dimensions,
+    difference_of_gaussians,
 )
 from skimage._shared._warnings import expected_warnings
 
@@ -107,3 +110,43 @@ def test_output_error():
     output = cp.zeros_like(image, dtype=cp.uint8)
     with pytest.raises(ValueError):
         gaussian(image, sigma=1, output=output, preserve_range=True)
+
+
+@pytest.mark.parametrize("s", [1, (2, 3)])
+@pytest.mark.parametrize("s2", [4, (5, 6)])
+def test_difference_of_gaussians(s, s2):
+    image = cp.random.rand(10, 10)
+    im1 = gaussian(image, s)
+    im2 = gaussian(image, s2)
+    dog = im1 - im2
+    dog2 = difference_of_gaussians(image, s, s2)
+    assert cp.allclose(dog, dog2)
+
+
+@pytest.mark.parametrize("s", [1, (1, 2)])
+def test_auto_sigma2(s):
+    image = cp.random.rand(10, 10)
+    im1 = gaussian(image, s)
+    s2 = 1.6 * np.array(s)
+    im2 = gaussian(image, s2)
+    dog = im1 - im2
+    dog2 = difference_of_gaussians(image, s, s2)
+    assert cp.allclose(dog, dog2)
+
+
+def test_dog_invalid_sigma_dims():
+    image = cp.ones((5, 5, 3))
+    with pytest.raises(ValueError):
+        difference_of_gaussians(image, (1, 2))
+    with pytest.raises(ValueError):
+        difference_of_gaussians(image, 1, (3, 4))
+    with pytest.raises(ValueError):
+        difference_of_gaussians(image, (1, 2, 3), multichannel=True)
+
+
+def test_dog_invalid_sigma2():
+    image = cp.ones((3, 3))
+    with pytest.raises(ValueError):
+        difference_of_gaussians(image, 3, 2)
+    with pytest.raises(ValueError):
+        difference_of_gaussians(image, (1, 5), (2, 4))

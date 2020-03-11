@@ -1,5 +1,9 @@
 from .lpi_filter import inverse, wiener, LPIFilter2D
-from ._gaussian import gaussian, _guess_spatial_dimensions  # noqa
+from ._gaussian import (
+    gaussian,
+    _guess_spatial_dimensions,
+    difference_of_gaussians,
+)  # noqa
 from .edges import (
     sobel,
     sobel_h,
@@ -30,6 +34,7 @@ __all__ = [
     "wiener",
     "LPIFilter2D",
     "gaussian",
+    "difference_of_gaussians",
     "median",
     "sobel",
     "sobel_h",
