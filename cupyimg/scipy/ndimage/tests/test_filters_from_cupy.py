@@ -142,3 +142,15 @@ class TestConvolveAndCorrelateSpecialCases(unittest.TestCase):
                 continue
             with self.assertRaises(ValueError):
                 self._filter(cupyimg.scipy, a, w, origin=origin)
+
+    @numpy_cupyimg_allclose(atol=1e-5, rtol=1e-5, scipy_name="scp")
+    def test_noncontig_input(self, xp, scp):
+        a = testing.shaped_random((16,) * self.ndim, xp, self.dtype)
+        w = testing.shaped_random((3,) * self.ndim, xp, self.dtype)
+        return self._filter(scp, a[..., :4], w)
+
+    @numpy_cupyimg_allclose(atol=1e-5, rtol=1e-5, scipy_name="scp")
+    def test_noncontig_weights(self, xp, scp):
+        a = testing.shaped_random((8,) * self.ndim, xp, self.dtype)
+        w = testing.shaped_random((4,) * self.ndim, xp, self.dtype)
+        return self._filter(scp, a, w[..., :2])

@@ -231,6 +231,9 @@ def _binary_erosion(
         raise TypeError("iterations parameter should be an integer")
 
     input = cupy.asarray(input)
+    if not input.flags.c_contiguous:
+        # TODO: grlee77: current indexing requires C contiguous arrays.
+        input = cupy.ascontiguousarray(input)
     if cupy.iscomplexobj(input):
         raise TypeError("Complex type not supported")
     if structure is None:
@@ -240,7 +243,8 @@ def _binary_erosion(
     if structure.ndim != input.ndim:
         raise RuntimeError("structure and input must have same dimensionality")
     if not structure.flags.c_contiguous:
-        structure = structure.copy()
+        # TODO: grlee77: current indexing requires C contiguous arrays.
+        structure = cupy.ascontiguousarray(structure)
     # if functools.reduce(operator.mul, structure.shape) < 1:
     if structure.size < 1:
         raise RuntimeError("structure must not be empty")
@@ -249,6 +253,9 @@ def _binary_erosion(
         mask = cupy.asarray(mask)
         if mask.shape != input.shape:
             raise RuntimeError("mask and input must have equal sizes")
+        if not mask.flags.c_contiguous:
+            # TODO: grlee77: current indexing requires C contiguous arrays.
+            mask = cupy.asacontiguousarray(mask)
         masked = True
     else:
         masked = False
@@ -277,13 +284,6 @@ def _binary_erosion(
         invert,
         masked,
     )
-
-    # TODO: grlee77: current indexing via x_data, etc. requires
-    #       C contiguous input arrays.
-    input = cupy.ascontiguousarray(input)
-    structure = cupy.ascontiguousarray(structure)
-    if masked:
-        mask = cupy.ascontiguousarray(mask)
 
     if iterations == 1:
         if masked:

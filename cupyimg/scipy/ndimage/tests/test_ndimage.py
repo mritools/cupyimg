@@ -1505,6 +1505,15 @@ class TestNdimage:
             out = ndimage.binary_erosion(data, border_value=1)
             assert_array_almost_equal(out, [[1, 1, 1]])
 
+    def test_binary_erosion19_noncontig(self):
+        # TODO: grlee77: add other cases with non-contiguous input
+        for type_ in self.types:
+            data = cupy.ones([1, 3, 4, 5, 0, 0, 0, 5], type_)
+            out = ndimage.binary_erosion(data[::-1], border_value=1)
+            expected = ndimage.binary_erosion(cupy.ascontiguousarray(data[::-1]), border_value=1)
+            assert_array_almost_equal(out, expected)
+
+
     def test_binary_erosion20(self):
         for type_ in self.types:
             data = cupy.ones([3, 3], type_)
@@ -1548,6 +1557,12 @@ class TestNdimage:
             )
             out = ndimage.binary_erosion(data, border_value=1)
             assert_array_almost_equal(out, expected)
+
+            # grlee77 add non-contiguous test case
+            out2 = ndimage.binary_erosion(data[::-1], border_value=1)
+            expected2 = ndimage.binary_erosion(
+                cupy.ascontiguousarray(data[::-1]), border_value=1)
+            assert_array_almost_equal(out2, expected2)
 
     def test_binary_erosion23(self):
         struct = ndimage.generate_binary_structure(2, 2)
@@ -1606,6 +1621,18 @@ class TestNdimage:
             )
             out = ndimage.binary_erosion(data, struct, border_value=1)
             assert_array_almost_equal(out, expected)
+
+            # grlee77: add cases with non-contiguous input
+            out2 = ndimage.binary_erosion(data[::-1], struct, border_value=1)
+            expected2 = ndimage.binary_erosion(
+                data[::-1].copy(), struct, border_value=1)
+            assert_array_almost_equal(out2, expected2)
+
+            out2 = ndimage.binary_erosion(data, struct[::-1], border_value=1)
+            expected2 = ndimage.binary_erosion(
+                data, struct[::-1].copy(), border_value=1
+            )
+            assert_array_almost_equal(out2, expected2)
 
     def test_binary_erosion25(self):
         # fmt: off
