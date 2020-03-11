@@ -23,7 +23,7 @@ import warnings
 import cupy
 import numpy as np
 
-from ..color.colorconv import lab2lch, _cart2polar_2pi
+from .colorconv import lab2lch, _cart2polar_2pi
 
 
 def deltaE_cie76(lab1, lab2):
@@ -127,7 +127,7 @@ def deltaE_ciede94(lab1, lab2, kH=1, kC=1, kL=1, k1=0.045, k2=0.015):
     tmp = kH * SH
     tmp *= tmp
     dE2 += dH2 / tmp
-    return cupy.sqrt(dE2, out=dE2)
+    return cupy.sqrt(cupy.maximum(dE2, 0, out=dE2), out=dE2)
 
 
 def deltaE_ciede2000(lab1, lab2, kL=1, kC=1, kH=1):
@@ -257,10 +257,10 @@ def deltaE_ciede2000(lab1, lab2, kL=1, kC=1, kH=1):
     dE2 += C_term * C_term
     dE2 += H_term * H_term
     dE2 += R_term
-    ans = cupy.sqrt(dE2)
+    cupy.sqrt(cupy.maximum(dE2, 0, out=dE2), out=dE2)
     if unroll:
-        ans = ans[0]
-    return ans
+        dE2 = dE2[0]
+    return dE2
 
 
 def deltaE_cmc(lab1, lab2, kL=1, kC=1):
@@ -324,7 +324,7 @@ def deltaE_cmc(lab1, lab2, kL=1, kC=1):
     dE2 = (dL / (kL * SL)) ** 2
     dE2 += (dC / (kC * SC)) ** 2
     dE2 += dH2 / (SH ** 2)
-    return cupy.sqrt(dE2)
+    return cupy.sqrt(cupy.maximum(dE2, 0, out=dE2), out=dE2)
 
 
 def get_dH2(lab1, lab2):

@@ -4,9 +4,13 @@ from os.path import abspath, dirname, join as pjoin
 import cupy as cp
 import numpy as np
 import pytest
-from cupy.testing import assert_allclose
+from cupy.testing import (
+    assert_allclose,
+    assert_array_almost_equal,
+    assert_array_equal
+)
 
-from cupyimg.skimage.color import (
+from cupyimg.skimage.color.delta_e import (
     deltaE_cie76,
     deltaE_ciede94,
     deltaE_ciede2000,
@@ -162,6 +166,23 @@ def test_cmc():
     # fmt: on
 
     assert_allclose(dE2, oracle, rtol=1.0e-8)
+
+    # Equal or close colors make `delta_e.get_dH2` function to return
+    # negative values resulting in NaNs when passed to sqrt (see #1908
+    # issue on Github):
+    lab1 = lab2
+    expected = cp.zeros_like(oracle)
+    assert_array_almost_equal(deltaE_cmc(lab1, lab2), expected, decimal=6)
+
+    lab2[0, 0] += cp.finfo(float).eps
+    assert_array_almost_equal(deltaE_cmc(lab1, lab2), expected, decimal=6)
+
+    # Single item case:
+    lab1 = lab2 = cp.asarray([0., 1.59607713, 0.87755709])
+    assert_array_equal(deltaE_cmc(lab1, lab2), 0)
+
+    lab2[0] += cp.finfo(float).eps
+    assert_array_equal(deltaE_cmc(lab1, lab2), 0)
 
 
 def test_single_color_cie76():
