@@ -106,6 +106,7 @@ yg = uniform_filter(xg, size=5)
 
 **cupyimg.numpy**:
 
+- apply_along_axis
 - convolve
 - correlate
 - gradient
@@ -120,27 +121,18 @@ yg = uniform_filter(xg, size=5)
 - interpnd
 - RegularGridInterpolator
 
-**cupyimg.scipy.ndimage**:
+**cupyimg.scipy.ndimage.filters**:
 
-- binary_erosion
-- binary_dilation
-- binary_opening
-- binary_closing
-- binary_hit_or_miss
-- binary_propagation
-- binary_fill_holes- convolve
-- black_tophat
-- convolve1d
-- correlate
-- correlate1d
+- convolve  (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
+- convolve1d  (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
+- correlate  (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
+- correlate1d  (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
 - gaussian_filter
 - gaussian_filter1d
 - gaussian_laplace
 - gaussian_gradient_magnitude
-- generate_binary_structure
 - generic_laplace
 - generic_gradient_magnitude
-- iterate_structure
 - laplace
 - prewitt
 - sobel
@@ -151,10 +143,51 @@ yg = uniform_filter(xg, size=5)
 - median_filter
 - minimum_filter
 - minimum_filter1d
-- morphological_gradient
-- morphological_laplace
 - percentile_filter
 - rank_filter
+
+**cupyimg.scipy.ndimage.fourier**:
+
+- fourier_shift
+
+**cupyimg.scipy.ndimage.interpolation**:
+
+- affine_transform  (upstream PR: [3166](https://github.com/cupy/cupy/pull/3166))
+- map_coordinates  (upstream PR: [3166](https://github.com/cupy/cupy/pull/3166))
+- rotate  (upstream PR: [3166](https://github.com/cupy/cupy/pull/3166))
+- shift  (upstream PR: [3166](https://github.com/cupy/cupy/pull/3166))
+- zoom  (upstream PR: [3166](https://github.com/cupy/cupy/pull/3166))
+
+**cupyimg.scipy.ndimage.measurements**:
+
+- center_of_mass
+- extrema
+- histogram
+- labeled_comprehension
+- maximum
+- maximum_position
+- mean
+- median
+- minimum
+- minimum_position
+- standard_deviation
+- sum
+- variance
+
+**cupyimg.scipy.ndimage.morphology**:
+
+- binary_erosion
+- binary_dilation
+- binary_opening
+- binary_closing
+- binary_hit_or_miss
+- binary_propagation
+- binary_fill_holes- convolve
+- black_tophat
+- generate_binary_structure
+- iterate_structure
+- morphological_gradient
+- morphological_laplace
 - white_tophat
 
 **cupyimg.scipy.signal**:
@@ -204,6 +237,7 @@ yg = uniform_filter(xg, size=5)
 
 **skimage.filters**:
 
+- difference_of_gaussians
 - farid
 - farid_h
 - farid_v
