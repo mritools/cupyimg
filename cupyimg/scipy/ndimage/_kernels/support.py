@@ -73,31 +73,6 @@ def _get_init_loop_vars(xshape, fshape, origin):
     return ops
 
 
-# def _compute_center_index_and_val(mode, xshape, fshape, background_val):
-#     ops = []
-#     ndim = len(xshape)
-#     ops.append('X val_center;')
-#     ops.append('int i_center = 0;')
-#     ops.append('{')
-#     for j in range(ndim - 1, -1, -1):
-#         ops.append("""
-#             int i_center_{j} = (cx_{j} + {fcenter}) * sx_{j};""".format(
-#             j=j, fcenter=fshape[j] // 2))
-#         ixvar = 'i_center_{}'.format(j)
-#         ops.append(
-#             _generate_boundary_condition_ops(mode, ixvar, xshape[j])
-#         )
-#         ops.append("""
-#             if (i_center_{j} == -1) {{
-#                 val_center = {background_val};
-#                 break;
-#             }} else {{
-#                 i_center += i_center_{j} * sx_{j};
-#             }}""".format(j=j, background_val=background_val))
-#     ops.append('val_center = x[i_center];')
-#     ops.append('}')
-
-
 def _nested_loops_init(
     mode,
     xshape,
@@ -174,7 +149,7 @@ def _masked_loop_init(mode, xshape, fshape, origin, nnz):
     for j in range(ndim):
         ops.append(
             """
-                int iw_{j} = wlocs[iw + {j} * {nnz}];
+                int iw_{j} = _wlocs[iw + {j} * {nnz}];
                 int ix_{j} = cx_{j} + iw_{j};""".format(
                 j=j, nnz=nnz
             )
@@ -215,7 +190,7 @@ def _pixelmask_to_buffer(mode, cval, xshape, fshape, origin, nnz):
             selected[iw] = (X){cval};
         }} else {{
             int ix = {expr};
-            selected[iw] = (X)x[ix];
+            selected[iw] = (X)_x[ix];
         }}
         """.format(
             cond=_cond, expr=_expr, cval=cval
@@ -257,7 +232,7 @@ def _pixelregion_to_buffer(mode, cval, xshape, fshape, origin, nnz):
             selected[iw] = (X){cval};
         }} else {{
             int ix = {expr};
-            selected[iw] = (X)x[ix];
+            selected[iw] = (X)_x[ix];
         }}
         iw += 1;
         """.format(
@@ -267,4 +242,24 @@ def _pixelregion_to_buffer(mode, cval, xshape, fshape, origin, nnz):
 
     ops.append("}" * ndim)
 
+    return ops
+
+
+def _raw_ptr_ops(in_params):
+    """Generate pointers to an array to use in place of CArray indexing.
+
+    The ptr will have a name matching the input variable, but will be prefixed
+    with an underscore.
+
+    As a concrete example, `_raw_ptr_ops('raw X x, raw W w')` would return:
+
+        ['X _x = (X*)&(x[0]);', 'W _w = (W*)&(w[0]);']
+
+    """
+    ops = []
+    for in_p in in_params.split(','):
+        in_p = in_p.strip()
+        if in_p.startswith('raw '):
+            _, typ, name = in_p.split(' ')
+            ops.append(f'{typ}* _{name} = ({typ}*)&({name}[0]);')
     return ops

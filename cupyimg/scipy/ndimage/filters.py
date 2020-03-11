@@ -1102,28 +1102,6 @@ def minimum_filter(
 
     .. seealso:: :func:`scipy.ndimage.minimum_filter`
     """
-    # ndim = input.ndim
-    # fshape, footprint, filter_size = _prep_size_footprint(
-    #     ndim, size, footprint, allow_separable=True
-    # )
-    # if footprint is None:
-    #     modes = _ni_support._normalize_sequence(mode, ndim)
-    #     # all elements true -> can use separable application of 1d filters
-    #     fshape_1d = [1, ] * ndim
-    #     for ax, sz in zip(range(ndim), fshape):
-    #         fshape_1d[ax] = sz
-    #         footprint = cupy.ones(tuple(fshape_1d), dtype=cupy.bool)
-    #         fshape_1d[ax] = 1
-    #         if ax == 0:
-    #             result = _min_or_max_filter(
-    #                 input, size, footprint, None, output, modes[ax], cval, origin, True
-    #             )
-    #         else:
-    #             result = _min_or_max_filter(
-    #                 result, size, footprint, None, None, modes[ax], cval, origin, True
-    #             )
-    #     return result
-
     return _min_or_max_filter(
         input, size, footprint, None, output, mode, cval, origin, True
     )
