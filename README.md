@@ -77,11 +77,21 @@ Developers should see additional requirements for development in
 
 **Installation:**
 
-This package can be obtained from PyPI via
+Packages for `cupyimg` are not yet on PyPI or conda-forge. Users should first
+configure a working CuPy environment that also includes NumPy, SciPy and
+scikit-image. `fast_upfirdn` can then be installed via.
 
 ```
-pip install cupyimg
+pip install fast_upfirdn
 ```
+
+Users should then clone the cupyimg source directory and navigate to it. Run
+the following to install it in development mode:
+
+```
+python -m pip install -e . -v  --no-build-isolation --no-use-pep517
+```
+
 
 **Example**
 ```Python
