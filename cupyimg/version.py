@@ -98,5 +98,5 @@ PACKAGE_DATA = {
         pjoin("skimage", "util", "tests"),
     ]
 }
-REQUIRES = ["numpy", "cupy"]
+REQUIRES = ["numpy"]
 PYTHON_REQUIRES = ">= 3.6"
