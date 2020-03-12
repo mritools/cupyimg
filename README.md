@@ -6,17 +6,20 @@ This package implements a subset of functions from [NumPy], [SciPy] and
 [scikit-image] with GPU support.
 
 These implementations generally match the API and behavior of their
-corresponding CPU equivalents, although there are some exceptions.
+corresponding CPU equivalents, although there are some limited exceptions.
 In some cases such as scipy.ndimage equivalents, complex-valued support is
 available on the GPU even though it is not present as part of the upstream
-library.
+library. See additional details under [API Differences](#Differences).
 
-Ideally, the NumPy/Scipy function implemented here will be submitted upstream
+Ideally, NumPy/Scipy function implemented here will be submitted upstream
 to [CuPy] itself where they will benefit from a more comprehensive CI
 architecture on real GPU hardware and a broader set of maintainers. Currently,
 testing of this package on NVIDIA hardware has been done only on an
 NVIDIA 1080 Ti GPU using CUDA versions 9.2-10.2. However, it should work for
 all CUDA versions supported by the underlying CuPy library.
+
+A more complete list of the implemented functions is available in the section
+below on [Implemented Functions](#Implemented).
 
 ## Basic Usage
 
@@ -31,7 +34,8 @@ itself where support for such array-likes is generally disallowed due to
 performance considerations. In ``cupyimg`` this ``cupy.ndarray`` rule is not
 yet consistently enforced everywhere, so some functions still accept numpy
 arrays as inputs and will transfer to the GPU automatically internally via
-``cupy.asarray``.
+``cupy.asarray``. Any such automatic coercion should not be relied upon and is
+subject to be removed in the future.
 
 An simple example demonstrating applying of a uniform_filter to an array is:
 
@@ -98,10 +102,52 @@ y = ndi.uniform_filter(x, size=5)
 xg = cupy.asarray(x)
 yg = uniform_filter(xg, size=5)
 # %timeit yg = uniform_filter(xg, size=5); d.synchronize()
-#    -> 26.6 ms ± 45 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
+#    -> 6.23 ms ± 24.8 µs per loop (mean ± std. dev. of 7 runs, 10 loops each)
 ```
 
+<a name="Differences"></a>
+## API/Behavior Differences
 
+### lack of automatic array coercion
+
+As in CuPy itself, automatic conversion via `cupy.asarray()` is typically not
+performed on inputs in order to avoid unintended overheads from host/device
+transfers. Thus, many functions only accept CuPy arrays rather than more
+general array-likes as input. Enforcing this policy uniformly across `cupyimg`
+still needs some work, but in general one should not expected lists, numpy
+arrays or other iterables to be acceptable "image" inputs.
+
+### complex dtypes
+
+Many functions in `cupyimg.scipy.ndimage` support complex-valued floating point
+dtypes. These are not currently supported in the upstream `scipy.ndimage`
+module.
+
+### single precision operations
+
+The functions in `scipy.ndimage.filters` have an additional `dtype_mode`
+keyword-only argument. When set to the default value of `ndimage`, convolutions
+are performed in double-precision as is done by `scipy.ndimage`. However, on
+the GPU single-precision operations are often substantially faster. The user
+can specify `dtype_mode='float'` to allow single-precision computations on
+single-precision inputs.
+
+### additional keyword-only arguments
+
+`cupyimg.scipy.ndimage.convolve` and `cupyimg.scipy.ndimage.correlate` have a
+couple of keyword-only arguments not present in `scipy.ndimage`. These are
+experimental and subject to change. For example, a `crop` kwarg allows
+performing "full" convolutions instead of one limited to the original image
+extent.
+
+### lack of exotic dtype support
+
+Some functions such as `numpy.convolve` support less common dtypes such as
+`datetime64` or `Decimal`. These are not supported by upstream CuPy and are
+thus not available in `cupyimg` either.
+
+
+<a name="Implemented"></a>
 ## Available Functions
 
 **cupyimg.numpy**:
