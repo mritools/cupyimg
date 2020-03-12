@@ -1,2 +1,5 @@
 numpy>=1.14.5
+scipy>=1.2
+scikit-image>=0.16.2
+fast_upfirdn>=0.2
 # cupy-cudaXXX>=7.0

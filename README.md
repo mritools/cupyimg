@@ -78,19 +78,23 @@ Developers should see additional requirements for development in
 **Installation:**
 
 Packages for `cupyimg` are not yet on PyPI or conda-forge. Users should first
-configure a working CuPy environment that also includes NumPy, SciPy and
-scikit-image. `fast_upfirdn` can then be installed via.
+configure a working CuPy environment. Then cupyimg can be installed from
+source.
+
+An example installing cupyimg in a new conda environment is:
 
 ```
+conda create -n cupyimg python=3.7
+conda activate cupyimg
+conda install numpy scipy scikit-image pytest cudatoolkit
+pip install cupy-cuda101
 pip install fast_upfirdn
+pip install https://github.com/mritools/cupyimg/archive/master.zip
 ```
 
-Users should then clone the cupyimg source directory and navigate to it. Run
-the following to install it in development mode:
-
-```
-python -m pip install -e . -v  --no-build-isolation --no-use-pep517
-```
+where cupy-cuda101 in the above will need to be changed to the appropriate
+version for the user's CUDA toolkit. See
+[CuPy's documentation](https://docs-cupy.chainer.org/en/stable/install.html#install-cupy).
 
 
 **Example**
