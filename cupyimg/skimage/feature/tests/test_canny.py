@@ -1,7 +1,6 @@
 import unittest
 
 import cupy as cp
-import numpy as np
 from cupy.testing import assert_array_equal
 from skimage import data
 
@@ -145,9 +144,14 @@ class TestCanny(unittest.TestCase):
 
         # Example from issue #4282
         image = data.camera()
-        self.assertRaises(ValueError, F.canny, image, use_quantiles=True,
-                          low_threshold=50, high_threshold=150)
-
+        self.assertRaises(
+            ValueError,
+            F.canny,
+            image,
+            use_quantiles=True,
+            low_threshold=50,
+            high_threshold=150,
+        )
 
     def test_dtype(self):
         """Check that the same output is produced regardless of image dtype."""

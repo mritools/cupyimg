@@ -1005,7 +1005,6 @@ def _conv_ops(x_shape, h_shape, mode):
     FFT (and the implementation of ``_freq_domain_conv``).
 
     """
-    x_size, h_size = _prod(x_shape), _prod(h_shape)
     if mode == "full":
         out_shape = [n + k - 1 for n, k in zip(x_shape, h_shape)]
     elif mode == "valid":

@@ -619,17 +619,15 @@ rbd_from_rgb = linalg.inv(rgb_from_rbd)
 # Methyl Green + DAB
 # fmt: off
 rgb_from_gdx = np.array([[0.98003, 0.144316, 0.133146],
-                           [0.268, 0.570, 0.776],
-                           [0.0, 0.0, 0.0]])
-# fmt: on
+                         [0.268, 0.570, 0.776],
+                         [0.0, 0.0, 0.0]])
 rgb_from_gdx[2, :] = np.cross(rgb_from_gdx[0, :], rgb_from_gdx[1, :])
 gdx_from_rgb = linalg.inv(rgb_from_gdx)
 
 # Hematoxylin + AEC
-# fmt: off
 rgb_from_hax = np.array([[0.650, 0.704, 0.286],
-                           [0.2743, 0.6796, 0.6803],
-                           [0.0, 0.0, 0.0]])
+                         [0.2743, 0.6796, 0.6803],
+                         [0.0, 0.0, 0.0]])
 rgb_from_hax[2, :] = np.cross(rgb_from_hax[0, :], rgb_from_hax[1, :])
 hax_from_rgb = linalg.inv(rgb_from_hax)
 
@@ -659,6 +657,7 @@ rgb_from_hpx = np.asarray([[0.644211, 0.716556, 0.266844],
                            [0.0, 0.0, 0.0]])
 rgb_from_hpx[2, :] = np.cross(rgb_from_hpx[0, :], rgb_from_hpx[1, :])
 hpx_from_rgb = linalg.inv(rgb_from_hpx)
+# fmt: on
 
 # -------------------------------------------------------------
 # The conversion functions that make use of the matrices above
@@ -893,8 +892,12 @@ def rgb2gray(rgb):
 
 @functools.wraps(rgb2gray)
 def rgb2grey(rgb):
-    warn('rgb2grey is deprecated. It will be removed in version 0.19.'
-         'Please use rgb2gray instead.', FutureWarning, stacklevel=2)
+    warn(
+        "rgb2grey is deprecated. It will be removed in version 0.19."
+        "Please use rgb2gray instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
     return rgb2gray(rgb)
 
 
@@ -940,8 +943,10 @@ def gray2rgb(image, alpha=None):
             image = image[..., :3]
 
         elif alpha is True and is_alpha is False:
-            alpha_layer = (cupy.ones_like(image[..., 0, np.newaxis]) *
-                           dtype_limits(image, clip_negative=False)[1])
+            alpha_layer = (
+                cupy.ones_like(image[..., 0, np.newaxis])
+                * dtype_limits(image, clip_negative=False)[1]
+            )
             image = cupy.concatenate((image, alpha_layer), axis=2)
 
         return image
@@ -950,7 +955,10 @@ def gray2rgb(image, alpha=None):
         image = image[..., np.newaxis]
 
         if alpha:
-            alpha_layer = (cupy.ones_like(image) * dtype_limits(image, clip_negative=False)[1])
+            alpha_layer = (
+                cupy.ones_like(image)
+                * dtype_limits(image, clip_negative=False)[1]
+            )
             return cupy.concatenate(3 * (image,) + (alpha_layer,), axis=-1)
         else:
             return cupy.concatenate(3 * (image,), axis=-1)
@@ -961,8 +969,12 @@ def gray2rgb(image, alpha=None):
 
 @functools.wraps(gray2rgb)
 def grey2rgb(image):
-    warn('grey2rgb is deprecated. It will be removed in version 0.19.'
-         'Please use gray2rgb instead.', FutureWarning, stacklevel=2)
+    warn(
+        "grey2rgb is deprecated. It will be removed in version 0.19."
+        "Please use gray2rgb instead.",
+        FutureWarning,
+        stacklevel=2,
+    )
     return gray2rgb(image)
 
 
@@ -1022,12 +1034,12 @@ def xyz2lab(xyz, illuminant="D65", observer="2"):
     # Nonlinear distortion and linear transformation
     mask = arr > 0.008856
     arr[mask] = cupy.cbrt(arr[mask])
-    arr[~mask] = 7.787 * arr[~mask] + 16. / 116.
+    arr[~mask] = 7.787 * arr[~mask] + 16.0 / 116.0
 
     x, y, z = arr[..., 0], arr[..., 1], arr[..., 2]
 
     # Vector scaling
-    L = (116. * y) - 16.
+    L = (116.0 * y) - 16.0
     a = 500.0 * (x - y)
     b = 200.0 * (y - z)
 
@@ -1078,21 +1090,23 @@ def lab2xyz(lab, illuminant="D65", observer="2"):
     arr = _prepare_colorarray(lab).copy()
 
     L, a, b = arr[:, :, 0], arr[:, :, 1], arr[:, :, 2]
-    y = (L + 16.) / 116.
-    x = (a / 500.) + y
-    z = y - (b / 200.)
+    y = (L + 16.0) / 116.0
+    x = (a / 500.0) + y
+    z = y - (b / 200.0)
 
     if cupy.any(z < 0):
         invalid = cupy.nonzero(z < 0)
-        warn('Color data out of range: Z < 0 in %s pixels' % invalid[0].size,
-             stacklevel=2)
+        warn(
+            "Color data out of range: Z < 0 in %s pixels" % invalid[0].size,
+            stacklevel=2,
+        )
         z[invalid] = 0
 
     out = cupy.dstack([x, y, z])
 
     mask = out > 0.2068966
-    out[mask] = cupy.power(out[mask], 3.)
-    out[~mask] = (out[~mask] - 16.0 / 116.) / 7.787
+    out[mask] = cupy.power(out[mask], 3.0)
+    out[~mask] = (out[~mask] - 16.0 / 116.0) / 7.787
 
     # rescale to the reference white (illuminant)
     xyz_ref_white = get_xyz_coords(illuminant, observer, arr.dtype)
@@ -1228,10 +1242,12 @@ def xyz2luv(xyz, illuminant="D65", observer="2"):
     eps = np.finfo(np.float).eps
 
     # compute y_r and L
-    xyz_ref_white = cupy.asarray(get_xyz_coords(illuminant, observer, arr.dtype))
+    xyz_ref_white = cupy.asarray(
+        get_xyz_coords(illuminant, observer, arr.dtype)
+    )
     L = y / xyz_ref_white[1]
     mask = L > 0.008856
-    L[mask] = 116. * cupy.cbrt(L[mask]) - 16.
+    L[mask] = 116.0 * cupy.cbrt(L[mask]) - 16.0
     L[~mask] = 903.3 * L[~mask]
 
     tmp = cupy.asarray([1, 15, 3], dtype=arr.dtype)
@@ -1240,14 +1256,14 @@ def xyz2luv(xyz, illuminant="D65", observer="2"):
 
     # u' and v' helper functions
     def fu(X, Y, Z):
-        return (4. * X) / (X + 15. * Y + 3. * Z + eps)
+        return (4.0 * X) / (X + 15.0 * Y + 3.0 * Z + eps)
 
     def fv(X, Y, Z):
-        return (9. * Y) / (X + 15. * Y + 3. * Z + eps)
+        return (9.0 * Y) / (X + 15.0 * Y + 3.0 * Z + eps)
 
     # compute u and v using helper functions
-    u = 13. * L * (fu(x, y, z) - u0)
-    v = 13. * L * (fv(x, y, z) - v0)
+    u = 13.0 * L * (fu(x, y, z) - u0)
+    v = 13.0 * L * (fv(x, y, z) - v0)
 
     return cupy.concatenate([q[..., np.newaxis] for q in [L, u, v]], axis=-1)
 
@@ -1300,7 +1316,7 @@ def luv2xyz(luv, illuminant="D65", observer="2"):
     # compute y
     y = L.copy()
     mask = y > 7.999625
-    y[mask] = cupy.power((y[mask] + 16.) / 116., 3.)
+    y[mask] = cupy.power((y[mask] + 16.0) / 116.0, 3.0)
     y[~mask] = y[~mask] / 903.3
     xyz_ref_white = get_xyz_coords(illuminant, observer, arr.dtype)
     y *= xyz_ref_white[1]
@@ -1311,13 +1327,13 @@ def luv2xyz(luv, illuminant="D65", observer="2"):
     v0 = 9 * xyz_ref_white[1] / (uv_weights @ xyz_ref_white)
 
     # compute intermediate values
-    a = u0 + u / (13. * L + eps)
-    b = v0 + v / (13. * L + eps)
+    a = u0 + u / (13.0 * L + eps)
+    b = v0 + v / (13.0 * L + eps)
     c = 3 * y * (5 * b - 3)
 
     # compute x and z
     z = ((a - 4) * c - 15 * a * b * y) / (12 * b)
-    x = -(c / b + 3. * z)
+    x = -(c / b + 3.0 * z)
 
     return cupy.concatenate([q[..., np.newaxis] for q in [x, y, z]], axis=-1)
 
@@ -1570,8 +1586,9 @@ def combine_stains(stains, conv_matrix):
     stains = dtype.img_as_float(stains)
     logrgb2 = -cupy.reshape(stains, (-1, 3)) @ conv_matrix
     rgb2 = cupy.power(10, logrgb2)
-    return rescale_intensity(cupy.reshape(rgb2 - 2, stains.shape),
-                             in_range=(-1, 1))
+    return rescale_intensity(
+        cupy.reshape(rgb2 - 2, stains.shape), in_range=(-1, 1)
+    )
 
 
 def lab2lch(lab):
@@ -1621,7 +1638,7 @@ def _cart2polar_2pi(x, y):
     NON-STANDARD RANGE! Maps to ``(0, 2*pi)`` rather than usual ``(-pi, +pi)``
     """
     r, t = cupy.hypot(x, y), cupy.arctan2(y, x)
-    t += cupy.where(t < 0., 2 * np.pi, 0)
+    t += cupy.where(t < 0.0, 2 * np.pi, 0)
     return r, t
 
 
@@ -1672,7 +1689,7 @@ def _prepare_lab_array(arr):
     arr = cupy.asarray(arr)
     shape = arr.shape
     if shape[-1] < 3:
-        raise ValueError('Input array has less than 3 color channels')
+        raise ValueError("Input array has less than 3 color channels")
     return dtype.img_as_float(arr, force_copy=True)
 
 

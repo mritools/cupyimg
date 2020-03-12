@@ -349,7 +349,6 @@ class TestColorconv(TestCase):
             self.colbars_array,
         )
 
-        decimal = 5  # TODO: grlee77: why did I need to loosen the tolerance?
         for i, space in enumerate(colspaces):
             print(f"space={space}")
             gt = colfuncs_from[i](self.colbars_array)
@@ -454,12 +453,12 @@ class TestColorconv(TestCase):
 
         # And we include a call to test the exception handling in the code.
         try:
-            xs = lab2xyz(lab_array_I_obs, "NaI", "2")  # Not an illuminant
+            lab2xyz(lab_array_I_obs, "NaI", "2")  # Not an illuminant
         except ValueError:
             pass
 
         try:
-            xs = lab2xyz(lab_array_I_obs, "d50", "42")  # Not a degree
+            lab2xyz(lab_array_I_obs, "d50", "42")  # Not a degree
         except ValueError:
             pass
 

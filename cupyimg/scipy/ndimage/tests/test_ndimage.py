@@ -1510,9 +1510,10 @@ class TestNdimage:
         for type_ in self.types:
             data = cupy.ones([1, 3, 4, 5, 0, 0, 0, 5], type_)
             out = ndimage.binary_erosion(data[::-1], border_value=1)
-            expected = ndimage.binary_erosion(cupy.ascontiguousarray(data[::-1]), border_value=1)
+            expected = ndimage.binary_erosion(
+                cupy.ascontiguousarray(data[::-1]), border_value=1
+            )
             assert_array_almost_equal(out, expected)
-
 
     def test_binary_erosion20(self):
         for type_ in self.types:
@@ -1561,7 +1562,8 @@ class TestNdimage:
             # grlee77 add non-contiguous test case
             out2 = ndimage.binary_erosion(data[::-1], border_value=1)
             expected2 = ndimage.binary_erosion(
-                cupy.ascontiguousarray(data[::-1]), border_value=1)
+                cupy.ascontiguousarray(data[::-1]), border_value=1
+            )
             assert_array_almost_equal(out2, expected2)
 
     def test_binary_erosion23(self):
@@ -1625,7 +1627,8 @@ class TestNdimage:
             # grlee77: add cases with non-contiguous input
             out2 = ndimage.binary_erosion(data[::-1], struct, border_value=1)
             expected2 = ndimage.binary_erosion(
-                data[::-1].copy(), struct, border_value=1)
+                data[::-1].copy(), struct, border_value=1
+            )
             assert_array_almost_equal(out2, expected2)
 
             out2 = ndimage.binary_erosion(data, struct[::-1], border_value=1)

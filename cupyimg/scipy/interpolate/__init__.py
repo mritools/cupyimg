@@ -1,1 +1,1 @@
-from .interpolate import *
+from .interpolate import *  # noqa

@@ -132,4 +132,8 @@ __all__ = [
     "deltaE_ciede94",
     "deltaE_ciede2000",  # TODO: fix
     "deltaE_cmc",
+    "xyz2luv",
+    "luv2xyz",
+    "luv2rgb",
+    "rgb2luv",
 ]

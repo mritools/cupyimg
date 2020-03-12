@@ -555,7 +555,7 @@ def _correlate_or_convolve(
             origin[ii] = -origin[ii]
             if weights.shape[ii] % 2 == 0:
                 origin[ii] -= 1
-    elif weights.dtype.kind == 'c':
+    elif weights.dtype.kind == "c":
         # numpy.correlate conjugates weights rather than input.
         weights = weights.conj()
 
@@ -604,7 +604,9 @@ def _correlate_or_convolve(
 
         #    if output is input:
         #        input = input.copy()
-        output = _ni_support._get_output(output, input, input.shape, weights_dtype)
+        output = _ni_support._get_output(
+            output, input, input.shape, weights_dtype
+        )
     if weights.size == 0:
         return output
 

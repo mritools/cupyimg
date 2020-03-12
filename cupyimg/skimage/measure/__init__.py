@@ -30,6 +30,7 @@ __all__ = [
     "block_reduce",
     "profile_line",
     "shannon_entropy",
+    "centroid",
     "moments",
     "moments_central",
     "moments_coords",

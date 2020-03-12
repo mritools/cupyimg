@@ -255,9 +255,8 @@ class TestRegularGridInterpolator(object):
         # from #3703; test that interpolator object construction succeeds
         values = cp.ones((10, 20, 30), dtype=">f4")
         points = [cp.arange(n) for n in values.shape]
-        xi = [(1, 1, 1)]
-        interpolator = RegularGridInterpolator(points, values)
-        interpolator = RegularGridInterpolator(points, values, fill_value=0.0)
+        RegularGridInterpolator(points, values)
+        RegularGridInterpolator(points, values, fill_value=0.0)
 
 
 class TestInterpN(object):

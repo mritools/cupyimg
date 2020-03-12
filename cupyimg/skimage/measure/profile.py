@@ -8,7 +8,14 @@ import cupyimg.numpy as cnp
 
 
 def profile_line(
-    image, src, dst, linewidth=1, order=None, mode="constant", cval=0.0, *,
+    image,
+    src,
+    dst,
+    linewidth=1,
+    order=None,
+    mode="constant",
+    cval=0.0,
+    *,
     reduce_func=cp.mean,
 ):
     """Return the intensity profile of an image measured along a scan line.
@@ -69,11 +76,14 @@ def profile_line(
         order = 0 if image.dtype == bool else 1
 
     if image.dtype == bool and order != 0:
-        warn("Input image dtype is bool. Interpolation is not defined "
-             "with bool data type. Please set order to 0 or explicitely "
-             "cast input image to another data type. Starting from version "
-             "0.19 a ValueError will be raised instead of this warning.",
-             FutureWarning, stacklevel=2)
+        warn(
+            "Input image dtype is bool. Interpolation is not defined "
+            "with bool data type. Please set order to 0 or explicitely "
+            "cast input image to another data type. Starting from version "
+            "0.19 a ValueError will be raised instead of this warning.",
+            FutureWarning,
+            stacklevel=2,
+        )
 
     perp_lines = _line_profile_coordinates(src, dst, linewidth=linewidth)
     if image.ndim == 3:

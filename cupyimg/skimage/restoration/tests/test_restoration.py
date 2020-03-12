@@ -60,7 +60,8 @@ def test_unsupervised_wiener():
     otf = uft.ir2tf(psf, data.shape, is_real=False)
 
     cp.random.seed(0)
-    deconvolved = restoration.unsupervised_wiener(
+    # deconvolved =
+    restoration.unsupervised_wiener(
         data,
         otf,
         reg=laplacian,

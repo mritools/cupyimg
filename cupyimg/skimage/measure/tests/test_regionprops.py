@@ -634,6 +634,6 @@ def test_column_dtypes_correct():
 
 def test_deprecated_coords_argument():
     with expected_warnings(["coordinates keyword argument"]):
-        region = regionprops(SAMPLE, coordinates="rc")
+        regionprops(SAMPLE, coordinates="rc")
     with pytest.raises(ValueError):
-        region = regionprops(SAMPLE, coordinates="xy")
+        regionprops(SAMPLE, coordinates="xy")

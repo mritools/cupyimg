@@ -647,7 +647,7 @@ class TestProminentPeaks(unittest.TestCase):
         image[5, 5] = 1
         labels[5, 5] = 1
         labelsin = labels.copy()
-        result = peak.peak_local_max(
+        peak.peak_local_max(
             image,
             labels=labels,
             footprint=cp.ones((3, 3), bool),

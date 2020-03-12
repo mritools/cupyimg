@@ -1,7 +1,6 @@
 import itertools
 
 import cupy as cp
-import numpy as np
 
 
 __all__ = ["RegularGridInterpolator", "interpn"]

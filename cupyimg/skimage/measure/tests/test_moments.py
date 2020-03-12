@@ -8,7 +8,6 @@ from cupy.testing import (
     assert_array_equal,
 )
 from numpy.testing import assert_almost_equal
-from skimage._shared._warnings import expected_warnings
 
 from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage.measure import (
@@ -193,9 +192,9 @@ def test_inertia_tensor_3d():
     # Check that axis has rotated by expected amount
     pi, cos, sin = np.pi, np.cos, np.sin
     # fmt: off
-    R = cp.asarray([[ cos(pi/6), -sin(pi/6), 0],
-                    [ sin(pi/6),  cos(pi/6), 0],
-                    [         0,          0, 1]])
+    R = cp.asarray([[cos(pi/6), -sin(pi/6), 0],   # noqa
+                    [sin(pi/6),  cos(pi/6), 0],   # noqa
+                    [        0,          0, 1]])  # noqa
     # fmt: on
     expected_vr = R @ v0
     assert cp.allclose(vr, expected_vr, atol=1e-3, rtol=0.01) or cp.allclose(

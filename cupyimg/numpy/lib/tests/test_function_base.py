@@ -109,7 +109,7 @@ class TestGradient(object):
         y = 2 * x ** 3 + 4 * x ** 2 + 2 * x
         analytical = 6 * x ** 2 + 8 * x + 2
         num_error = cp.abs((gradient(y, dx, edge_order=2) / analytical) - 1)
-        assert cp.all(num_error < 0.03) == True
+        assert cp.all(num_error < 0.03).item() is True
 
         # test with unevenly spaced
         cp.random.seed(0)
@@ -117,7 +117,7 @@ class TestGradient(object):
         y = 2 * x ** 3 + 4 * x ** 2 + 2 * x
         analytical = 6 * x ** 2 + 8 * x + 2
         num_error = cp.abs((gradient(y, x, edge_order=2) / analytical) - 1)
-        assert cp.all(num_error < 0.03) == True
+        assert cp.all(num_error < 0.03).item() is True
 
     def test_spacing(self):
         f = cp.array([0, 2.0, 3.0, 4.0, 5.0, 5.0])

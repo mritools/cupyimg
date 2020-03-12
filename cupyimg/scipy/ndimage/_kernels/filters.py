@@ -157,10 +157,12 @@ def _generate_min_or_max_kernel(
 
     # declare the loop and intialize image indices, ix_0, etc.
     trim_unit_dims = True  # timing seems equivalent either way, so could remove
-    ops += _nested_loops_init(mode, xshape, wshape, origin, trim_unit_dims=trim_unit_dims)
+    ops += _nested_loops_init(
+        mode, xshape, wshape, origin, trim_unit_dims=trim_unit_dims
+    )
 
     # Add code that is executed for each pixel in the footprint
-    #_cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
+    # _cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
     # for cond: only need to check bounds on axes where filter shape is > 1
     _cond = " || ".join(
         ["(ix_{0} < 0)".format(j) for j in range(ndim) if wshape[j] > 1]

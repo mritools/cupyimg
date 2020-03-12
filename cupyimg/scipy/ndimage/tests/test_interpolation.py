@@ -19,6 +19,7 @@ except ImportError:
 
 
 import cupyimg.scipy.ndimage._kernels.interp
+
 cupyimg.scipy.ndimage._kernels.interp.const_legacy_mode = True
 
 

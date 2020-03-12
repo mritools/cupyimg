@@ -82,10 +82,12 @@ class cache_source(object):
     Python process. CuPy tends to cache previously compiled kernels in each
     process so that they don't have to be repeatedly retrieved from disk
     """
+
     def __init__(self, temp_dir=None):
         # store values of environment variables prior to entering the context
         from cupy.cuda.compiler import get_cache_dir
-        val = os.environ.get('CUPY_CACHE_SAVE_CUDA_SOURCE')
+
+        val = os.environ.get("CUPY_CACHE_SAVE_CUDA_SOURCE")
         if val is None or len(val) == 0:
             self.cache_val = False
         else:
@@ -106,11 +108,11 @@ class cache_source(object):
 
     def __enter__(self):
         # enable caching of source files to the specified directory
-        os.environ['CUPY_CACHE_SAVE_CUDA_SOURCE'] = '1'
-        os.environ['CUPY_CACHE_DIR'] = self.temp_dir
+        os.environ["CUPY_CACHE_SAVE_CUDA_SOURCE"] = "1"
+        os.environ["CUPY_CACHE_DIR"] = self.temp_dir
         return self.temp_dir
 
     def __exit__(self, type, value, traceback):
         # restore values of environment variables prior to entering the context
-        os.environ['CUPY_CACHE_SAVE_CUDA_SOURCE'] = str(int(self.cache_val))
-        os.environ['CUPY_CACHE_DIR'] = self.cache_dir
+        os.environ["CUPY_CACHE_SAVE_CUDA_SOURCE"] = str(int(self.cache_val))
+        os.environ["CUPY_CACHE_DIR"] = self.cache_dir

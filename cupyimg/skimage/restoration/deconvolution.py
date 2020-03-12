@@ -1,7 +1,5 @@
 """Implementations restoration functions"""
 
-import math
-
 import cupy
 import numpy as np
 import cupy.random as npr

@@ -7,7 +7,7 @@ import pytest
 from cupy.testing import (
     assert_allclose,
     assert_array_almost_equal,
-    assert_array_equal
+    assert_array_equal,
 )
 
 from cupyimg.skimage.color.delta_e import (
@@ -178,7 +178,7 @@ def test_cmc():
     assert_array_almost_equal(deltaE_cmc(lab1, lab2), expected, decimal=6)
 
     # Single item case:
-    lab1 = lab2 = cp.asarray([0., 1.59607713, 0.87755709])
+    lab1 = lab2 = cp.asarray([0.0, 1.59607713, 0.87755709])
     assert_array_equal(deltaE_cmc(lab1, lab2), 0)
 
     lab2[0] += cp.finfo(float).eps

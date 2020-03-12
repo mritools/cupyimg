@@ -174,7 +174,15 @@ def _get_coord_affine(ndim):
 
 
 def _generate_interp_custom(
-    in_params, coord_func, xshape, yshape, mode, cval, order, name="", integer_output=False
+    in_params,
+    coord_func,
+    xshape,
+    yshape,
+    mode,
+    cval,
+    order,
+    name="",
+    integer_output=False,
 ):
     """
     Args:
@@ -195,8 +203,8 @@ def _generate_interp_custom(
 
     ndim = len(xshape)
 
-    if mode == 'constant' and not const_legacy_mode:
-        mode = 'constant2'  # only set constant2 if want bug-fixed constant mode
+    if mode == "constant" and not const_legacy_mode:
+        mode = "constant2"  # only set constant2 if want bug-fixed constant mode
 
     ops = []
     ops = ops + _raw_ptr_ops(in_params)
@@ -295,7 +303,7 @@ def _generate_interp_custom(
                 )
             )
         _coord_idx = " + ".join(["ic_{}".format(j) for j in range(ndim)])
-        if mode == 'constant2':
+        if mode == "constant2":
             _cond = " || ".join(["(ic_{0} < 0)".format(j) for j in range(ndim)])
             ops.append(
                 """
@@ -370,7 +378,7 @@ def _generate_interp_custom(
 
         _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
         _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
-        if mode == 'constant2':
+        if mode == "constant2":
             _cond = " || ".join(["(ic_{0} < 0)".format(j) for j in range(ndim)])
             ops.append(
                 """

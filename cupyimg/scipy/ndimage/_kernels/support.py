@@ -264,9 +264,9 @@ def _raw_ptr_ops(in_params):
 
     """
     ops = []
-    for in_p in in_params.split(','):
+    for in_p in in_params.split(","):
         in_p = in_p.strip()
-        if in_p.startswith('raw '):
-            _, typ, name = in_p.split(' ')
-            ops.append(f'{typ}* {name}_data = ({typ}*)&({name}[0]);')
+        if in_p.startswith("raw "):
+            _, typ, name = in_p.split(" ")
+            ops.append(f"{typ}* {name}_data = ({typ}*)&({name}[0]);")
     return ops

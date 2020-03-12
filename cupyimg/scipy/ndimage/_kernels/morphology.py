@@ -6,8 +6,6 @@ import cupy
 from .support import (
     _nested_loops_init,
     _masked_loop_init,
-    _pixelregion_to_buffer,
-    _pixelmask_to_buffer,
     _raw_ptr_ops,
 )
 
@@ -56,9 +54,7 @@ def _generate_erode_kernel(
     masked=False,
 ):
     if masked:
-        in_params = (
-            "raw X x, raw W w, raw M mask"
-        )  # TODO: can I set bool explicitly here?
+        in_params = "raw X x, raw W w, raw M mask"  # TODO: can I set bool explicitly here?
     else:
         in_params = "raw X x, raw W w"
     out_params = "Y y"
@@ -151,9 +147,7 @@ def _generate_erode_kernel_masked(
     masked=False,
 ):
     if masked:
-        in_params = (
-            "raw X x, raw I wlocs, raw W wvals, raw M mask"
-        )  # TODO: can I set bool explicitly here?
+        in_params = "raw X x, raw I wlocs, raw W wvals, raw M mask"  # TODO: can I set bool explicitly here?
     else:
         in_params = "raw X x, raw I wlocs, raw W wvals"
     out_params = "Y y"

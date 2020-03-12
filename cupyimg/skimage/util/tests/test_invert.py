@@ -1,5 +1,4 @@
 import cupy as cp
-import numpy as np
 
 from cupyimg.skimage import dtype_limits
 from cupyimg.skimage.util.dtype import dtype_range

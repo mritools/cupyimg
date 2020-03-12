@@ -1,5 +1,4 @@
 import cupy as cp
-import numpy as np
 
 from cupyimg.scipy import signal
 
