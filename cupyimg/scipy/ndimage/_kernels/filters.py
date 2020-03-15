@@ -1549,24 +1549,7 @@ def _generate_rank_kernel_masked(mode, cval, xshape, fshape, nnz, origin, rank):
             )
         )
     else:
-        if nnz == 3:
-            ops.append("y = (Y)opt_med3(selected);")
-        elif nnz == 5:
-            ops.append("y = (Y)opt_med5(selected);")
-        elif nnz == 7:
-            ops.append("y = (Y)opt_med7(selected);")
-        elif nnz == 9:
-            ops.append("y = (Y)opt_med9(selected);")
-        elif nnz == 25:
-            ops.append("y = (Y)opt_med25(selected);")
-        elif nnz == 27:
-            ops.append("y = (Y)fast_med27(selected);")
-        elif nnz == 49:
-            ops.append("y = (Y)fast_med49(selected);")
-        elif nnz == 81:
-            ops.append("y = (Y)fast_med81(selected);")
-        elif nnz == 125:
-            ops.append("y = (Y)fast_med125(selected);")
+        ops.append(f"y = (Y)opt_med{nnz}(selected);")
     operation = "\n".join(ops)
 
     name = "cupy_ndimage_{}_{}d_{}_x{}_w{}_nnz{}".format(
