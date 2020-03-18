@@ -30,6 +30,9 @@ def _correlate_or_convolve(
             if wsize % 2 == 0:
                 origins[i] -= 1
         origins = tuple(origins)
+    elif weights.dtype.kind == "c":
+        # numpy.correlate conjugates weights rather than input.
+        weights = weights.conj()
 
     if dtype_mode == "numpy":
         # This "numpy" mode is used by cupyimg.scipy.signal.signaltools
