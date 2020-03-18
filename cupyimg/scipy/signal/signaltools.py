@@ -1093,7 +1093,7 @@ def _reverse_and_conj(x):
     Reverse array `x` in all dimensions and perform the complex conjugate
     """
     reverse = (slice(None, None, -1),) * x.ndim
-    return x[reverse].conj()
+    return x[reverse].conj().copy()  # copy to void negative strides!
 
 
 def _np_conv_ok(volume, kernel, mode):
@@ -1396,6 +1396,7 @@ def convolve(in1, in2, mode="full", method="auto"):
 
     if method == "auto":
         method = choose_conv_method(volume, kernel, mode=mode)
+    print(f"method={method}")
 
     if method == "fft":
         out = fftconvolve(volume, kernel, mode=mode)

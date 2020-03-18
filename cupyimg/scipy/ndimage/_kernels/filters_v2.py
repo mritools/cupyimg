@@ -73,6 +73,8 @@ def _correlate_or_convolve(
     unsigned_output = output.dtype.kind in ["u", "b"]
 
     if use_weights_mask:
+        input = cupy.ascontiguousarray(input)
+
         # The kernel needs only the non-zero kernel values and their coordinates.
         # This allows us to use a single for loop to compute the ndim convolution.
         # The loop will be over only the the non-zero entries of the filter.
@@ -93,6 +95,10 @@ def _correlate_or_convolve(
             unsigned_output,
         )(input, wlocs, wvals, output)
     else:
+        if mode == "constant":
+            # TODO: negative strides gives incorrect result for constant mode
+            #       so make sure input is C contiguous.
+            input = cupy.ascontiguousarray(input)
         kernel = _get_correlate_kernel(
             mode, weights.shape, int_type, origins, cval, unsigned_output
         )
