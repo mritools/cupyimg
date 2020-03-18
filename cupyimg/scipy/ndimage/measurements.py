@@ -620,7 +620,7 @@ def _select(
     idxs[~found] = labels.max() + 1
 
     if find_median:
-        # TODO: grlee77: fix cupy.lexsort for muliple keys
+        # TODO: grlee77: fix cupy.lexsort for multiple keys
         order = cupy.asarray(
             numpy.lexsort(
                 (cupy.asnumpy(input.ravel()), cupy.asnumpy(labels.ravel()))
