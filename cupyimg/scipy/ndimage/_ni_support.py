@@ -9,8 +9,11 @@ def _check_axis(axis, rank):
     return axis
 
 
-def _invalid_origin(origin, lenw):
-    return (origin < -(lenw // 2)) or (origin > (lenw - 1) // 2)
+def _check_origin(origin, lenw):
+    origin = int(origin)
+    if (origin < -(lenw // 2)) or (origin > (lenw - 1) // 2):
+        raise ValueError("invalid origin")
+    return origin
 
 
 #        if (lenw // 2 + _origin < 0) or (lenw // 2 + _origin >= lenw):
