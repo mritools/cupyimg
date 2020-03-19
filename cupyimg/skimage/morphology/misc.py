@@ -127,7 +127,6 @@ def remove_small_objects(ar, min_size=64, connectivity=1, in_place=False):
     if out.dtype == bool:
         selem = ndi.generate_binary_structure(ar.ndim, connectivity)
         ccs = cp.zeros_like(ar, dtype=cp.int32)
-        raise NotImplementedError("TODO: GPU ndi.label")
         ndi.label(ar, selem, output=ccs)
     else:
         ccs = out

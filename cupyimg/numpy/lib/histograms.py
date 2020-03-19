@@ -147,7 +147,15 @@ def _get_bin_edges(a, bins, range):
     n_equal_bins = None
     bin_edges = None
 
-    if isinstance(bins, int):  # cupy.ndim(bins) == 0:
+    # if isinstance(bins, cupy.ndarray) and bins.ndim == 0:
+    #     # allow uint8 array, etc
+    #     if bins.dtype not in 'bui':
+    #         raise TypeError(
+    #             "`bins` must be an integer, a string, or an array")
+    #     bins = int(bins)  # synchronize
+
+    if isinstance(bins, int):  # will not allow 0-dimensional cupy array
+        # if cupy.ndim(bins) == 0:
         try:
             n_equal_bins = operator.index(bins)
         except TypeError:
