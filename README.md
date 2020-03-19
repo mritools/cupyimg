@@ -223,6 +223,7 @@ thus not available in `cupyimg` either.
 - center_of_mass
 - extrema
 - histogram
+- label (upstream PR: [PR 3210](https://github.com/cupy/cupy/pull/3210))
 - labeled_comprehension
 - maximum
 - maximum_position
