@@ -121,7 +121,7 @@ def iterate_structure(structure, iterations, origin=None):
         return out, origin
 
 
-def generate_binary_structure(rank, connectivity):
+def generate_binary_structure(rank, connectivity, *, on_cpu=False):
     """
     Generate a binary structure for binary morphological operations.
 
@@ -137,6 +137,9 @@ def generate_binary_structure(rank, connectivity):
          the center are considered neighbors. `connectivity` may range from 1
          (no diagonal elements are neighbors) to `rank` (all elements are
          neighbors).
+    on_cpu : bool
+        If True, return a NumPy array rather than transferring the structure
+        to the GPU.
 
     Returns
     -------
@@ -210,9 +213,10 @@ def generate_binary_structure(rank, connectivity):
         return cupy.asarray(True, dtype=bool)
     output = numpy.fabs(numpy.indices([3] * rank) - 1)
     output = numpy.add.reduce(output, 0)
-    # small, so should be faster to leave the computations above in NumPy and
-    # just transfer to the GPU at the end
-    return cupy.asarray(output <= connectivity)
+    output = output <= connectivity
+    if on_cpu:
+        return output
+    return cupy.asarray(output)
 
 
 def _binary_erosion(
