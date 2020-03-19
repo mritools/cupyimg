@@ -1,6 +1,13 @@
+import os
+
 import cupy as cp
 import numpy as np
-from numpy.testing import assert_, assert_equal, assert_almost_equal
+from numpy.testing import (
+    assert_,
+    assert_equal,
+    assert_almost_equal,
+    assert_raises,
+)
 from cupy.testing import assert_array_equal, assert_array_almost_equal
 from scipy._lib._numpy_compat import suppress_warnings
 
@@ -147,231 +154,309 @@ class Test_measurements_select(object):
             assert_equal(result[1].dtype.kind, "i")
 
 
-# def test_label01():
-#     data = cp.ones([])
-#     out, n = ndimage.label(data)
-#     assert_array_almost_equal(out, 1)
-#     assert_equal(n, 1)
+def test_label01():
+    data = cp.ones([])
+    out, n = ndimage.label(data)
+    assert_array_almost_equal(out, 1)
+    assert_equal(n, 1)
 
 
-# def test_label02():
-#     data = cp.zeros([])
-#     out, n = ndimage.label(data)
-#     assert_array_almost_equal(out, 0)
-#     assert_equal(n, 0)
+def test_label02():
+    data = cp.zeros([])
+    out, n = ndimage.label(data)
+    assert_array_almost_equal(out, 0)
+    assert_equal(n, 0)
 
 
-# def test_label03():
-#     data = cp.ones([1])
-#     out, n = ndimage.label(data)
-#     assert_array_almost_equal(out, [1])
-#     assert_equal(n, 1)
+def test_label03():
+    data = cp.ones([1])
+    out, n = ndimage.label(data)
+    assert_array_almost_equal(out, [1])
+    assert_equal(n, 1)
 
 
-# def test_label04():
-#     data = cp.zeros([1])
-#     out, n = ndimage.label(data)
-#     assert_array_almost_equal(out, [0])
-#     assert_equal(n, 0)
+def test_label04():
+    data = cp.zeros([1])
+    out, n = ndimage.label(data)
+    assert_array_almost_equal(out, [0])
+    assert_equal(n, 0)
 
 
-# def test_label05():
-#     data = cp.ones([5])
-#     out, n = ndimage.label(data)
-#     assert_array_almost_equal(out, [1, 1, 1, 1, 1])
-#     assert_equal(n, 1)
+def test_label05():
+    data = cp.ones([5])
+    out, n = ndimage.label(data)
+    assert_array_almost_equal(out, [1, 1, 1, 1, 1])
+    assert_equal(n, 1)
 
 
-# def test_label06():
-#     data = cp.asarray([1, 0, 1, 1, 0, 1])
-#     out, n = ndimage.label(data)
-#     assert_array_almost_equal(out, [1, 0, 2, 2, 0, 3])
-#     assert_equal(n, 3)
+def test_label06():
+    data = cp.asarray([1, 0, 1, 1, 0, 1])
+    out, n = ndimage.label(data)
+    assert_array_almost_equal(out, [1, 0, 2, 2, 0, 3])
+    assert_equal(n, 3)
 
 
-# def test_label07():
-#     data = cp.asarray([[0, 0, 0, 0, 0, 0],
-#                        [0, 0, 0, 0, 0, 0],
-#                        [0, 0, 0, 0, 0, 0],
-#                        [0, 0, 0, 0, 0, 0],
-#                        [0, 0, 0, 0, 0, 0],
-#                        [0, 0, 0, 0, 0, 0]])
-#     out, n = ndimage.label(data)
-#     assert_array_almost_equal(out, [[0, 0, 0, 0, 0, 0],
-#                                     [0, 0, 0, 0, 0, 0],
-#                                     [0, 0, 0, 0, 0, 0],
-#                                     [0, 0, 0, 0, 0, 0],
-#                                     [0, 0, 0, 0, 0, 0],
-#                                     [0, 0, 0, 0, 0, 0]])
-#     assert_equal(n, 0)
+def test_label07():
+    data = cp.asarray(
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+        ]
+    )
+    out, n = ndimage.label(data)
+    assert_array_almost_equal(
+        out,
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+        ],
+    )
+    assert_equal(n, 0)
 
 
-# def test_label08():
-#     data = cp.asarray([[1, 0, 0, 0, 0, 0],
-#                        [0, 0, 1, 1, 0, 0],
-#                        [0, 0, 1, 1, 1, 0],
-#                        [1, 1, 0, 0, 0, 0],
-#                        [1, 1, 0, 0, 0, 0],
-#                        [0, 0, 0, 1, 1, 0]])
-#     out, n = ndimage.label(data)
-#     assert_array_almost_equal(out, [[1, 0, 0, 0, 0, 0],
-#                                     [0, 0, 2, 2, 0, 0],
-#                                     [0, 0, 2, 2, 2, 0],
-#                                     [3, 3, 0, 0, 0, 0],
-#                                     [3, 3, 0, 0, 0, 0],
-#                                     [0, 0, 0, 4, 4, 0]])
-#     assert_equal(n, 4)
+def test_label08():
+    data = cp.asarray(
+        [
+            [1, 0, 0, 0, 0, 0],
+            [0, 0, 1, 1, 0, 0],
+            [0, 0, 1, 1, 1, 0],
+            [1, 1, 0, 0, 0, 0],
+            [1, 1, 0, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0],
+        ]
+    )
+    out, n = ndimage.label(data)
+    assert_array_almost_equal(
+        out,
+        [
+            [1, 0, 0, 0, 0, 0],
+            [0, 0, 2, 2, 0, 0],
+            [0, 0, 2, 2, 2, 0],
+            [3, 3, 0, 0, 0, 0],
+            [3, 3, 0, 0, 0, 0],
+            [0, 0, 0, 4, 4, 0],
+        ],
+    )
+    assert_equal(n, 4)
 
 
-# def test_label09():
-#     data = cp.asarray([[1, 0, 0, 0, 0, 0],
-#                        [0, 0, 1, 1, 0, 0],
-#                        [0, 0, 1, 1, 1, 0],
-#                        [1, 1, 0, 0, 0, 0],
-#                        [1, 1, 0, 0, 0, 0],
-#                        [0, 0, 0, 1, 1, 0]])
-#     struct = ndimage.generate_binary_structure(2, 2)
-#     out, n = ndimage.label(data, struct)
-#     assert_array_almost_equal(out, [[1, 0, 0, 0, 0, 0],
-#                                     [0, 0, 2, 2, 0, 0],
-#                                     [0, 0, 2, 2, 2, 0],
-#                                     [2, 2, 0, 0, 0, 0],
-#                                     [2, 2, 0, 0, 0, 0],
-#                                     [0, 0, 0, 3, 3, 0]])
-#     assert_equal(n, 3)
+def test_label09():
+    data = cp.asarray(
+        [
+            [1, 0, 0, 0, 0, 0],
+            [0, 0, 1, 1, 0, 0],
+            [0, 0, 1, 1, 1, 0],
+            [1, 1, 0, 0, 0, 0],
+            [1, 1, 0, 0, 0, 0],
+            [0, 0, 0, 1, 1, 0],
+        ]
+    )
+    struct = ndimage.generate_binary_structure(2, 2)
+    out, n = ndimage.label(data, struct)
+    assert_array_almost_equal(
+        out,
+        [
+            [1, 0, 0, 0, 0, 0],
+            [0, 0, 2, 2, 0, 0],
+            [0, 0, 2, 2, 2, 0],
+            [2, 2, 0, 0, 0, 0],
+            [2, 2, 0, 0, 0, 0],
+            [0, 0, 0, 3, 3, 0],
+        ],
+    )
+    assert_equal(n, 3)
 
 
-# def test_label10():
-#     data = cp.asarray([[0, 0, 0, 0, 0, 0],
-#                        [0, 1, 1, 0, 1, 0],
-#                        [0, 1, 1, 1, 1, 0],
-#                        [0, 0, 0, 0, 0, 0]])
-#     struct = ndimage.generate_binary_structure(2, 2)
-#     out, n = ndimage.label(data, struct)
-#     assert_array_almost_equal(out, [[0, 0, 0, 0, 0, 0],
-#                                     [0, 1, 1, 0, 1, 0],
-#                                     [0, 1, 1, 1, 1, 0],
-#                                     [0, 0, 0, 0, 0, 0]])
-#     assert_equal(n, 1)
+def test_label10():
+    data = cp.asarray(
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 1, 1, 0, 1, 0],
+            [0, 1, 1, 1, 1, 0],
+            [0, 0, 0, 0, 0, 0],
+        ]
+    )
+    struct = ndimage.generate_binary_structure(2, 2)
+    out, n = ndimage.label(data, struct)
+    assert_array_almost_equal(
+        out,
+        [
+            [0, 0, 0, 0, 0, 0],
+            [0, 1, 1, 0, 1, 0],
+            [0, 1, 1, 1, 1, 0],
+            [0, 0, 0, 0, 0, 0],
+        ],
+    )
+    assert_equal(n, 1)
 
 
-# def test_label11():
-#     for type in types:
-#         data = cp.asarray([[1, 0, 0, 0, 0, 0],
-#                            [0, 0, 1, 1, 0, 0],
-#                            [0, 0, 1, 1, 1, 0],
-#                            [1, 1, 0, 0, 0, 0],
-#                            [1, 1, 0, 0, 0, 0],
-#                            [0, 0, 0, 1, 1, 0]], type)
-#         out, n = ndimage.label(data)
-#         expected = [[1, 0, 0, 0, 0, 0],
-#                     [0, 0, 2, 2, 0, 0],
-#                     [0, 0, 2, 2, 2, 0],
-#                     [3, 3, 0, 0, 0, 0],
-#                     [3, 3, 0, 0, 0, 0],
-#                     [0, 0, 0, 4, 4, 0]]
-#         assert_array_almost_equal(out, expected)
-#         assert_equal(n, 4)
+def test_label11():
+    for type in types:
+        data = cp.asarray(
+            [
+                [1, 0, 0, 0, 0, 0],
+                [0, 0, 1, 1, 0, 0],
+                [0, 0, 1, 1, 1, 0],
+                [1, 1, 0, 0, 0, 0],
+                [1, 1, 0, 0, 0, 0],
+                [0, 0, 0, 1, 1, 0],
+            ],
+            type,
+        )
+        out, n = ndimage.label(data)
+        expected = [
+            [1, 0, 0, 0, 0, 0],
+            [0, 0, 2, 2, 0, 0],
+            [0, 0, 2, 2, 2, 0],
+            [3, 3, 0, 0, 0, 0],
+            [3, 3, 0, 0, 0, 0],
+            [0, 0, 0, 4, 4, 0],
+        ]
+        assert_array_almost_equal(out, expected)
+        assert_equal(n, 4)
 
 
-# def test_label11_inplace():
-#     for type in types:
-#         data = cp.asarray([[1, 0, 0, 0, 0, 0],
-#                            [0, 0, 1, 1, 0, 0],
-#                            [0, 0, 1, 1, 1, 0],
-#                            [1, 1, 0, 0, 0, 0],
-#                            [1, 1, 0, 0, 0, 0],
-#                            [0, 0, 0, 1, 1, 0]], type)
-#         n = ndimage.label(data, output=data)
-#         expected = [[1, 0, 0, 0, 0, 0],
-#                     [0, 0, 2, 2, 0, 0],
-#                     [0, 0, 2, 2, 2, 0],
-#                     [3, 3, 0, 0, 0, 0],
-#                     [3, 3, 0, 0, 0, 0],
-#                     [0, 0, 0, 4, 4, 0]]
-#         assert_array_almost_equal(data, expected)
-#         assert_equal(n, 4)
+def test_label11_inplace():
+    for type in types:
+        data = cp.asarray(
+            [
+                [1, 0, 0, 0, 0, 0],
+                [0, 0, 1, 1, 0, 0],
+                [0, 0, 1, 1, 1, 0],
+                [1, 1, 0, 0, 0, 0],
+                [1, 1, 0, 0, 0, 0],
+                [0, 0, 0, 1, 1, 0],
+            ],
+            type,
+        )
+        n = ndimage.label(data, output=data)
+        expected = [
+            [1, 0, 0, 0, 0, 0],
+            [0, 0, 2, 2, 0, 0],
+            [0, 0, 2, 2, 2, 0],
+            [3, 3, 0, 0, 0, 0],
+            [3, 3, 0, 0, 0, 0],
+            [0, 0, 0, 4, 4, 0],
+        ]
+        assert_array_almost_equal(data, expected)
+        assert_equal(n, 4)
 
 
-# def test_label12():
-#     for type in types:
-#         data = cp.asarray([[0, 0, 0, 0, 1, 1],
-#                            [0, 0, 0, 0, 0, 1],
-#                            [0, 0, 1, 0, 1, 1],
-#                            [0, 0, 1, 1, 1, 1],
-#                            [0, 0, 0, 1, 1, 0]], type)
-#         out, n = ndimage.label(data)
-#         expected = [[0, 0, 0, 0, 1, 1],
-#                     [0, 0, 0, 0, 0, 1],
-#                     [0, 0, 1, 0, 1, 1],
-#                     [0, 0, 1, 1, 1, 1],
-#                     [0, 0, 0, 1, 1, 0]]
-#         assert_array_almost_equal(out, expected)
-#         assert_equal(n, 1)
+def test_label12():
+    for type in types:
+        data = cp.asarray(
+            [
+                [0, 0, 0, 0, 1, 1],
+                [0, 0, 0, 0, 0, 1],
+                [0, 0, 1, 0, 1, 1],
+                [0, 0, 1, 1, 1, 1],
+                [0, 0, 0, 1, 1, 0],
+            ],
+            type,
+        )
+        out, n = ndimage.label(data)
+        expected = [
+            [0, 0, 0, 0, 1, 1],
+            [0, 0, 0, 0, 0, 1],
+            [0, 0, 1, 0, 1, 1],
+            [0, 0, 1, 1, 1, 1],
+            [0, 0, 0, 1, 1, 0],
+        ]
+        assert_array_almost_equal(out, expected)
+        assert_equal(n, 1)
 
 
-# def test_label13():
-#     for type in types:
-#         data = cp.asarray([[1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1],
-#                            [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1],
-#                            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-#                            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]],
-#                           type)
-#         out, n = ndimage.label(data)
-#         expected = [[1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1],
-#                     [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1],
-#                     [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-#                     [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]
-#         assert_array_almost_equal(out, expected)
-#         assert_equal(n, 1)
+def test_label13():
+    for type in types:
+        data = cp.asarray(
+            [
+                [1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1],
+                [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1],
+                [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+                [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            ],
+            type,
+        )
+        out, n = ndimage.label(data)
+        expected = [
+            [1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1],
+            [1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1],
+            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        ]
+        assert_array_almost_equal(out, expected)
+        assert_equal(n, 1)
 
 
-# def test_label_output_typed():
-#     data = cp.ones([5])
-#     for t in types:
-#         output = cp.zeros([5], dtype=t)
-#         n = ndimage.label(data, output=output)
-#         assert_array_almost_equal(output, 1)
-#         assert_equal(n, 1)
+def test_label_output_typed():
+    data = cp.ones([5])
+    for t in types:
+        output = cp.zeros([5], dtype=t)
+        n = ndimage.label(data, output=output)
+        assert_array_almost_equal(output, 1)
+        assert_equal(n, 1)
 
 
-# def test_label_output_dtype():
-#     data = cp.ones([5])
-#     for t in types:
-#         output, n = ndimage.label(data, output=t)
-#         assert_array_almost_equal(output, 1)
-#         assert output.dtype == t
+def test_label_output_dtype():
+    data = cp.ones([5])
+    for t in types:
+        output, n = ndimage.label(data, output=t)
+        assert_array_almost_equal(output, 1)
+        assert output.dtype == t
 
 
-# def test_label_output_wrong_size():
-#     data = cp.ones([5])
-#     for t in types:
-#         output = cp.zeros([10], t)
-#         assert_raises((RuntimeError, ValueError), ndimage.label, data, output=output)
+def test_label_output_wrong_size():
+    data = cp.ones([5])
+    for t in types:
+        output = cp.zeros([10], t)
+        assert_raises(
+            (RuntimeError, ValueError), ndimage.label, data, output=output
+        )
 
 
-# def test_label_structuring_elements():
-#     data = cp.loadtxt(os.path.join(os.path.dirname(__file__), "data", "label_inputs.txt"))
-#     strels = cp.loadtxt(os.path.join(os.path.dirname(__file__), "data", "label_strels.txt"))
-#     results = cp.loadtxt(os.path.join(os.path.dirname(__file__), "data", "label_results.txt"))
-#     data = data.reshape((-1, 7, 7))
-#     strels = strels.reshape((-1, 3, 3))
-#     results = results.reshape((-1, 7, 7))
-#     r = 0
-#     for i in range(data.shape[0]):
-#         d = data[i, :, :]
-#         for j in range(strels.shape[0]):
-#             s = strels[j, :, :]
-#             assert_equal(ndimage.label(d, s)[0], results[r, :, :])
-#             r += 1
+def test_label_structuring_elements():
+    data = cp.asarray(
+        np.loadtxt(
+            os.path.join(os.path.dirname(__file__), "data", "label_inputs.txt")
+        )
+    )
+    strels = cp.asarray(
+        np.loadtxt(
+            os.path.join(os.path.dirname(__file__), "data", "label_strels.txt")
+        )
+    )
+    results = cp.asarray(
+        np.loadtxt(
+            os.path.join(os.path.dirname(__file__), "data", "label_results.txt")
+        )
+    )
+    data = data.reshape((-1, 7, 7))
+    strels = strels.reshape((-1, 3, 3))
+    results = results.reshape((-1, 7, 7))
+    r = 0
+    for i in range(data.shape[0]):
+        d = data[i, :, :]
+        for j in range(strels.shape[0]):
+            s = strels[j, :, :]
+            assert_array_equal(ndimage.label(d, s)[0], results[r, :, :])
+            r += 1
 
 
-# def test_label_default_dtype():
-#     test_array = cp.random.rand(10, 10)
-#     label, no_features = ndimage.label(test_array > 0.5)
-#     assert_(label.dtype in (cp.int32, cp.int64))
-#     # Shouldn't raise an exception
-#     ndimage.find_objects(label)
+def test_label_default_dtype():
+    test_array = cp.random.rand(10, 10)
+    label, no_features = ndimage.label(test_array > 0.5)
+    assert_(label.dtype in (cp.int32, cp.int64))
+    # TODO: uncomment once find_objects is implemented
+    # Shouldn't raise an exception
+    # ndimage.find_objects(label)
 
 
 # def test_find_objects01():

@@ -1458,6 +1458,8 @@ def label(input, structure=None, output=None):
         raise TypeError("Complex type not supported")
     if structure is None:
         structure = generate_binary_structure(input.ndim, 1, on_cpu=True)
+    if isinstance(structure, cupy.ndarray):
+        structure = structure.get()
     structure = numpy.array(structure, dtype=bool)
     if structure.ndim != input.ndim:
         raise RuntimeError("structure and input must have equal rank")
@@ -1479,6 +1481,10 @@ def label(input, structure=None, output=None):
     if input.size == 0:
         # 0-dim array
         maxlabel = 0
+    elif input.ndim == 0:
+        # scalar
+        maxlabel = 1 if (input != 0) else 0  # synchronize
+        output[...] = maxlabel
     else:
         if output.dtype is not numpy.int32:
             y = cupy.empty(input.shape, numpy.int32)
