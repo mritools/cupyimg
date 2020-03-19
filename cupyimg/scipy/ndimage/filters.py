@@ -22,8 +22,6 @@ import cupy
 import numpy
 
 from ._kernels.filters import (
-    _get_correlate_kernel,
-    _get_correlate_kernel_masked,
     _get_min_or_max_kernel,
     _get_min_or_max_kernel_masked,
     _get_min_or_max_kernel_masked_v2,
@@ -31,6 +29,7 @@ from ._kernels.filters import (
     _get_rank_kernel_masked,
 )
 from . import _ni_support
+from ._kernels.filters_v2 import _correlate_or_convolve
 
 _partial = functools.partial
 
@@ -84,12 +83,8 @@ def correlate1d(
     This version supports only ``numpy.float32``, ``numpy.float64``,
     ``numpy.complex64`` and ``numpy.complex128`` dtypes.
     """
-    if _ni_support._invalid_origin(origin, len(weights)):
-        raise ValueError(
-            "Invalid origin; origin must satisfy "
-            "-(len(weights) // 2) <= origin <= "
-            "(len(weights)-1) // 2"
-        )
+
+    origin = _ni_support._check_origin(origin, len(weights))
 
     weights = weights[::-1]
     origin = -origin
@@ -138,16 +133,10 @@ def convolve1d(
     """
     from cupyimg._misc import _reshape_nd
 
-    if _ni_support._invalid_origin(origin, len(weights)):
-        raise ValueError(
-            "Invalid origin; origin must satisfy "
-            "-(len(weights) // 2) <= origin <= "
-            "(len(weights)-1) // 2"
-        )
-
     axis = _ni_support._check_axis(axis, input.ndim)
-
     if backend == "fast_upfirdn":
+        origin = _ni_support._check_origin(origin, len(weights))
+
         try:
             from fast_upfirdn.cupy import convolve1d as _convolve1d_gpu
         except ImportError as err:
@@ -527,125 +516,6 @@ def gaussian_gradient_magnitude(
         extra_arguments=(sigma,),
         extra_keywords=kwargs,
     )
-
-
-def _correlate_or_convolve(
-    input,
-    weights,
-    output,
-    mode,
-    cval,
-    origin,
-    convolution,
-    dtype_mode,
-    use_weights_mask,
-):
-    if not hasattr(origin, "__getitem__"):
-        origin = [origin] * input.ndim
-    else:
-        origin = list(origin)
-    wshape = [ii for ii in weights.shape if ii > 0]
-    if len(wshape) != input.ndim:
-        raise RuntimeError("filter weights array has incorrect shape.")
-    if convolution:
-        # weights are reversed in order for convolution and the origin
-        # must be adjusted.
-        weights = weights[tuple([slice(None, None, -1)] * weights.ndim)]
-        for ii in range(len(origin)):
-            origin[ii] = -origin[ii]
-            if weights.shape[ii] % 2 == 0:
-                origin[ii] -= 1
-    elif weights.dtype.kind == "c":
-        # numpy.correlate conjugates weights rather than input.
-        weights = weights.conj()
-
-    for _origin, lenw in zip(origin, wshape):
-        if (lenw // 2 + _origin < 0) or (lenw // 2 + _origin >= lenw):
-            raise ValueError("invalid origin")
-    if mode not in ("reflect", "constant", "nearest", "mirror", "wrap"):
-        msg = "boundary mode not supported (actual: {}).".format(mode)
-        raise RuntimeError(msg)
-
-    if dtype_mode == "numpy":
-        # numpy.convolve and correlate do not always cast to floats
-        dtype = numpy.promote_types(input.dtype, weights.dtype)
-        output_dtype = dtype
-        if dtype.char == "e":
-            # promote internal float type to float32 for accuracy
-            dtype = "f"
-        if output is not None:
-            raise ValueError(
-                "dtype_mode == 'numpy' does not support the output " "argument"
-            )
-        weights_dtype = dtype
-        if weights.dtype != dtype:
-            weights = weights.astype(dtype)
-        if input.dtype != dtype:
-            input = input.astype(dtype)
-        output = cupy.zeros(input.shape, output_dtype)
-        weights_dtype = dtype
-    else:
-        # scipy.ndimage always use double precision for the weights
-        if weights.dtype.kind == "c" or input.dtype.kind == "c":
-            if dtype_mode == "ndimage":
-                weights_dtype = numpy.complex128
-            elif dtype_mode == "float":
-                weights_dtype = numpy.promote_types(
-                    input.real.dtype, numpy.complex64
-                )
-        else:
-            if dtype_mode == "ndimage":
-                weights_dtype = numpy.float64
-            elif dtype_mode == "float":
-                weights_dtype = numpy.promote_types(
-                    input.real.dtype, numpy.float32
-                )
-        weights_dtype = cupy.dtype(weights_dtype)
-
-        #    if output is input:
-        #        input = input.copy()
-        output = _ni_support._get_output(
-            output, input, input.shape, weights_dtype
-        )
-    if weights.size == 0:
-        return output
-
-    # TODO: grlee77: current indexing via x_data, etc. requires
-    #       C contiguous input arrays.
-    input = cupy.ascontiguousarray(input)
-    weights = cupy.ascontiguousarray(weights, weights_dtype)
-
-    unsigned_output = output.dtype.kind in ["u", "b"]
-
-    if use_weights_mask:
-        # The kernel needs only the non-zero kernel values and their coordinates.
-        # This allows us to use a single for loop to compute the ndim convolution.
-        # The loop will be over only the the non-zero entries of the filter.
-        wlocs = cupy.nonzero(weights)
-        wvals = weights[wlocs]  # (nnz,) array of non-zero values
-        wlocs = cupy.stack(
-            wlocs
-        )  # (ndim, nnz) array of indices for these values
-
-        return _get_correlate_kernel_masked(
-            mode,
-            cval,
-            input.shape,
-            weights.shape,
-            wvals.size,
-            tuple(origin),
-            unsigned_output,
-        )(input, wlocs, wvals, output)
-    else:
-        return _get_correlate_kernel(
-            input.ndim,
-            mode,
-            cval,
-            input.shape,
-            weights.shape,
-            tuple(origin),
-            unsigned_output,
-        )(input, weights, output)
 
 
 def _prep_size_footprint(
