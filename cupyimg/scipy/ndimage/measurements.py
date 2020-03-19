@@ -1427,7 +1427,7 @@ def _label(x, structure, y):
     _kernel_init()(x, y)
     _kernel_connect()(y_shape, dirs, ndirs, x.ndim, y, size=y.size)
     _kernel_count()(y, count, size=y.size)
-    maxlabel = int(count[0])
+    maxlabel = int(count[0])  # synchronize
     labels = cupy.empty(maxlabel, dtype=numpy.int32)
     _kernel_labels()(y, count, labels, size=y.size)
     _kernel_finalize()(maxlabel, cupy.sort(labels), y, size=y.size)
