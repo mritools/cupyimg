@@ -170,6 +170,38 @@ def _get_coord_affine(ndim):
     return ops
 
 
+def _unravel_loop_index(shape, uint_t="unsigned int"):
+    """
+    declare a multi-index array in_coord and unravel the 1D index, i into it.
+    This code assumes that the array is a C-ordered array.
+    """
+    ndim = len(shape)
+    code = [
+        """
+        {uint_t} in_coord[{ndim}];
+        {uint_t} s, t, idx = i;
+        """.format(
+            uint_t=uint_t, ndim=ndim
+        )
+    ]
+    for j in range(ndim - 1, 0, -1):
+        code.append(
+            """
+        s = {size};
+        t = idx / s;
+        in_coord[{j}] = idx - t * s;
+        idx = t;
+        """.format(
+                j=j, size=shape[j]
+            )
+        )
+    code.append(
+        """
+        in_coord[0] = idx;"""
+    )
+    return "\n".join(code)
+
+
 def _generate_interp_custom(
     in_params,
     coord_func,
@@ -184,8 +216,11 @@ def _generate_interp_custom(
 ):
     """
     Args:
+        in_params (str): input parameters for the ElementwiseKernel
         coord_func (function): generates code to do the coordinate
             transformation. See for example, `_get_coord_shift`.
+        ndim (int): The number of dimensions.
+        large_int (bool): If true use Py_ssize_t instead of int for indexing.
         yshape (tuple): Shape of the output array.
         mode (str): Signal extension mode to use at the array boundaries
         cval (float): constant value used when `mode == 'constant'`.
@@ -211,11 +246,8 @@ def _generate_interp_custom(
     else:
         uint_t = "unsigned int"
         int_t = "int"
-    ops.append("{uint_t} in_coord[{ndim}];".format(uint_t=uint_t, ndim=ndim))
 
-    # determine strides for x along each axis
-    # for j in range(ndim):
-    #     ops.append("const {uint_t} sx_{j} = x.strides()[{j}];".format(uint_t=uint_t, j=j))
+    # determine strides of x (in elements, not bytes)
     for j in range(ndim):
         ops.append(
             "const {int_t} xsize_{j} = x.shape()[{j}];".format(int_t=int_t, j=j)
@@ -228,28 +260,8 @@ def _generate_interp_custom(
             )
         )
 
-    # determine nd coordinate in x corresponding to a given raveled coordinate,
-    # i, in y.
-    ops.append(
-        """
-        {uint_t} idx = i;
-        {uint_t} s, t;
-        """.format(
-            uint_t=uint_t
-        )
-    )
-    for j in range(ndim - 1, 0, -1):
-        ops.append(
-            """
-        s = {zsize_j};
-        t = idx / s;
-        in_coord[{j}] = idx - t * s;
-        idx = t;
-        """.format(
-                j=j, zsize_j=yshape[j]
-            )
-        )
-    ops.append("in_coord[0] = idx;")
+    # create out_coords array to store the unraveled indices into the output
+    ops.append(_unravel_loop_index(yshape, uint_t))
 
     # compute the transformed (target) coordinates, c_j
     ops = ops + coord_func(ndim)
@@ -420,12 +432,12 @@ def _generate_interp_custom(
     name = "interpolate_{}_order{}_{}_{}d_y{}".format(
         name, order, mode, ndim, "_".join(["{}".format(j) for j in yshape]),
     )
-    if int_t == "size_t":
+    if uint_t == "size_t":
         name += "_i64"
     return operation, name
 
 
-@cupy.util.memoize()
+@cupy.util.memoize(for_each_device=True)
 def _get_map_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):
@@ -446,7 +458,7 @@ def _get_map_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize()
+@cupy.util.memoize(for_each_device=True)
 def _get_shift_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):
@@ -467,7 +479,7 @@ def _get_shift_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize()
+@cupy.util.memoize(for_each_device=True)
 def _get_zoom_shift_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):
@@ -488,7 +500,7 @@ def _get_zoom_shift_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize()
+@cupy.util.memoize(for_each_device=True)
 def _get_zoom_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):
@@ -509,7 +521,7 @@ def _get_zoom_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize()
+@cupy.util.memoize(for_each_device=True)
 def _get_affine_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):
