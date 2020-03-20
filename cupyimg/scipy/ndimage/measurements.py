@@ -23,39 +23,6 @@ __all__ = [
 # TODO: grlee77: 'find_objects', 'watershed_ift'
 
 
-def _find_objects(input, max_label):
-    """Python equivalent of Py_FindObjects from nd_image.c"""
-    # TODO: grlee77: could implement this function in Cython to avoid overhead.
-    ndim = input.ndim
-    if max_label < 0:
-        max_label = 0
-    if max_label > 0:
-        if ndim > 0:
-            regions = cupy.full(
-                2 * max_label * input.ndim, -1, dtype=numpy.intp
-            )
-        else:
-            regions = cupy.full(max_label, -1, dtype=numpy.intp)
-
-    # call kernel equivalent to NI_FindObjects(input, max_label, regions)
-    raise NotImplementedError("NI_FindObjects kernel unimplemented")
-
-    result = []
-    for ii in range(max_label):
-        idx = 2 * input.ndim * ii if ndim > 0 else ii
-        if regions[ii] >= 0:
-            slices = tuple(
-                [
-                    slice(regions[idx + jj], regions[idx + jj + ndim])
-                    for jj in range(ndim)
-                ]
-            )
-        else:
-            slices = None
-        result.append(slices)
-    return result
-
-
 def _safely_castable_to_int(dt):
     """Test whether the NumPy data type `dt` can be safely cast to an int."""
     int_size = cupy.dtype(int).itemsize
