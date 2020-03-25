@@ -210,7 +210,10 @@ def generate_binary_structure(rank, connectivity, *, on_cpu=False):
     if connectivity < 1:
         connectivity = 1
     if rank < 1:
-        return cupy.asarray(True, dtype=bool)
+        if on_cpu:
+            return numpy.asarray(True, dtype=bool)
+        else:
+            return cupy.asarray(True, dtype=bool)
     output = numpy.fabs(numpy.indices([3] * rank) - 1)
     output = numpy.add.reduce(output, 0)
     output = output <= connectivity
