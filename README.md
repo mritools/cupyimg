@@ -223,6 +223,7 @@ thus not available in `cupyimg` either.
 - center_of_mass
 - extrema
 - histogram
+- label (upstream PR: [PR 3210](https://github.com/cupy/cupy/pull/3210))
 - labeled_comprehension
 - maximum
 - maximum_position
@@ -297,6 +298,7 @@ thus not available in `cupyimg` either.
 
 **skimage.filters**:
 
+- apply_hysteresis_threshold
 - difference_of_gaussians
 - farid
 - farid_h
@@ -325,6 +327,17 @@ thus not available in `cupyimg` either.
 - sobel
 - sobel_h
 - sobel_v
+- threshold_isodata
+- threshold_li
+- threshold_local
+- threshold_mean
+- threshold_minimum
+- threshold_niblack
+- threshold_otsu
+- threshold_sauvola
+- threshold_triangle
+- threshold_yen
+- try_all_threshold
 - unsharp_mask
 - wiener
 - window

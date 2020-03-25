@@ -13,6 +13,9 @@ from ._kernels.interp import (
 )
 
 
+_prod = cupy.core.internal.prod
+
+
 def _get_output(output, input, shape=None):
     if shape is None:
         shape = input.shape
@@ -120,8 +123,11 @@ def map_coordinates(
     if input.dtype.kind in "iu":
         input = input.astype(cupy.float32)
 
+    large_int = max(_prod(input.shape), coordinates.shape[0]) > 1 << 31
     kern = _get_map_kernel(
-        input.shape,
+        input.ndim,
+        large_int,
+        yshape=coordinates.shape,
         mode=mode,
         cval=cval,
         order=order,
@@ -230,11 +236,13 @@ def affine_transform(
     if input.dtype.kind in "iu":
         input = input.astype(cupy.float32)
     integer_output = output.dtype.kind in "iu"
+    large_int = max(_prod(input.shape), _prod(output_shape)) > 1 << 31
     if matrix.ndim == 1:
         offset = cupy.asarray(offset, dtype=float)
         offset = -offset / matrix
         kern = _get_zoom_shift_kernel(
-            input.shape,
+            ndim,
+            large_int,
             output_shape,
             mode,
             cval=cval,
@@ -244,7 +252,8 @@ def affine_transform(
         kern(input, offset, matrix, output)
     else:
         kern = _get_affine_kernel(
-            input.shape,
+            ndim,
+            large_int,
             output_shape,
             mode,
             cval=cval,
@@ -449,8 +458,10 @@ def shift(
         if input.dtype.kind in "iu":
             input = input.astype(cupy.float32)
         integer_output = output.dtype.kind in "iu"
+        large_int = _prod(input.shape) > 1 << 31
         kern = _get_shift_kernel(
-            input.shape,
+            input.ndim,
+            large_int,
             input.shape,
             mode,
             cval=cval,
@@ -548,8 +559,10 @@ def zoom(
         if input.dtype.kind in "iu":
             input = input.astype(cupy.float32)
         integer_output = output.dtype.kind in "iu"
+        large_int = max(_prod(input.shape), _prod(output_shape)) > 1 << 31
         kern = _get_zoom_kernel(
-            input.shape,
+            input.ndim,
+            large_int,
             output_shape,
             mode,
             order=order,

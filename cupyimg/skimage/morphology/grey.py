@@ -4,6 +4,7 @@ Grayscale morphological operations
 import functools
 import cupy as cp
 from cupyimg.scipy import ndimage as ndi
+
 from .misc import default_selem
 from ..util import crop
 

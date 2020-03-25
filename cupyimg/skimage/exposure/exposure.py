@@ -1,6 +1,8 @@
 import cupy
 import numpy as np
 
+from cupyimg import numpy as cnp
+
 from ..color import rgb2gray
 from ..util.dtype import dtype_range, dtype_limits
 from .._shared.utils import warn
@@ -151,13 +153,10 @@ def histogram(image, nbins=256, source_range="image", normalize=False):
     else:
         if source_range == "image":
             hist_range = None
-            hist, bin_edges = cupy.histogram(image, bins=nbins)
+            hist, bin_edges = cnp.histogram(image, bins=nbins)
         elif source_range == "dtype":
             hist_range = dtype_limits(image, clip_negative=False)
-            # TODO: grlee77. add range argument support to cupy.histogram
-            hist, bin_edges = cupy.histogram(
-                image, bins=nbins, range=hist_range
-            )
+            hist, bin_edges = cnp.histogram(image, bins=nbins, range=hist_range)
         else:
             ValueError("Wrong value for the `source_range` argument")
 
