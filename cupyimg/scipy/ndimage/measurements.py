@@ -1402,13 +1402,13 @@ def _label(x, structure, y):
 
 
 def label(input, structure=None, output=None):
-    """Label features in an array
+    """Labels features in an array
 
     Args:
         input (cupy.ndarray): The input array.
         structure (array_like or None): A structuring element that defines
             feature connections. ```structure``` must be centersymmetric. If
-            None, structure is automatically generated with a squad
+            None, structure is automatically generated with a squared
             connectivity equal to one.
         output (cupy.ndarray, dtype or None): The array in which to place the
             output.
@@ -1418,6 +1418,10 @@ def label(input, structure=None, output=None):
             ```input``` has a unique label in the array.
         num_features (int): Number of features found.
 
+    .. warning::
+
+        This function may synchronize the device.
+
     .. seealso:: :func:`scipy.ndimage.label`
     """
     assert isinstance(input, cupy.ndarray)
@@ -1425,8 +1429,8 @@ def label(input, structure=None, output=None):
         raise TypeError("Complex type not supported")
     if structure is None:
         structure = generate_binary_structure(input.ndim, 1, on_cpu=True)
-    if isinstance(structure, cupy.ndarray):
-        structure = structure.get()
+    elif isinstance(structure, cupy.ndarray):
+        structure = cupy.asnumpy(structure)
     structure = numpy.array(structure, dtype=bool)
     if structure.ndim != input.ndim:
         raise RuntimeError("structure and input must have equal rank")
@@ -1449,16 +1453,16 @@ def label(input, structure=None, output=None):
         # 0-dim array
         maxlabel = 0
     elif input.ndim == 0:
-        # scalar
-        maxlabel = 1 if (input != 0) else 0  # synchronize
+        # 0-dim array
+        maxlabel = 0 if input.item() == 0 else 1  # synchronize
         output[...] = maxlabel
     else:
-        if output.dtype is not numpy.int32:
+        if output.dtype != numpy.int32:
             y = cupy.empty(input.shape, numpy.int32)
         else:
             y = output
         maxlabel = _label(input, structure, y)
-        if output.dtype is not numpy.int32:
+        if output.dtype != numpy.int32:
             output[...] = y[...]
 
     if caller_provided_output:
