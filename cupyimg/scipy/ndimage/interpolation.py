@@ -4,6 +4,8 @@ import warnings
 import cupy
 import numpy
 
+from cupyimg.scipy.ndimage import _ni_support
+
 from ._kernels.interp import (
     _get_map_kernel,
     _get_shift_kernel,
@@ -11,9 +13,32 @@ from ._kernels.interp import (
     _get_zoom_shift_kernel,
     _get_affine_kernel,
 )
+from ._kernels.spline import get_raw_spline1d_code, get_gain, get_poles
 
 
 _prod = cupy.core.internal.prod
+
+
+__all__ = [
+    "spline_filter1d",
+    "spline_filter",
+    "map_coordinates",
+    "affine_transform",
+    "shift",
+    "zoom",
+    "rotate",
+]
+
+
+def highest_power_of_2(n):
+    """Find highest power of 2 divisor of n.
+
+    Notes
+    -----
+    Efficient bitwise implementation from
+    https://www.geeksforgeeks.org/highest-power-of-two-that-divides-a-given-number/
+    """
+    return n & (~(n - 1))
 
 
 def _get_output(output, input, shape=None):
@@ -60,6 +85,221 @@ def _check_parameter(func_name, order, mode):
         "_opencv_edge",
     ):
         raise ValueError("boundary mode is not supported")
+
+
+def spline_filter1d(input, order=3, axis=-1, output=None, mode="mirror"):
+    """
+    Calculate a 1-D spline filter along the given axis.
+
+    The lines of the array along the given axis are filtered by a
+    spline filter. The order of the spline must be >= 2 and <= 5.
+
+    Args:
+        input (cupy.ndarray): The input array.
+        order (int): The order of the spline interpolation. If it is not given,
+            order 1 is used. It is different from :mod:`scipy.ndimage` and can
+            change in the future. Currently it supports only order 0 and 1.
+        axis (int): The axis along which the spline filter is applied. Default
+            is the last axis.
+        output (cupy.ndarray or dtype, optional): The array in which to place
+            the output, or the dtype of the returned array. Default is
+            ``numpy.float64`` for real-valued inputs and ``numpy.complex128``
+            for complex-valued inputs.
+        mode (str): Points outside the boundaries of the input are filled
+            according to the given mode (``'constant'``, ``'nearest'``,
+            ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
+
+    Returns:
+        cupy.ndarray:
+            The result of prefiltering the input.
+
+    Notes
+    -----
+    All functions in `ndimage.interpolation` do spline interpolation of
+    the input image. If using B-splines of `order > 1`, the input image
+    values have to be converted to B-spline coefficients first, which is
+    done by applying this 1-D filter sequentially along all
+    axes of the input. All functions that require B-spline coefficients
+    will automatically filter their inputs, a behavior controllable with
+    the `prefilter` keyword argument. For functions that accept a `mode`
+    parameter, the result will only be correct if it matches the `mode`
+    used when filtering.
+    """
+    if order < 0 or order > 5:
+        raise RuntimeError("spline order not supported")
+    x = input
+    ndim = x.ndim
+    axis = _ni_support._check_axis(axis, ndim)
+
+    run_kernel = True
+    if order < 2 or x.ndim == 0 or x.shape[axis] == 1:
+        # order 0, 1 don't require reshaping as no CUDA kernel will be called
+        # scalar or size 1 arrays also don't need to be filtered
+        run_kernel = False
+
+    if run_kernel:
+        if axis != ndim - 1:
+            x = x.swapaxes(axis, -1)
+        x_shape = x.shape
+        x = cupy.ascontiguousarray(x)
+        x = x.reshape((-1, x.shape[-1]), order="C")
+    elif isinstance(output, cupy.ndarray):
+        output[...] = x[...]
+        return output
+
+    # TODO: Add kernel with strided access to avoid need for reshaping below
+    #       and allow in-place operation.
+    complex_data = input.dtype.kind == "c"
+    if isinstance(output, cupy.ndarray):
+        if complex_data and cupy.dtype(output).kind != "c":
+            raise ValueError(
+                "output must have complex dtype for complex inputs"
+            )
+        # For now, strided operation is not supported, so have to create a new
+        # temporary array, y, even when the user provides an output array.
+        y = _get_output(output.dtype, input)
+    else:
+        if complex_data:
+            if output is None:
+                output = cupy.complex128
+            elif cupy.dtype(output).kind != "c":
+                raise ValueError(
+                    "output must have complex dtype for complex inputs"
+                )
+        elif output is None:
+            output = cupy.float64
+        y = _get_output(output, input)
+
+    if not run_kernel:
+        # just copy input into the allocated output array
+        y[...] = x[...]
+        return y
+
+    n_batch = x.shape[0]
+    out_len = x.shape[-1]
+    y = y.reshape((n_batch, out_len))
+
+    if y.dtype == cupy.float32:
+        dtype_data = "float"
+        dtype_pole = "float"
+    elif y.dtype == cupy.float64:
+        dtype_data = "double"
+        dtype_pole = "double"
+    elif y.dtype == cupy.complex64:
+        dtype_data = "complex<float>"
+        dtype_pole = "float"
+    elif y.dtype == cupy.complex128:
+        dtype_data = "complex<double>"
+        dtype_pole = "double"
+    else:
+        raise RuntimeError("unexpected dtype: {}".format(x.dtype))
+
+    # For the kernel, the input and output must have matching dtype
+    x = x.astype(y.dtype, copy=False)
+
+    module = cupy.RawModule(
+        code=get_raw_spline1d_code(
+            mode,
+            order=order,
+            dtype_index="int",
+            dtype_data=dtype_data,
+            dtype_pole=dtype_pole,
+        )
+    )
+    kern = module.get_function("batch_spline_prefilter")
+
+    # Due to recursive nature, a given line of data must be processed by a
+    # single thread.
+    block = (min(highest_power_of_2(n_batch), 64),)
+    grid = (int(math.ceil(n_batch / block[0])),)
+
+    # apply prefilter gain
+    y = x * get_gain(get_poles(order=order))
+    # apply caual + anti-causal IIR spline filters
+    kern(grid, block, (y, out_len, n_batch))
+
+    y = y.reshape(x_shape, order="C")
+    if axis != ndim - 1:
+        y = y.swapaxes(axis, -1)
+
+    contiguous_output = True  # TODO: always enforce contiguity of the output?
+    if isinstance(output, cupy.ndarray):
+        # copy result back to the user-provided output array
+        output[:] = y
+    elif contiguous_output and not y.flags.c_contiguous:
+        y = cupy.ascontiguousarray(y)
+
+    return y
+
+
+def spline_filter(input, order=3, output=numpy.float64, mode="mirror"):
+    """Multidimensional spline filter.
+
+    Args:
+        input (cupy.ndarray): The input array.
+        order (int): The order of the spline interpolation. If it is not given,
+            order 1 is used. It is different from :mod:`scipy.ndimage` and can
+            change in the future. Currently it supports only order 0 and 1.
+        output (cupy.ndarray or dtype, optional): The array in which to place
+            the output, or the dtype of the returned array. Default is
+            ``numpy.float64`` for real-valued inputs and ``numpy.complex128``
+            for complex-valued inputs.
+        mode (str): Points outside the boundaries of the input are filled
+            according to the given mode (``'constant'``, ``'nearest'``,
+            ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
+
+    Returns:
+        cupy.ndarray:
+            The result of prefiltering the input.
+
+    See Also
+    --------
+    spline_filter1d
+
+    Notes
+    -----
+    The multidimensional filter is implemented as a sequence of
+    1-D spline filters. The intermediate arrays are stored
+    in the same data type as the output. Therefore, for output types
+    with a limited precision, the results may be imprecise because
+    intermediate results may be stored with insufficient precision.
+
+    """
+    if order < 2 or order > 5:
+        raise RuntimeError("spline order not supported")
+
+    # TODO: Add kernel with strided access to avoid need for reshaping below
+    #       and allow in-place operation.
+    complex_data = input.dtype.kind == "c"
+    if isinstance(output, cupy.ndarray):
+        if complex_data and cupy.dtype(output).kind != "c":
+            raise ValueError(
+                "output must have complex dtype for complex inputs"
+            )
+        # For now, strided operation is not supported, so have to create a new
+        # temporary array, y, even when the user provides an output array.
+        y = _get_output(output.dtype, input)
+    else:
+        if complex_data:
+            if output is None:
+                output = cupy.complex128
+            elif cupy.dtype(output).kind != "c":
+                raise ValueError(
+                    "output must have complex dtype for complex inputs"
+                )
+        elif output is None:
+            output = cupy.float64
+        y = _get_output(output, input)
+
+    if order not in [0, 1] and input.ndim > 0:
+        for axis in range(input.ndim):
+            spline_filter1d(input, order, axis, output=y, mode=mode)
+            input = y
+    if isinstance(output, cupy.ndarray):
+        output[...] = input[...]
+    else:
+        output = input
+    return output
 
 
 def map_coordinates(
