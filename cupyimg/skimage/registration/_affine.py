@@ -93,7 +93,7 @@ def affine(
     moving_image,
     *,
     cost=cost_nmi,
-    initial_vector=None,
+    initial_parameters=None,
     translation_indices=None,
     vector_to_matrix=None,
     pyramid_scale=2,
@@ -117,7 +117,7 @@ def affine(
         A cost function which takes two images and returns a score which is
         at a minimum when images are aligned. Uses the normalized mutual
         information by default.
-    initial_vector : array of float, optional
+    initial_parameters : array of float, optional
         The initial vector to optimize. This vector should have the same
         dimensionality as the transform being optimized. For example, a 2D
         affine transform has 6 parameters. A 2D rigid transform, on the other
@@ -129,12 +129,18 @@ def affine(
         example, in a 2D transform, the translation parameters are in the
         top two positions of the third column of the 3 x 3 matrix, which
         corresponds to the linear indices [2, 5].
+        The translation parameters are special in this class of transforms
+        because they are the only ones not scale-invariant. This means that
+        they need to be adjusted for each level of the image pyramid.
     vector_to_matrix : callable, array (M,) -> array-like (N+1, N+1), optional
         A function to convert a linear vector of parameters, as used by
         `scipy.optimize.minimize`, to an affine transformation matrix in
         homogeneous coordinates.
     pyramid_scale : float, optional
-        Scaling factor to generate the image pyramid.
+        Scaling factor to generate the image pyramid. The affine transformation
+        is estimated first for a downscaled version of the image, then
+        progressively refined with higher resolutions. This parameter controls
+        the increase in resolution at each level.
     pyramid_minimum_size : integer, optional
         The smallest size for an image along any dimension. This value
         determines the size of the image pyramid used. Choosing a smaller value
@@ -148,7 +154,7 @@ def affine(
         in the reference space to coordinates in the target space. For
         technical reasons, this is the transform expected by
         ``scipy.ndimage.affine_transform`` to map the target image to the
-        reference space.
+        reference space. Defaults to True.
     level_callback : callable, optional
         If given, this function is called once per pyramid level with a tuple
         containing the current downsampled image, transformation matrix, and
@@ -203,9 +209,9 @@ def affine(
     )
     image_pairs = reversed(list(zip(pyramid_ref, pyramid_mvg)))
 
-    if initial_vector is None:
-        initial_vector = cp.eye(ndim, ndim + 1).ravel()
-    parameter_vector = initial_vector
+    if initial_parameters is None:
+        initial_parameters = cp.eye(ndim, ndim + 1).ravel()
+    parameter_vector = initial_parameters
 
     if vector_to_matrix is None:
         vector_to_matrix = _parameter_vector_to_matrix

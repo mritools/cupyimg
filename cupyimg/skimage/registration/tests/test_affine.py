@@ -1,9 +1,10 @@
 import cupy as cp
+import numpy as np
 from skimage import data
 
 from cupyimg.skimage.registration import _affine
 from cupyimg.scipy import ndimage as ndi
-from cupy.testing import assert_array_almost_equal
+from cupy.testing import assert_array_equal, assert_array_almost_equal
 
 
 def test_register_affine():
@@ -45,3 +46,15 @@ def test_register_affine_multichannel():
         options=powell_options,
     )
     assert_array_almost_equal(matrix, inverse, decimal=1)
+
+
+def test_matrix_parameter_vector_conversion():
+    for ndim in range(2, 5):
+        p_v = cp.asarray(np.random.rand((ndim + 1) * ndim))
+        matrix = _affine._parameter_vector_to_matrix(p_v)
+        en = cp.zeros(ndim + 1)
+        en[-1] = 1
+        p_v_2 = cp.concatenate(
+            (p_v.reshape((ndim, ndim + 1)), en[np.newaxis]), axis=0
+        )
+        assert_array_equal(matrix, p_v_2)
