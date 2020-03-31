@@ -33,6 +33,27 @@ def test_spline_filter_1d_real(dtype, order, axis, mode):
 @pytest.mark.parametrize(
     "dtype, order, axis, mode",
     itertools.product(
+        [np.float32, np.float64],
+        [2, 3, 4, 5],
+        [0, -1],
+        ["mirror"],  # "constant", "nearest", "reflect", "wrap"],
+    ),
+)
+def test_spline_filter_1d_real_ndimage(dtype, order, axis, mode):
+    rstate = np.random.RandomState(1234)
+    atol = rtol = 1e-6
+    x = rstate.randn(156, 256).astype(dtype)
+    xd = cp.asarray(x)
+    y = ndi.spline_filter1d(x, order=order, axis=axis, output=dtype)
+    yd = spline_filter1d(
+        xd, order=order, axis=axis, output=dtype, dtype_mode="ndimage"
+    )
+    cp.testing.assert_allclose(y, yd, atol=atol, rtol=rtol)
+
+
+@pytest.mark.parametrize(
+    "dtype, order, axis, mode",
+    itertools.product(
         [np.complex64, np.complex128],
         [2, 3, 4, 5],
         [0, -1],

@@ -27,10 +27,10 @@ cupyimg.scipy.ndimage._kernels.interp.const_legacy_mode = True
     *testing.product(
         {
             "output": [None, numpy.float64, "f", float, "empty"],
-            "order": [0, 1],
+            "order": [0, 1, 3],
             "mode": ["constant", "nearest", "mirror"],
             "cval": [1.0],
-            "prefilter": [True],
+            "prefilter": [False, True],
         }
     )
 )
@@ -70,6 +70,9 @@ class TestMapCoordinates(unittest.TestCase):
     @numpy_cupyimg_allclose(atol=1e-5, scipy_name="scp")
     def test_map_coordinates_float(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         coordinates = testing.shaped_random((a.ndim, 100), xp, dtype)
         return self._map_coordinates(xp, scp, a, coordinates)
 
@@ -77,6 +80,9 @@ class TestMapCoordinates(unittest.TestCase):
     @numpy_cupyimg_allclose(atol=1e-5, scipy_name="scp")
     def test_map_coordinates_float_nd_coords(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         coordinates = testing.shaped_random(
             (a.ndim, 10, 10), xp, dtype, scale=99.0
         )
@@ -92,6 +98,9 @@ class TestMapCoordinates(unittest.TestCase):
                 dtype = numpy.uint64
 
         a = testing.shaped_random((100, 100), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         coordinates = testing.shaped_random((a.ndim, 100), xp, dtype)
         out = self._map_coordinates(xp, scp, a, coordinates)
         float_out = (
@@ -110,10 +119,10 @@ class TestMapCoordinates(unittest.TestCase):
             "offset": [0.3, [-1.3, 1.3]],
             "output_shape": [None],
             "output": [None, numpy.float64, "empty"],
-            "order": [0, 1],
+            "order": [0, 1, 3],
             "mode": ["constant", "nearest", "mirror"],
             "cval": [1.0],
-            "prefilter": [True],
+            "prefilter": [False, True],
         }
     )
 )
@@ -164,6 +173,9 @@ class TestAffineTransform(unittest.TestCase):
     @numpy_cupyimg_allclose(atol=1e-5, scipy_name="scp")
     def test_affine_transform_float(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         matrix = testing.shaped_random(self.matrix_shape, xp, dtype)
         return self._affine_transform(xp, scp, a, matrix)
 
@@ -177,6 +189,9 @@ class TestAffineTransform(unittest.TestCase):
                 dtype = numpy.uint64
 
         a = testing.shaped_random((100, 100), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         matrix = testing.shaped_random(self.matrix_shape, xp, dtype)
         out = self._affine_transform(xp, scp, a, matrix)
         float_out = (
@@ -215,10 +230,10 @@ class TestAffineTransformOpenCV(unittest.TestCase):
             "axes": [(1, 0)],
             "reshape": [False, True],
             "output": [None, numpy.float64, "empty"],
-            "order": [0, 1],
+            "order": [0, 1, 2, 3, 4, 5],
             "mode": ["constant", "nearest", "mirror"],
             "cval": [1.0],
-            "prefilter": [True],
+            "prefilter": [False, True],
         }
     )
 )
@@ -272,6 +287,9 @@ class TestRotate(unittest.TestCase):
     @numpy_cupyimg_allclose(atol=1e-5, scipy_name="scp")
     def test_rotate_float(self, xp, scp, dtype):
         a = testing.shaped_random((10, 10), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         return self._rotate(xp, scp, a)
 
     @testing.for_float_dtypes(no_float16=True)
@@ -281,6 +299,9 @@ class TestRotate(unittest.TestCase):
             # skip, known failures due to rounding with order=0
             return xp.asarray(0)
         a = testing.shaped_random((32, 32), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         return self._rotate(xp, scp, a)
 
     @testing.for_int_dtypes(no_bool=True)
@@ -293,6 +314,9 @@ class TestRotate(unittest.TestCase):
                 dtype = numpy.uint64
 
         a = testing.shaped_random((10, 10), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         out = self._rotate(xp, scp, a)
         float_out = self._rotate(xp, scp, a.astype(xp.float64)) % 1
         half = xp.full_like(float_out, 0.5)
@@ -341,10 +365,10 @@ class TestRotateOpenCV(unittest.TestCase):
         {
             "shift": [0.1, -10, (5, -5)],
             "output": [None, numpy.float64, "empty"],
-            "order": [0, 1],
+            "order": [0, 1, 3],
             "mode": ["constant", "nearest", "mirror"],
             "cval": [1.0],
-            "prefilter": [True],
+            "prefilter": [False, True],
         }
     )
 )
@@ -384,6 +408,10 @@ class TestShift(unittest.TestCase):
     @numpy_cupyimg_allclose(atol=1e-5, scipy_name="scp")
     def test_shift_float(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
+
         return self._shift(xp, scp, a)
 
     @testing.for_int_dtypes(no_bool=True)
@@ -396,6 +424,10 @@ class TestShift(unittest.TestCase):
                 dtype = numpy.uint64
 
         a = testing.shaped_random((100, 100), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
+
         out = self._shift(xp, scp, a)
         float_out = self._shift(xp, scp, a.astype(xp.float64)) % 1
         half = xp.full_like(float_out, 0.5)
@@ -424,12 +456,12 @@ class TestShiftOpenCV(unittest.TestCase):
 @testing.parameterize(
     *testing.product(
         {
-            "zoom": [0.1, 10, (0.1, 10)],
+            "zoom": [0.1, 4, (0.1, 4)],
             "output": [None, numpy.float64, "empty"],
-            "order": [0, 1],
+            "order": [0, 1, 3],
             "mode": ["constant", "nearest", "mirror"],
             "cval": [1.0],
-            "prefilter": [True],
+            "prefilter": [False, True],
         }
     )
 )
@@ -477,6 +509,9 @@ class TestZoom(unittest.TestCase):
     @numpy_cupyimg_allclose(atol=1e-5, scipy_name="scp")
     def test_zoom_float(self, xp, scp, dtype):
         a = testing.shaped_random((100, 100), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         return self._zoom(xp, scp, a)
 
     @testing.for_int_dtypes(no_bool=True)
@@ -489,6 +524,9 @@ class TestZoom(unittest.TestCase):
                 dtype = numpy.uint64
 
         a = testing.shaped_random((100, 100), xp, dtype)
+        if self.order > 1 and self.mode != "mirror":
+            # Note: SciPy (as of 1.4.0) only correct for boundary='mirror'
+            return a
         out = self._zoom(xp, scp, a)
         float_out = self._zoom(xp, scp, a.astype(xp.float64)) % 1
         half = xp.full_like(float_out, 0.5)

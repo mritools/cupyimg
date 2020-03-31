@@ -64,11 +64,6 @@ def _check_parameter(func_name, order, mode):
         )
     elif order < 0 or 5 < order:
         raise ValueError("spline order is not supported")
-    elif 1 < order:
-        # SciPy supports order 0-5, but CuPy supports only order 0 and 1. Other
-        # orders will be implemented, therefore it raises NotImplementedError
-        # instead of ValueError.
-        raise NotImplementedError("spline order is not supported")
 
     # if mode in ("reflect", "wrap"):
     #     raise NotImplementedError(
@@ -87,7 +82,50 @@ def _check_parameter(func_name, order, mode):
         raise ValueError("boundary mode is not supported")
 
 
-def spline_filter1d(input, order=3, axis=-1, output=None, mode="mirror"):
+def _get_spline_output(input, output, dtype_mode):
+
+    # TODO: Add kernel with strided access to avoid need for reshaping below
+    #       and allow in-place operation.
+    complex_data = input.dtype.kind == "c"
+    if isinstance(output, cupy.ndarray):
+        if complex_data and output.dtype.kind != "c":
+            raise ValueError(
+                "output must have complex dtype for complex inputs"
+            )
+        if dtype_mode == "ndimage":
+            output_dtype = cupy.promote_types(output.dtype, cupy.float64)
+        elif dtype_mode == "float":
+            output_dtype = cupy.promote_types(output.dtype, cupy.float32)
+        else:
+            raise ValueError(f"unrecognized dtype_mode: {dtype_mode}")
+        output_dtype_requested = output_dtype
+        # For now, strided operation is not supported, so have to create a new
+        # temporary array, y, even when the user provides an output array.
+        y = _get_output(output_dtype, input)
+    else:
+        if output is None:
+            output = output_dtype_requested = input.dtype
+        else:
+            output_dtype_requested = cupy.dtype(output)
+            if complex_data and output_dtype_requested.kind != "c":
+                raise ValueError(
+                    "output must have complex dtype for complex inputs"
+                )
+        if dtype_mode == "ndimage":
+            output = cupy.promote_types(output, cupy.float64)
+        elif dtype_mode == "float":
+            output = cupy.promote_types(output, cupy.float32)
+        else:
+            raise ValueError(f"unrecognized dtype_mode: {dtype_mode}")
+        output_dtype = output
+
+        y = _get_output(output_dtype, input)
+    return y, output_dtype, output_dtype_requested, complex_data
+
+
+def spline_filter1d(
+    input, order=3, axis=-1, output=None, mode="mirror", *, dtype_mode="float"
+):
     """
     Calculate a 1-D spline filter along the given axis.
 
@@ -108,6 +146,9 @@ def spline_filter1d(input, order=3, axis=-1, output=None, mode="mirror"):
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
+        dtype_mode (str): If 'ndimage', double-precision computations will be
+            performed as in scipy.ndimage. If 'float', single precision will be
+            used for single precision inputs.
 
     Returns:
         cupy.ndarray:
@@ -124,6 +165,9 @@ def spline_filter1d(input, order=3, axis=-1, output=None, mode="mirror"):
     the `prefilter` keyword argument. For functions that accept a `mode`
     parameter, the result will only be correct if it matches the `mode`
     used when filtering.
+
+    Note that the prefilter does not handle the boundaries accurately for modes
+    'constant' or 'nearest'.
     """
     if order < 0 or order > 5:
         raise RuntimeError("spline order not supported")
@@ -147,28 +191,9 @@ def spline_filter1d(input, order=3, axis=-1, output=None, mode="mirror"):
         output[...] = x[...]
         return output
 
-    # TODO: Add kernel with strided access to avoid need for reshaping below
-    #       and allow in-place operation.
-    complex_data = input.dtype.kind == "c"
-    if isinstance(output, cupy.ndarray):
-        if complex_data and cupy.dtype(output).kind != "c":
-            raise ValueError(
-                "output must have complex dtype for complex inputs"
-            )
-        # For now, strided operation is not supported, so have to create a new
-        # temporary array, y, even when the user provides an output array.
-        y = _get_output(output.dtype, input)
-    else:
-        if complex_data:
-            if output is None:
-                output = cupy.complex128
-            elif cupy.dtype(output).kind != "c":
-                raise ValueError(
-                    "output must have complex dtype for complex inputs"
-                )
-        elif output is None:
-            output = cupy.float64
-        y = _get_output(output, input)
+    y, output_dtype, output_dtype_requested, complex_data = _get_spline_output(
+        input, output, dtype_mode
+    )
 
     if not run_kernel:
         # just copy input into the allocated output array
@@ -179,20 +204,29 @@ def spline_filter1d(input, order=3, axis=-1, output=None, mode="mirror"):
     out_len = x.shape[-1]
     y = y.reshape((n_batch, out_len))
 
-    if y.dtype == cupy.float32:
-        dtype_data = "float"
-        dtype_pole = "float"
-    elif y.dtype == cupy.float64:
-        dtype_data = "double"
-        dtype_pole = "double"
-    elif y.dtype == cupy.complex64:
-        dtype_data = "complex<float>"
-        dtype_pole = "float"
-    elif y.dtype == cupy.complex128:
-        dtype_data = "complex<double>"
-        dtype_pole = "double"
+    if dtype_mode == "ndimage":
+        # data arrays and poles always stored in double precision
+        if y.dtype.kind == "c":
+            dtype_data = "complex<double>"
+            dtype_pole = "double"
+        else:
+            dtype_data = "double"
+            dtype_pole = "double"
     else:
-        raise RuntimeError("unexpected dtype: {}".format(x.dtype))
+        if y.dtype == cupy.float32:
+            dtype_data = "float"
+            dtype_pole = "float"
+        elif y.dtype == cupy.float64:
+            dtype_data = "double"
+            dtype_pole = "double"
+        elif y.dtype == cupy.complex64:
+            dtype_data = "complex<float>"
+            dtype_pole = "float"
+        elif y.dtype == cupy.complex128:
+            dtype_data = "complex<double>"
+            dtype_pole = "double"
+        else:
+            raise RuntimeError("unexpected dtype: {}".format(x.dtype))
 
     # For the kernel, the input and output must have matching dtype
     x = x.astype(y.dtype, copy=False)
@@ -209,7 +243,7 @@ def spline_filter1d(input, order=3, axis=-1, output=None, mode="mirror"):
     kern = module.get_function("batch_spline_prefilter")
 
     # Due to recursive nature, a given line of data must be processed by a
-    # single thread.
+    # single thread. n_batch lines will be processed in total.
     block = (min(highest_power_of_2(n_batch), 64),)
     grid = (int(math.ceil(n_batch / block[0])),)
 
@@ -229,10 +263,14 @@ def spline_filter1d(input, order=3, axis=-1, output=None, mode="mirror"):
     elif contiguous_output and not y.flags.c_contiguous:
         y = cupy.ascontiguousarray(y)
 
+    if output_dtype_requested != output_dtype:
+        y = y.astype(output_dtype_requested)
     return y
 
 
-def spline_filter(input, order=3, output=numpy.float64, mode="mirror"):
+def spline_filter(
+    input, order=3, output=numpy.float64, mode="mirror", *, dtype_mode="float"
+):
     """Multidimensional spline filter.
 
     Args:
@@ -258,47 +296,34 @@ def spline_filter(input, order=3, output=numpy.float64, mode="mirror"):
 
     Notes
     -----
-    The multidimensional filter is implemented as a sequence of
-    1-D spline filters. The intermediate arrays are stored
-    in the same data type as the output. Therefore, for output types
-    with a limited precision, the results may be imprecise because
-    intermediate results may be stored with insufficient precision.
+    The multidimensional filter is implemented as a sequence of 1-D spline
+    filters. The intermediate arrays are stored in the same data type as the
+    output. Therefore, for output types with a limited precision, the results
+    may be imprecise because intermediate results may be stored with
+    insufficient precision.
 
+    Note that the prefilter does not handle the boundaries accurately for modes
+    'constant' or 'nearest'.
     """
     if order < 2 or order > 5:
         raise RuntimeError("spline order not supported")
 
-    # TODO: Add kernel with strided access to avoid need for reshaping below
-    #       and allow in-place operation.
-    complex_data = input.dtype.kind == "c"
-    if isinstance(output, cupy.ndarray):
-        if complex_data and cupy.dtype(output).kind != "c":
-            raise ValueError(
-                "output must have complex dtype for complex inputs"
-            )
-        # For now, strided operation is not supported, so have to create a new
-        # temporary array, y, even when the user provides an output array.
-        y = _get_output(output.dtype, input)
-    else:
-        if complex_data:
-            if output is None:
-                output = cupy.complex128
-            elif cupy.dtype(output).kind != "c":
-                raise ValueError(
-                    "output must have complex dtype for complex inputs"
-                )
-        elif output is None:
-            output = cupy.float64
-        y = _get_output(output, input)
+    y, output_dtype, output_dtype_requested, complex_data = _get_spline_output(
+        input, output, dtype_mode
+    )
 
     if order not in [0, 1] and input.ndim > 0:
         for axis in range(input.ndim):
-            spline_filter1d(input, order, axis, output=y, mode=mode)
+            spline_filter1d(
+                input, order, axis, output=y, mode=mode, dtype_mode=dtype_mode
+            )
             input = y
     if isinstance(output, cupy.ndarray):
         output[...] = input[...]
     else:
         output = input
+    if output.dtype != output_dtype_requested:
+        output = output.astype(output_dtype_requested)
     return output
 
 
@@ -310,7 +335,8 @@ def map_coordinates(
     mode="constant",
     cval=0.0,
     prefilter=True,
-    old_implementation=False,
+    *,
+    dtype_mode="float",
 ):
     """Map the input array to new coordinates by interpolation.
 
@@ -345,6 +371,18 @@ def map_coordinates(
             The result of transforming the input. The shape of the output is
             derived from that of ``coordinates`` by dropping the first axis.
 
+    Notes
+    -----
+    This implementation handles boundary modes 'wrap' and 'reflect' correctly,
+    while SciPy does not (at least as of release 1.4.0). So, if comparing to
+    SciPy, some disagreement near the borders may occur unless
+    ``mode == 'mirror'``.
+
+    For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
+    conditions are implemented correctly only for modes 'mirror', 'reflect'
+    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
+    innacuracy near the boundary of the array.
+
     .. seealso:: :func:`scipy.ndimage.map_coordinates`
     """
 
@@ -363,9 +401,36 @@ def map_coordinates(
     if input.dtype.kind in "iu":
         input = input.astype(cupy.float32)
 
+    if coordinates.dtype.kind in "iu":
+        if order > 1:
+            # order > 1 (spline) kernels require floating-point coordinates
+            if dtype_mode == "float":
+                coord_dtype = cupy.promote_types(
+                    coordinates.dtype, cupy.float32
+                )
+            else:
+                coord_dtype = cupy.promote_types(
+                    coordinates.dtype, cupy.float64
+                )
+            coordinates = coordinates.astype(coord_dtype)
+    elif coordinates.dtype.kind != "f":
+        raise ValueError("coordinates should have floating point dtype")
+    else:
+        if dtype_mode == "float":
+            coord_dtype = cupy.promote_types(coordinates.dtype, cupy.float32)
+        else:
+            coord_dtype = cupy.promote_types(coordinates.dtype, cupy.float64)
+
+    if prefilter and order > 1:
+        filtered = spline_filter(
+            input, order, output=input.dtype, mode=mode, dtype_mode=dtype_mode
+        )
+    else:
+        filtered = input
+
     large_int = max(_prod(input.shape), coordinates.shape[0]) > 1 << 31
     kern = _get_map_kernel(
-        input.ndim,
+        filtered.ndim,
         large_int,
         yshape=coordinates.shape,
         mode=mode,
@@ -373,7 +438,7 @@ def map_coordinates(
         order=order,
         integer_output=integer_output,
     )
-    kern(input, coordinates, ret)
+    kern(filtered, coordinates, ret)
     return ret
 
 
@@ -387,6 +452,8 @@ def affine_transform(
     mode="constant",
     cval=0.0,
     prefilter=True,
+    *,
+    dtype_mode="float",
 ):
     """Apply an affine transformation.
 
@@ -436,6 +503,18 @@ def affine_transform(
             The transformed input. If ``output`` is given as a parameter,
             ``None`` is returned.
 
+    Notes
+    -----
+    This implementation handles boundary modes 'wrap' and 'reflect' correctly,
+    while SciPy does not (at least as of release 1.4.0). So, if comparing to
+    SciPy, some disagreement near the borders may occur unless
+    ``mode == 'mirror'``.
+
+    For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
+    conditions are implemented correctly only for modes 'mirror', 'reflect'
+    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
+    innacuracy near the boundary of the array.
+
     .. seealso:: :func:`scipy.ndimage.affine_transform`
     """
 
@@ -475,6 +554,14 @@ def affine_transform(
     output = _get_output(output, input, shape=output_shape)
     if input.dtype.kind in "iu":
         input = input.astype(cupy.float32)
+
+    if prefilter and order > 1:
+        filtered = spline_filter(
+            input, order, output=input.dtype, mode=mode, dtype_mode=dtype_mode
+        )
+    else:
+        filtered = input
+
     integer_output = output.dtype.kind in "iu"
     large_int = max(_prod(input.shape), _prod(output_shape)) > 1 << 31
     if matrix.ndim == 1:
@@ -489,7 +576,7 @@ def affine_transform(
             order=order,
             integer_output=integer_output,
         )
-        kern(input, offset, matrix, output)
+        kern(filtered, offset, matrix, output)
     else:
         kern = _get_affine_kernel(
             ndim,
@@ -503,7 +590,7 @@ def affine_transform(
         m = cupy.zeros((ndim, ndim + 1), dtype=float)
         m[:, :-1] = matrix
         m[:, -1] = cupy.asarray(offset, dtype=float)
-        kern(input, m, output)
+        kern(filtered, m, output)
     return output
 
 
@@ -529,6 +616,8 @@ def rotate(
     mode="constant",
     cval=0.0,
     prefilter=True,
+    *,
+    dtype_mode="float",
 ):
     """Rotate an array.
 
@@ -561,7 +650,19 @@ def rotate(
         cupy.ndarray or None:
             The rotated input.
 
-    .. seealso:: :func:`scipy.ndimage.rotate`
+    Notes
+    -----
+    This implementation handles boundary modes 'wrap' and 'reflect' correctly,
+    while SciPy does not (at least as of release 1.4.0). So, if comparing to
+    SciPy, some disagreement near the borders may occur unless
+    ``mode == 'mirror'``.
+
+    For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
+    conditions are implemented correctly only for modes 'mirror', 'reflect'
+    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
+    innacuracy near the boundary of the array.
+
+    .. seealso:: :func:`scipy.ndimage.zoom`
     """
 
     _check_parameter("rotate", order, mode)
@@ -628,6 +729,7 @@ def rotate(
         mode,
         cval,
         prefilter,
+        dtype_mode=dtype_mode,
     )
 
 
@@ -639,6 +741,8 @@ def shift(
     mode="constant",
     cval=0.0,
     prefilter=True,
+    *,
+    dtype_mode="float",
 ):
     """Shift an array.
 
@@ -669,6 +773,18 @@ def shift(
         cupy.ndarray or None:
             The shifted input.
 
+    Notes
+    -----
+    This implementation handles boundary modes 'wrap' and 'reflect' correctly,
+    while SciPy does not (at least as of release 1.4.0). So, if comparing to
+    SciPy, some disagreement near the borders may occur unless
+    ``mode == 'mirror'``.
+
+    For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
+    conditions are implemented correctly only for modes 'mirror', 'reflect'
+    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
+    innacuracy near the boundary of the array.
+
     .. seealso:: :func:`scipy.ndimage.shift`
     """
 
@@ -697,6 +813,18 @@ def shift(
         output = _get_output(output, input)
         if input.dtype.kind in "iu":
             input = input.astype(cupy.float32)
+
+        if prefilter and order > 1:
+            filtered = spline_filter(
+                input,
+                order,
+                output=input.dtype,
+                mode=mode,
+                dtype_mode=dtype_mode,
+            )
+        else:
+            filtered = input
+
         integer_output = output.dtype.kind in "iu"
         large_int = _prod(input.shape) > 1 << 31
         kern = _get_shift_kernel(
@@ -709,7 +837,7 @@ def shift(
             integer_output=integer_output,
         )
         shift = cupy.asarray(shift, dtype=float)
-        kern(input, shift, output)
+        kern(filtered, shift, output)
     return output
 
 
@@ -721,6 +849,8 @@ def zoom(
     mode="constant",
     cval=0.0,
     prefilter=True,
+    *,
+    dtype_mode="float",
 ):
     """Zoom an array.
 
@@ -748,6 +878,18 @@ def zoom(
     Returns:
         cupy.ndarray or None:
             The zoomed input.
+
+    Notes
+    -----
+    This implementation handles boundary modes 'wrap' and 'reflect' correctly,
+    while SciPy does not (at least as of release 1.4.0). So, if comparing to
+    SciPy, some disagreement near the borders may occur unless
+    ``mode == 'mirror'``.
+
+    For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
+    conditions are implemented correctly only for modes 'mirror', 'reflect'
+    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
+    innacuracy near the boundary of the array.
 
     .. seealso:: :func:`scipy.ndimage.zoom`
     """
@@ -798,6 +940,18 @@ def zoom(
         output = _get_output(output, input, shape=output_shape)
         if input.dtype.kind in "iu":
             input = input.astype(cupy.float32)
+
+        if prefilter and order > 1:
+            filtered = spline_filter(
+                input,
+                order,
+                output=input.dtype,
+                mode=mode,
+                dtype_mode=dtype_mode,
+            )
+        else:
+            filtered = input
+
         integer_output = output.dtype.kind in "iu"
         large_int = max(_prod(input.shape), _prod(output_shape)) > 1 << 31
         kern = _get_zoom_kernel(
@@ -809,5 +963,5 @@ def zoom(
             integer_output=integer_output,
         )
         zoom = cupy.asarray(zoom, dtype=float)
-        kern(input, zoom, output)
+        kern(filtered, zoom, output)
     return output

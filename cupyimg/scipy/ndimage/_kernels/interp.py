@@ -2,6 +2,7 @@ import cupy
 import cupy.core.internal
 
 from .support import _generate_boundary_condition_ops, _raw_ptr_ops
+from .spline import spline_weights_inline
 
 const_legacy_mode = False
 
@@ -375,10 +376,10 @@ def _generate_interp_custom(
 
             ops.append(
                 """
+            W w_{j};
+            {int_t} ic_{j};
             for (int s_{j} = 0; s_{j} < n_{j}; s_{j}++)
                 {{
-                    W w_{j};
-                    {int_t} ic_{j};
                     if (s_{j} == 0)
                     {{
                         w_{j} = (W)cc_{j} - c_{j};
@@ -391,6 +392,72 @@ def _generate_interp_custom(
                     int_t=int_t, j=j
                 )
             )
+
+    elif order >= 1:
+        # wx, wy are temporary variables used during spline weight computation
+        if order == 1:
+            ops.append(
+                """
+            W wx;"""
+            )
+        else:
+            ops.append(
+                """
+            W wx, wy;"""
+            )
+        for j in range(ndim):
+            # determine weights along the current axis
+            ops.append(
+                """
+            W weights_{j}[{n}];""".format(
+                    j=j, n=order + 1
+                )
+            )
+            ops.append(spline_weights_inline[order].format(j=j, order=order))
+
+            # get starting coordinates for spline interpolation along axis j
+            if order & 1:
+                op_str = """
+                {int_t} start_{j} = ({int_t})floor((double)c_{j}) - {order_2};"""
+            else:
+                op_str = """
+                {int_t} start_{j} = ({int_t})floor((double)c_{j} + 0.5) - {order_2};"""
+            ops.append(op_str.format(int_t=int_t, j=j, order_2=order // 2))
+
+            # set of coordinate values within spline footprint along axis j
+            ops.append(
+                """{int_t} ci_{j}[{n}];""".format(int_t=int_t, j=j, n=order + 1)
+            )
+            for k in range(order + 1):
+                ops.append(
+                    """
+                ci_{j}[{k}] = start_{j} + {k};""".format(
+                        j=j, k=k
+                    )
+                )
+                if mode != "constant":
+                    ixvar = "ci_{j}[{k}]".format(j=j, k=k)
+                    ops.append(
+                        _generate_boundary_condition_ops(
+                            mode, ixvar, "xsize_{}".format(j)
+                        )
+                    )
+
+            # loop over the order + 1 values in the spline filter
+            ops.append(
+                """
+            W w_{j};
+            {int_t} ic_{j};
+            for (int k_{j} = 0; k_{j} <= {order}; k_{j}++)
+                {{
+                    w_{j} = weights_{j}[k_{j}];
+                    ic_{j} = ci_{j}[k_{j}] * sx_{j};
+            """.format(
+                    int_t=int_t, j=j, order=order
+                )
+            )
+
+    if order > 0:
 
         _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
         _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
