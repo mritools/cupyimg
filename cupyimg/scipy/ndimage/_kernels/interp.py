@@ -435,13 +435,12 @@ def _generate_interp_custom(
                         j=j, k=k
                     )
                 )
-                if mode != "constant":
-                    ixvar = "ci_{j}[{k}]".format(j=j, k=k)
-                    ops.append(
-                        _generate_boundary_condition_ops(
-                            mode, ixvar, "xsize_{}".format(j)
-                        )
+                ixvar = "ci_{j}[{k}]".format(j=j, k=k)
+                ops.append(
+                    _generate_boundary_condition_ops(
+                        mode, ixvar, "xsize_{}".format(j)
                     )
+                )
 
             # loop over the order + 1 values in the spline filter
             ops.append(
