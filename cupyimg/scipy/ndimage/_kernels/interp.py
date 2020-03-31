@@ -405,6 +405,12 @@ def _generate_interp_custom(
                 """
             W wx, wy;"""
             )
+        ops.append(
+            """
+        {int_t} start;""".format(
+                int_t=int_t
+            )
+        )
         for j in range(ndim):
             # determine weights along the current axis
             ops.append(
@@ -418,10 +424,10 @@ def _generate_interp_custom(
             # get starting coordinates for spline interpolation along axis j
             if order & 1:
                 op_str = """
-                {int_t} start_{j} = ({int_t})floor((double)c_{j}) - {order_2};"""
+                start = ({int_t})floor((double)c_{j}) - {order_2};"""
             else:
                 op_str = """
-                {int_t} start_{j} = ({int_t})floor((double)c_{j} + 0.5) - {order_2};"""
+                start = ({int_t})floor((double)c_{j} + 0.5) - {order_2};"""
             ops.append(op_str.format(int_t=int_t, j=j, order_2=order // 2))
 
             # set of coordinate values within spline footprint along axis j
@@ -431,7 +437,7 @@ def _generate_interp_custom(
             for k in range(order + 1):
                 ops.append(
                     """
-                ci_{j}[{k}] = start_{j} + {k};""".format(
+                ci_{j}[{k}] = start + {k};""".format(
                         j=j, k=k
                     )
                 )
