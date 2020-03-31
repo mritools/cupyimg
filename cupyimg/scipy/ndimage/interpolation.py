@@ -193,8 +193,9 @@ def spline_filter1d(
         if axis != ndim - 1:
             x = x.swapaxes(axis, -1)
         x_shape = x.shape
-        x = cupy.ascontiguousarray(x)
         x = x.reshape((-1, x.shape[-1]), order="C")
+        if not x.flags.c_contiguous:
+            x = cupy.ascontiguousarray(x)
     elif isinstance(output, cupy.ndarray):
         output[...] = x[...]
         return output
@@ -239,16 +240,32 @@ def spline_filter1d(
     # For the kernel, the input and output must have matching dtype
     x = x.astype(y.dtype, copy=False)
 
-    module = cupy.RawModule(
-        code=get_raw_spline1d_code(
-            mode,
-            order=order,
-            dtype_index="int",
-            dtype_data=dtype_data,
-            dtype_pole=dtype_pole,
+    if True:
+        module = cupy.RawModule(
+            code=get_raw_spline1d_code(
+                mode,
+                order=order,
+                dtype_index="int",
+                dtype_data=dtype_data,
+                dtype_pole=dtype_pole,
+            )
         )
-    )
-    kern = module.get_function("batch_spline_prefilter")
+        kern = module.get_function("batch_spline_prefilter")
+    else:
+        # name = "cupy_spline_prefilt_order{}_{}".format(order, dtype_pole[0])
+        # if complex_data:
+        #     name += "_cplx"
+        name = "batch_spline_prefilter"
+        kern = cupy.RawKernel(
+            get_raw_spline1d_code(
+                mode,
+                order=order,
+                dtype_index="int",
+                dtype_data=dtype_data,
+                dtype_pole=dtype_pole,
+            ),
+            name=name,
+        )
 
     # Due to recursive nature, a given line of data must be processed by a
     # single thread. n_batch lines will be processed in total.
@@ -257,6 +274,7 @@ def spline_filter1d(
 
     # apply prefilter gain
     y = x * get_gain(get_poles(order=order))
+
     # apply caual + anti-causal IIR spline filters
     kern(grid, block, (y, out_len, n_batch))
 
@@ -264,15 +282,19 @@ def spline_filter1d(
     if axis != ndim - 1:
         y = y.swapaxes(axis, -1)
 
-    contiguous_output = True  # TODO: always enforce contiguity of the output?
     if isinstance(output, cupy.ndarray):
         # copy result back to the user-provided output array
         output[:] = y
-    elif contiguous_output and not y.flags.c_contiguous:
-        y = cupy.ascontiguousarray(y)
+        return output
+    else:
+        contiguous_output = (
+            True  # TODO: always enforce contiguity of the output?
+        )
+        if contiguous_output and not y.flags.c_contiguous:
+            y = cupy.ascontiguousarray(y)
 
-    if output_dtype_requested != output_dtype:
-        y = y.astype(output_dtype_requested)
+        if output_dtype_requested != output_dtype:
+            y = y.astype(output_dtype_requested)
     return y
 
 
@@ -293,6 +315,9 @@ def spline_filter(
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
+        dtype_mode (str): If 'ndimage', double-precision computations will be
+            performed as in scipy.ndimage. If 'float', single precision will be
+            used for single precision inputs.
 
     Returns:
         cupy.ndarray:
@@ -372,6 +397,9 @@ def map_coordinates(
             0.0
         prefilter (bool): It is not used yet. It just exists for compatibility
             with :mod:`scipy.ndimage`.
+        dtype_mode (str): If 'ndimage', double-precision computations will be
+            performed as in scipy.ndimage. If 'float', single precision will be
+            used for single precision inputs.
 
     Returns:
         cupy.ndarray:
@@ -503,6 +531,9 @@ def affine_transform(
             0.0
         prefilter (bool): It is not used yet. It just exists for compatibility
             with :mod:`scipy.ndimage`.
+        dtype_mode (str): If 'ndimage', double-precision computations will be
+            performed as in scipy.ndimage. If 'float', single precision will be
+            used for single precision inputs.
 
     Returns:
         cupy.ndarray or None:
@@ -650,6 +681,9 @@ def rotate(
             0.0
         prefilter (bool): It is not used yet. It just exists for compatibility
             with :mod:`scipy.ndimage`.
+        dtype_mode (str): If 'ndimage', double-precision computations will be
+            performed as in scipy.ndimage. If 'float', single precision will be
+            used for single precision inputs.
 
     Returns:
         cupy.ndarray or None:
@@ -772,6 +806,9 @@ def shift(
             0.0
         prefilter (bool): It is not used yet. It just exists for compatibility
             with :mod:`scipy.ndimage`.
+        dtype_mode (str): If 'ndimage', double-precision computations will be
+            performed as in scipy.ndimage. If 'float', single precision will be
+            used for single precision inputs.
 
     Returns:
         cupy.ndarray or None:
@@ -881,6 +918,9 @@ def zoom(
     Returns:
         cupy.ndarray or None:
             The zoomed input.
+        dtype_mode (str): If 'ndimage', double-precision computations will be
+            performed as in scipy.ndimage. If 'float', single precision will be
+            used for single precision inputs.
 
     Notes
     -----
