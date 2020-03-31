@@ -48,7 +48,7 @@ from pytest import raises as assert_raises
 # import pytest
 # from pytest import raises as assert_raises
 # from scipy._lib._numpy_compat import suppress_warnings
-import cupyimg.scipy.ndimage as ndimage
+from cupyimg.scipy import ndimage
 
 
 eps = 1e-12
@@ -1304,6 +1304,46 @@ class TestNdimage:
                 assert_array_almost_equal(
                     a.imag, cupy.zeros(shape), decimal=dec
                 )
+
+    def test_spline01(self):
+        for type_ in self.types:
+            data = cupy.ones([], type_)
+            for order in range(2, 6):
+                out = ndimage.spline_filter(data, order=order)
+                assert_array_almost_equal(out, 1)
+
+    def test_spline02(self):
+        for type_ in self.types:
+            data = cupy.asarray([1], type_)
+            for order in range(2, 6):
+                out = ndimage.spline_filter(data, order=order)
+                assert_array_almost_equal(out, [1])
+
+    def test_spline03(self):
+        for type_ in self.types:
+            data = cupy.ones([], type_)
+            for order in range(2, 6):
+                out = ndimage.spline_filter(data, order, output=type_)
+                assert_array_almost_equal(out, 1)
+
+    def test_spline04(self):
+        for type_ in self.types:
+            data = cupy.ones([4], type_)
+            for order in range(2, 6):
+                out = ndimage.spline_filter(data, order)
+                assert_array_almost_equal(out, [1, 1, 1, 1])
+
+    def test_spline05(self):
+        for type_ in self.types:
+            data = cupy.ones([4, 4], type_)
+            for order in range(2, 6):
+                out = ndimage.spline_filter(data, order=order)
+                # fmt: off
+                assert_array_almost_equal(out, [[1, 1, 1, 1],
+                                                [1, 1, 1, 1],
+                                                [1, 1, 1, 1],
+                                                [1, 1, 1, 1]])
+                # fmt: on
 
     def test_generate_structure01(self):
         struct = ndimage.generate_binary_structure(0, 1)
