@@ -56,20 +56,28 @@ def _get_output(output, input, shape=None):
 
 
 def _check_parameter(func_name, order, mode):
-    if order is None:
-        warnings.warn(
-            "In the current feature the default order of {} is 1. "
-            "It is different from scipy.ndimage and can change in "
-            "the future.".format(func_name)
-        )
-    elif order < 0 or 5 < order:
+    if order < 0 or 5 < order:
         raise ValueError("spline order is not supported")
 
-    # if mode in ("reflect", "wrap"):
-    #     raise NotImplementedError(
-    #         "'{}' mode is not supported. See "
-    #         "https://github.com/scipy/scipy/issues/8465".format(mode)
-    #     )
+    warn = False
+    if warn:
+        if order == 0 and mode == "constant":
+            from ._kernels import interp
+
+            if not interp.const_legacy_mode:
+                warnings.warn(
+                    "Boundary handling differs slightly from scipy for "
+                    "order=0 with mode == 'constant'. See "
+                    "https://github.com/scipy/scipy/issues/8465"
+                )
+        elif order > 1 and mode != "mirror":
+            warnings.warn(
+                (
+                    "Boundary handling differs slightly from scipy for "
+                    "order={order} with mode == '{mode}'. See "
+                    "https://github.com/scipy/scipy/issues/8465"
+                ).format(order, mode)
+            )
     if mode not in (
         "constant",
         "nearest",
@@ -331,7 +339,7 @@ def map_coordinates(
     input,
     coordinates,
     output=None,
-    order=None,
+    order=3,
     mode="constant",
     cval=0.0,
     prefilter=True,
@@ -354,9 +362,8 @@ def map_coordinates(
             evaluated.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. If it is not given,
-            order 1 is used. It is different from :mod:`scipy.ndimage` and can
-            change in the future. Currently it supports only order 0 and 1.
+        order (int): The order of the spline interpolation. Must be between 0
+            and 5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
@@ -448,7 +455,7 @@ def affine_transform(
     offset=0.0,
     output_shape=None,
     output=None,
-    order=None,
+    order=3,
     mode="constant",
     cval=0.0,
     prefilter=True,
@@ -486,9 +493,8 @@ def affine_transform(
         output_shape (tuple of ints): Shape tuple.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. If it is not given,
-            order 1 is used. It is different from :mod:`scipy.ndimage` and can
-            change in the future. Currently it supports only order 0 and 1.
+        order (int): The order of the spline interpolation. Must be between 0
+            and 5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
@@ -612,7 +618,7 @@ def rotate(
     axes=(1, 0),
     reshape=True,
     output=None,
-    order=None,
+    order=3,
     mode="constant",
     cval=0.0,
     prefilter=True,
@@ -634,9 +640,8 @@ def rotate(
             is True.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. If it is not given,
-            order 1 is used. It is different from :mod:`scipy.ndimage` and can
-            change in the future. Currently it supports only order 0 and 1.
+        order (int): The order of the spline interpolation. Must be between 0
+            and 5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
@@ -737,7 +742,7 @@ def shift(
     input,
     shift,
     output=None,
-    order=None,
+    order=3,
     mode="constant",
     cval=0.0,
     prefilter=True,
@@ -757,9 +762,8 @@ def shift(
             should contain one value for each axis.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. If it is not given,
-            order 1 is used. It is different from :mod:`scipy.ndimage` and can
-            change in the future. Currently it supports only order 0 and 1.
+        order (int): The order of the spline interpolation. Must be between 0
+            and 5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
@@ -845,7 +849,7 @@ def zoom(
     input,
     zoom,
     output=None,
-    order=None,
+    order=3,
     mode="constant",
     cval=0.0,
     prefilter=True,
@@ -863,9 +867,8 @@ def zoom(
             contain one value for each axis.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. If it is not given,
-            order 1 is used. It is different from :mod:`scipy.ndimage` and can
-            change in the future. Currently it supports only order 0 and 1.
+        order (int): The order of the spline interpolation. Must be between 0
+            and 5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.

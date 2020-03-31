@@ -1,3 +1,6 @@
+import cupy
+
+
 def get_poles(order):
     if order == 2:
         # sqrt(8.0) - 3.0
@@ -193,6 +196,7 @@ batch_spline1d_template = """
 """
 
 
+@cupy.util.memoize()
 def get_raw_spline1d_code(
     mode, order=3, dtype_index="int", dtype_data="double", dtype_pole="double"
 ):
