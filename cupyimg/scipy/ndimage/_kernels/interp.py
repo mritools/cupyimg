@@ -524,7 +524,7 @@ def _get_map_kernel(
         mode=mode,
         cval=cval,
         order=order,
-        name="shift",
+        name="map_coordinates",
         integer_output=integer_output,
     )
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)

@@ -455,6 +455,7 @@ def map_coordinates(
             coord_dtype = cupy.promote_types(coordinates.dtype, cupy.float32)
         else:
             coord_dtype = cupy.promote_types(coordinates.dtype, cupy.float64)
+        coordinates = coordinates.astype(coord_dtype, copy=False)
 
     if prefilter and order > 1:
         filtered = spline_filter(
@@ -473,6 +474,11 @@ def map_coordinates(
         order=order,
         integer_output=integer_output,
     )
+    # kernel assumes C-contiguous arrays
+    if not filtered.flags.c_contiguous:
+        filtered = cupy.ascontiguousarray(filtered)
+    if not coordinates.flags.c_contiguous:
+        coordinates = cupy.ascontiguousarray(coordinates)
     kern(filtered, coordinates, ret)
     return ret
 
@@ -560,6 +566,7 @@ def affine_transform(
     if not hasattr(offset, "__iter__") and type(offset) is not cupy.ndarray:
         offset = [offset] * input.ndim
 
+    matrix = cupy.asarray(matrix, order="C", dtype=float)
     if matrix.ndim not in [1, 2]:
         raise RuntimeError("no proper affine matrix provided")
     if matrix.ndim == 2:
@@ -571,7 +578,7 @@ def affine_transform(
             matrix = matrix[:-1, :-1]
 
     if mode == "opencv":
-        m = cupy.zeros((input.ndim + 1, input.ndim + 1))
+        m = cupy.zeros((input.ndim + 1, input.ndim + 1), dtype=float)
         m[:-1, :-1] = matrix
         m[:-1, -1] = offset
         m[-1, -1] = 1
@@ -599,10 +606,16 @@ def affine_transform(
     else:
         filtered = input
 
+    # kernel assumes C-contiguous arrays
+    if not filtered.flags.c_contiguous:
+        filtered = cupy.ascontiguousarray(filtered)
+    if not matrix.flags.c_contiguous:
+        matrix = cupy.ascontiguousarray(matrix)
+
     integer_output = output.dtype.kind in "iu"
     large_int = max(_prod(input.shape), _prod(output_shape)) > 1 << 31
     if matrix.ndim == 1:
-        offset = cupy.asarray(offset, dtype=float)
+        offset = cupy.asarray(offset, dtype=float, order="C")
         offset = -offset / matrix
         kern = _get_zoom_shift_kernel(
             ndim,
@@ -866,6 +879,10 @@ def shift(
         else:
             filtered = input
 
+        # kernel assumes C-contiguous arrays
+        if not filtered.flags.c_contiguous:
+            filtered = cupy.ascontiguousarray(filtered)
+
         integer_output = output.dtype.kind in "iu"
         large_int = _prod(input.shape) > 1 << 31
         kern = _get_shift_kernel(
@@ -877,7 +894,11 @@ def shift(
             order=order,
             integer_output=integer_output,
         )
-        shift = cupy.asarray(shift, dtype=float)
+        shift = cupy.asarray(shift, dtype=float, order="C")
+        if shift.ndim != 1:
+            raise ValueError("shift must be 1d")
+        if shift.size != filtered.ndim:
+            raise ValueError("len(shift) must equal input.ndim")
         kern(filtered, shift, output)
     return output
 
@@ -995,6 +1016,10 @@ def zoom(
         else:
             filtered = input
 
+        # kernel assumes C-contiguous arrays
+        if not filtered.flags.c_contiguous:
+            filtered = cupy.ascontiguousarray(filtered)
+
         integer_output = output.dtype.kind in "iu"
         large_int = max(_prod(input.shape), _prod(output_shape)) > 1 << 31
         kern = _get_zoom_kernel(
@@ -1005,6 +1030,10 @@ def zoom(
             order=order,
             integer_output=integer_output,
         )
-        zoom = cupy.asarray(zoom, dtype=float)
+        zoom = cupy.asarray(zoom, dtype=float, order="C")
+        if zoom.ndim != 1:
+            raise ValueError("zoom must be 1d")
+        if zoom.size != filtered.ndim:
+            raise ValueError("len(zoom) must equal input.ndim")
         kern(filtered, zoom, output)
     return output
