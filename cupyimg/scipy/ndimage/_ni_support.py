@@ -65,6 +65,8 @@ def _normalize_sequence(arr, rank):
     check if its length is equal to the length of array.
     """
     if hasattr(arr, "__iter__") and not isinstance(arr, str):
+        if isinstance(arr, cupy.ndarray):
+            arr = cupy.asnumpy(arr)
         normalized = list(arr)
         if len(normalized) != rank:
             err = "sequence argument must have length equal to arr rank"
