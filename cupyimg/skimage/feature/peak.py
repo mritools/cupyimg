@@ -343,7 +343,12 @@ def _prominent_peaks(
         "host/device transfer required. TODO: implement measure.label"
     )
 
-    label_img = cpu_measure.label(cp.asnumpy(img_t))
+    if True:
+        label_img = cpu_measure.label(cp.asnumpy(img_t))
+    else:
+        # TODO: can use ndi.label instead?
+        label_img, _ = ndi.label(img_t)
+        label_img = cp.asnumpy(label_img)
     props = cpu_measure.regionprops(label_img, cp.asnumpy(img_max))
 
     # Sort the list of peaks by intensity, not left-right, so larger peaks

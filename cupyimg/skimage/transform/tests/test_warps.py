@@ -10,7 +10,7 @@ from skimage.feature import peak_local_max
 from skimage._shared.testing import test_parallel
 from skimage._shared._warnings import expected_warnings
 
-from cupyx.scipy.ndimage import map_coordinates
+from cupyimg.scipy.ndimage import map_coordinates
 
 from cupyimg.skimage.transform._warps import (
     _stackcopy,

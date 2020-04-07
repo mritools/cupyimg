@@ -170,7 +170,7 @@ def deltaE_ciede2000(lab1, lab2, kL=1, kC=1, kH=1):
            dataset," Appl. Opt. 33, 8069-8077 (1994).
     """
     warnings.warn(
-        "The numberical accuracy of this function on the GPU is reduced "
+        "The numerical accuracy of this function on the GPU is reduced "
         "relative to the CPU version"
     )
     lab1 = cupy.asarray(lab1)

@@ -1,7 +1,7 @@
 import math
 
 import numpy as np
-from cupyx.scipy import ndimage as ndi
+from cupyimg.scipy import ndimage as ndi
 import cupy
 from cupyimg.scipy.ndimage import gaussian_filter
 

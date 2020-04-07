@@ -3,7 +3,7 @@ from warnings import warn
 
 import cupy as cp
 import numpy as np
-from cupyx.scipy import ndimage as ndi
+from cupyimg.scipy import ndimage as ndi
 import cupyimg.numpy as cnp
 
 
