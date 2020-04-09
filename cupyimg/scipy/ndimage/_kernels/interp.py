@@ -466,7 +466,7 @@ def _generate_interp_custom(
 
         _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
         _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
-        if mode == "constant2":
+        if mode == "constant2" or (order > 1 and mode == "constant"):
             _cond = " || ".join(["(ic_{0} < 0)".format(j) for j in range(ndim)])
             ops.append(
                 """
