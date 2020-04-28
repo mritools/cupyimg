@@ -43,8 +43,10 @@ def test_block_reduce_mean():
     assert_equal(expected2, out2)
 
 
-@pytest.mark.skip(reason="cupy.median not yet available")
 def test_block_reduce_median():
+    if not hasattr(cp, "median"):
+        pytest.skip("cupy.median is not available")
+        return
     image1 = cp.arange(4 * 6).reshape(4, 6)
     out1 = block_reduce(image1, (2, 3), func=cp.median)
     # fmt: off

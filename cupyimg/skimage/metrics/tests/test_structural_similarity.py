@@ -1,36 +1,44 @@
-import os
-
 import numpy as np
-import cupy
+import cupy as cp
 import pytest
-from skimage import data, data_dir  # TODO: remove need for skimage import
+from skimage import data  # TODO: remove need for skimage import
 
 from cupyimg.skimage.metrics import structural_similarity
 
 from cupyimg.skimage._shared._warnings import expected_warnings
 
+# TODO: remove need for skimage import
+try:
+    from skimage._shared.testing import fetch
+
+    have_fetch = True
+except ImportError:
+    import os
+    from skimage import data_dir
+
+    have_fetch = False
 
 # need exact NumPy seed here. (CuPy as it won't be identical)
 np.random.seed(5)
-cam = cupy.asarray(data.camera())
+cam = cp.asarray(data.camera())
 sigma = 20.0
-noise = cupy.asarray(sigma * np.random.randn(*cam.shape))
-cam_noisy = cupy.clip(cam + noise, 0, 255)
+noise = cp.asarray(sigma * np.random.randn(*cam.shape))
+cam_noisy = cp.clip(cam + noise, 0, 255)
 cam_noisy = cam_noisy.astype(cam.dtype)
 
 
-cupy.random.seed(1234)
+cp.random.seed(1234)
 
-assert_equal = cupy.testing.assert_array_equal
-assert_almost_equal = cupy.testing.assert_array_almost_equal
-assert_array_almost_equal = cupy.testing.assert_array_almost_equal
+assert_equal = cp.testing.assert_array_equal
+assert_almost_equal = cp.testing.assert_array_almost_equal
+assert_array_almost_equal = cp.testing.assert_array_almost_equal
 
 
 def test_structural_similarity_patch_range():
     N = 51
-    rstate = cupy.random.RandomState(1234)
-    X = (rstate.rand(N, N) * 255).astype(cupy.uint8)
-    Y = (rstate.rand(N, N) * 255).astype(cupy.uint8)
+    rstate = cp.random.RandomState(1234)
+    X = (rstate.rand(N, N) * 255).astype(cp.uint8)
+    Y = (rstate.rand(N, N) * 255).astype(cp.uint8)
 
     # grlee77: increase value from 0.1 to 0.15
     assert structural_similarity(X, Y, win_size=N) < 0.1
@@ -39,9 +47,9 @@ def test_structural_similarity_patch_range():
 
 def test_structural_similarity_image():
     N = 100
-    rstate = cupy.random.RandomState(1234)
-    X = (rstate.rand(N, N) * 255).astype(cupy.uint8)
-    Y = (rstate.rand(N, N) * 255).astype(cupy.uint8)
+    rstate = cp.random.RandomState(1234)
+    X = (rstate.rand(N, N) * 255).astype(cp.uint8)
+    Y = (rstate.rand(N, N) * 255).astype(cp.uint8)
 
     S0 = structural_similarity(X, X, win_size=3)
     assert_equal(S0, 1)
@@ -72,11 +80,11 @@ def test_structural_similarity_grad(seed):
     #       The likely cause of this failure is that we are setting a hard
     #       threshold on the value of the gradient. Often the computed gradient
     #       is only slightly larger than what was measured.
-    # X = cupy.random.rand(N, N) * 255
-    # Y = cupy.random.rand(N, N) * 255
+    # X = cp.random.rand(N, N) * 255
+    # Y = cp.random.rand(N, N) * 255
     rnd = np.random.RandomState(seed)
-    X = cupy.asarray(rnd.rand(N, N) * 255)
-    Y = cupy.asarray(rnd.rand(N, N) * 255)
+    X = cp.asarray(rnd.rand(N, N) * 255)
+    Y = cp.asarray(rnd.rand(N, N) * 255)
 
     f = structural_similarity(X, Y, data_range=255)
     g = structural_similarity(X, Y, data_range=255, gradient=True)
@@ -84,23 +92,23 @@ def test_structural_similarity_grad(seed):
     assert f < 0.05
 
     assert g[0] < 0.05
-    assert cupy.all(g[1] < 0.05)
+    assert cp.all(g[1] < 0.05)
 
     mssim, grad, s = structural_similarity(
         X, Y, data_range=255, gradient=True, full=True
     )
-    assert cupy.all(grad < 0.05)
+    assert cp.all(grad < 0.05)
 
 
 def test_structural_similarity_dtype():
     N = 30
-    X = cupy.random.rand(N, N)
-    Y = cupy.random.rand(N, N)
+    X = cp.random.rand(N, N)
+    Y = cp.random.rand(N, N)
 
     S1 = structural_similarity(X, Y)
 
-    X = (X * 255).astype(cupy.uint8)
-    Y = (X * 255).astype(cupy.uint8)
+    X = (X * 255).astype(cp.uint8)
+    Y = (X * 255).astype(cp.uint8)
 
     S2 = structural_similarity(X, Y)
 
@@ -110,14 +118,14 @@ def test_structural_similarity_dtype():
 
 def test_structural_similarity_multichannel():
     N = 100
-    X = (cupy.random.rand(N, N) * 255).astype(cupy.uint8)
-    Y = (cupy.random.rand(N, N) * 255).astype(cupy.uint8)
+    X = (cp.random.rand(N, N) * 255).astype(cp.uint8)
+    Y = (cp.random.rand(N, N) * 255).astype(cp.uint8)
 
     S1 = structural_similarity(X, Y, win_size=3)
 
     # replicate across three channels.  should get identical value
-    Xc = cupy.tile(X[..., cupy.newaxis], (1, 1, 3))
-    Yc = cupy.tile(Y[..., cupy.newaxis], (1, 1, 3))
+    Xc = cp.tile(X[..., cp.newaxis], (1, 1, 3))
+    Yc = cp.tile(Y[..., cp.newaxis], (1, 1, 3))
     S2 = structural_similarity(Xc, Yc, multichannel=True, win_size=3)
     assert_almost_equal(S1, S2)
 
@@ -146,8 +154,8 @@ def test_structural_similarity_nD():
     N = 10
     for ndim in range(1, 5):
         xsize = [N] * 5
-        X = (cupy.random.rand(*xsize) * 255).astype(cupy.uint8)
-        Y = (cupy.random.rand(*xsize) * 255).astype(cupy.uint8)
+        X = (cp.random.rand(*xsize) * 255).astype(cp.uint8)
+        Y = (cp.random.rand(*xsize) * 255).astype(cp.uint8)
 
         mssim = structural_similarity(X, Y, win_size=3)
         assert mssim < 0.05
@@ -155,9 +163,9 @@ def test_structural_similarity_nD():
 
 def test_structural_similarity_multichannel_chelsea():
     # color image example
-    Xc = cupy.asarray(data.chelsea())
+    Xc = cp.asarray(data.chelsea())
     sigma = 15.0
-    Yc = cupy.clip(Xc + sigma * cupy.random.randn(*Xc.shape), 0, 255)
+    Yc = cp.clip(Xc + sigma * cp.random.randn(*Xc.shape), 0, 255)
     Yc = Yc.astype(Xc.dtype)
 
     # multichannel result should be mean of the individual channel results
@@ -204,7 +212,10 @@ def test_gaussian_mssim_and_gradient_vs_Matlab():
     # https://ece.uwaterloo.ca/~nnikvand/Coderep/SHINE%20TOOLBOX/SHINEtoolbox/
     # Note: final line of ssim_sens.m was modified to discard image borders
 
-    ref = cupy.load(os.path.join(data_dir, "mssim_matlab_output.npz"))
+    if have_fetch:
+        ref = np.load(fetch("data/mssim_matlab_output.npz"))
+    else:
+        ref = np.load(os.path.join(data_dir, "mssim_matlab_output.npz"))
     grad_matlab = ref["grad_matlab"]
     mssim_matlab = float(ref["mssim_matlab"])
 
@@ -232,20 +243,20 @@ def test_mssim_vs_legacy():
 def test_mssim_mixed_dtype():
     mssim = structural_similarity(cam, cam_noisy)
     with expected_warnings(["Inputs have mismatched dtype"]):
-        mssim_mixed = structural_similarity(cam, cam_noisy.astype(cupy.float32))
+        mssim_mixed = structural_similarity(cam, cam_noisy.astype(cp.float32))
     assert_almost_equal(mssim, mssim_mixed)
 
     # no warning when user supplies data_range
     mssim_mixed = structural_similarity(
-        cam, cam_noisy.astype(cupy.float32), data_range=255
+        cam, cam_noisy.astype(cp.float32), data_range=255
     )
     assert_almost_equal(mssim, mssim_mixed)
 
 
 def test_invalid_input():
     # size mismatch
-    X = cupy.zeros((9, 9), dtype=cupy.double)
-    Y = cupy.zeros((8, 8), dtype=cupy.double)
+    X = cp.zeros((9, 9), dtype=cp.double)
+    Y = cp.zeros((8, 8), dtype=cp.double)
     with pytest.raises(ValueError):
         structural_similarity(X, Y)
     # win_size exceeds image extent

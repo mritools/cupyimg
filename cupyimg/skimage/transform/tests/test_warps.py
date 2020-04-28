@@ -3,33 +3,34 @@ from cupy.testing import assert_array_almost_equal, assert_array_equal
 import numpy as np
 import pytest
 
-from skimage import data
-from skimage.color import rgb2gray
-from skimage.draw import circle_perimeter_aa
-from skimage.feature import peak_local_max
+from skimage.data import checkerboard, astronaut
+from skimage.color.colorconv import rgb2gray
+from skimage.draw.draw import circle_perimeter_aa
+from skimage.feature.peak import peak_local_max
 from skimage._shared.testing import test_parallel
 from skimage._shared._warnings import expected_warnings
 
+from cupyimg.skimage.util.dtype import img_as_float
 from cupyimg.scipy.ndimage import map_coordinates
 
 from cupyimg.skimage.transform._warps import (
     _stackcopy,
     _linear_polar_mapping,
     _log_polar_mapping,
-)
-from cupyimg.skimage.transform import (
     warp,
     warp_coords,
     rotate,
     resize,
     rescale,
+    warp_polar,
+    swirl,
+    downscale_local_mean,
+)
+from cupyimg.skimage.transform._geometric import (
     AffineTransform,
     ProjectiveTransform,
     SimilarityTransform,
-    downscale_local_mean,
-    warp_polar,
 )
-from cupyimg.skimage import transform as tf, img_as_float
 
 cp.random.seed(0)
 
@@ -415,7 +416,7 @@ def test_resize_dtype():
 
 
 def test_swirl():
-    image = img_as_float(cp.asarray(data.checkerboard()))
+    image = img_as_float(cp.asarray(checkerboard()))
 
     # swirl_params = {"radius": 80, "rotation": 0, "order": 2, "mode": "reflect"}
     # TODO: grlee77: switched order to 1 as order=2 is unsupported on GPU
@@ -423,8 +424,8 @@ def test_swirl():
     swirl_params = {"radius": 80, "rotation": 0, "order": 1, "mode": "reflect"}
 
     # with expected_warnings(["Bi-quadratic.*bug"]):
-    swirled = tf.swirl(image, strength=10, **swirl_params)
-    unswirled = tf.swirl(swirled, strength=-10, **swirl_params)
+    swirled = swirl(image, strength=10, **swirl_params)
+    unswirled = swirl(swirled, strength=-10, **swirl_params)
 
     # assert cp.mean(cp.abs(image - unswirled)) < 0.01
     assert cp.mean(cp.abs(image - unswirled)) < 0.02
@@ -432,8 +433,8 @@ def test_swirl():
     swirl_params.pop("mode")
 
     # with expected_warnings(["Bi-quadratic.*bug"]):
-    swirled = tf.swirl(image, strength=10, **swirl_params)
-    unswirled = tf.swirl(swirled, strength=-10, **swirl_params)
+    swirled = swirl(image, strength=10, **swirl_params)
+    unswirled = swirl(swirled, strength=-10, **swirl_params)
 
     # assert cp.mean(cp.abs(image[1:-1, 1:-1] - unswirled[1:-1, 1:-1])) < 0.01
     assert cp.mean(cp.abs(image[1:-1, 1:-1] - unswirled[1:-1, 1:-1])) < 0.02
@@ -447,7 +448,7 @@ def test_const_cval_out_of_range():
 
 
 def test_warp_identity():
-    img = img_as_float(cp.asarray(rgb2gray(data.astronaut())))
+    img = img_as_float(cp.asarray(rgb2gray(astronaut())))
     assert len(img.shape) == 2
     assert cp.allclose(img, warp(img, AffineTransform(rotation=0)))
     assert not cp.allclose(img, warp(img, AffineTransform(rotation=0.1)))
@@ -464,7 +465,7 @@ def test_warp_identity():
 
 
 def test_warp_coords_example():
-    image = cp.asarray(data.astronaut().astype(np.float32))
+    image = cp.asarray(astronaut().astype(np.float32))
     assert 3 == image.shape[2]
     tform = SimilarityTransform(translation=(0, -10), xp=cp)
     coords = warp_coords(tform, (30, 30, 3))
@@ -789,8 +790,9 @@ def test_log_warp_polar():
     profile = warped.mean(axis=0)
     # TODO: grlee77: peak_local_max.  For now, transfer to CPU to use
     #                peak_local_max (not yet implemented for GPU)
-    peaks = peak_local_max(profile.get())
-    gaps = peaks[:-1] - peaks[1:]
+    peaks_coord = peak_local_max(profile.get())
+    peaks_coord.sort(axis=0)
+    gaps = peaks_coord[1:] - peaks_coord[:-1]
     assert np.alltrue([x >= 38 and x <= 40 for x in gaps])
 
 
@@ -808,3 +810,44 @@ def test_invalid_dimensions_polar():
         warp_polar(cp.zeros((10, 10)), (5, 5), multichannel=True)
     with pytest.raises(ValueError):
         warp_polar(cp.zeros((10, 10, 10, 3)), (5, 5), multichannel=True)
+
+
+def test_bool_img_rescale():
+    img = cp.ones((12, 18), dtype=bool)
+    img[2:-2, 4:-4] = False
+    res = rescale(img, 0.5)
+
+    expected = cp.ones((6, 9))
+    expected[1:-1, 2:-2] = False
+
+    assert_array_equal(res, expected)
+
+
+def test_bool_img_resize():
+    img = cp.ones((12, 18), dtype=bool)
+    img[2:-2, 4:-4] = False
+    res = resize(img, (6, 9))
+
+    expected = cp.ones((6, 9))
+    expected[1:-1, 2:-2] = False
+
+    assert_array_equal(res, expected)
+
+
+def test_bool_array_warnings():
+    img = cp.zeros((10, 10), dtype=bool)
+
+    with expected_warnings(["Input image dtype is bool"]):
+        rescale(img, 0.5, anti_aliasing=True)
+
+    with expected_warnings(["Input image dtype is bool"]):
+        resize(img, (5, 5), anti_aliasing=True)
+
+    with expected_warnings(["Input image dtype is bool"]):
+        rescale(img, 0.5, order=1)
+
+    with expected_warnings(["Input image dtype is bool"]):
+        resize(img, (5, 5), order=1)
+
+    with expected_warnings(["Input image dtype is bool"]):
+        warp(img, cp.eye(3), order=1)

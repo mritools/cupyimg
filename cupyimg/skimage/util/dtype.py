@@ -198,7 +198,7 @@ def _scale(a, n, m, copy=True):
             return a
 
 
-def convert(image, dtype, force_copy=False, uniform=False):
+def _convert(image, dtype, force_copy=False, uniform=False):
     """
     Convert an image to the requested data-type.
 
@@ -403,7 +403,7 @@ def img_as_float32(image, force_copy=False):
     and can be outside the ranges [0.0, 1.0] or [-1.0, 1.0].
 
     """
-    return convert(image, cupy.float32, force_copy)
+    return _convert(image, cupy.float32, force_copy)
 
 
 def img_as_float64(image, force_copy=False):
@@ -429,7 +429,7 @@ def img_as_float64(image, force_copy=False):
     and can be outside the ranges [0.0, 1.0] or [-1.0, 1.0].
 
     """
-    return convert(image, cupy.float64, force_copy)
+    return _convert(image, cupy.float64, force_copy)
 
 
 def img_as_float(image, force_copy=False):
@@ -458,7 +458,7 @@ def img_as_float(image, force_copy=False):
     and can be outside the ranges [0.0, 1.0] or [-1.0, 1.0].
 
     """
-    return convert(image, cupy.floating, force_copy)
+    return _convert(image, cupy.floating, force_copy)
 
 
 def img_as_uint(image, force_copy=False):
@@ -482,7 +482,7 @@ def img_as_uint(image, force_copy=False):
     Positive values are scaled between 0 and 65535.
 
     """
-    return convert(image, cupy.uint16, force_copy)
+    return _convert(image, cupy.uint16, force_copy)
 
 
 def img_as_int(image, force_copy=False):
@@ -507,7 +507,7 @@ def img_as_int(image, force_copy=False):
     the output image will still only have positive values.
 
     """
-    return convert(image, cupy.int16, force_copy)
+    return _convert(image, cupy.int16, force_copy)
 
 
 def img_as_ubyte(image, force_copy=False):
@@ -531,7 +531,7 @@ def img_as_ubyte(image, force_copy=False):
     Positive values are scaled between 0 and 255.
 
     """
-    return convert(image, cupy.uint8, force_copy)
+    return _convert(image, cupy.uint8, force_copy)
 
 
 def img_as_bool(image, force_copy=False):
@@ -555,4 +555,4 @@ def img_as_bool(image, force_copy=False):
     half is False. All negative values (if present) are False.
 
     """
-    return convert(image, cupy.bool_, force_copy)
+    return _convert(image, cupy.bool_, force_copy)

@@ -1,8 +1,5 @@
-import os
-
 import cupy as cp
 import numpy as np
-from skimage import data_dir
 from skimage import data
 
 from cupyimg.scipy import ndimage as ndi
@@ -11,6 +8,16 @@ from cupyimg.skimage.util import img_as_uint, img_as_ubyte
 from cupyimg.skimage.morphology import grey, selem
 from skimage._shared._warnings import expected_warnings
 from skimage._shared.testing import TestCase, parametrize
+
+try:
+    from skimage._shared.testing import fetch
+
+    have_fetch = True
+except ImportError:
+    import os
+    from skimage import data_dir
+
+    have_fetch = False
 
 
 class TestMorphology(TestCase):
@@ -50,9 +57,12 @@ class TestMorphology(TestCase):
         return output
 
     def test_gray_morphology(self):
-        expected = dict(
-            np.load(os.path.join(data_dir, "gray_morph_output.npz"))
-        )
+        if have_fetch:
+            expected = dict(np.load(fetch("data/gray_morph_output.npz")))
+        else:
+            expected = dict(
+                np.load(os.path.join(data_dir, "gray_morph_output.npz"))
+            )
         calculated = self._build_expected_output()
         for k, v in calculated.items():
             cp.testing.assert_array_equal(expected[k], v)

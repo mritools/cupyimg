@@ -12,7 +12,7 @@ from cupyimg.skimage import (
     img_as_uint,
     img_as_ubyte,
 )
-from cupyimg.skimage.util.dtype import convert
+from cupyimg.skimage.util.dtype import _convert
 from cupyimg.skimage._shared._warnings import expected_warnings
 
 dtype_range = {
@@ -68,7 +68,7 @@ def test_range(dtype, f_and_dt):
     )
 
 
-# Add non-standard data types that are allowed by the `convert` function.
+# Add non-standard data types that are allowed by the `_convert` function.
 dtype_range_extra = dtype_range.copy()
 dtype_range_extra.update(
     {cp.int32: (-2147483648, 2147483647), cp.uint32: (0, 4294967295)}
@@ -91,7 +91,7 @@ def test_range_extra_dtypes(dtype_in, dt):
     imin, imax = dtype_range_extra[dtype_in]
     x = cp.linspace(imin, imax, 10).astype(dtype_in)
 
-    y = convert(x, dt)
+    y = _convert(x, dt)
 
     omin, omax = dtype_range_extra[dt]
     _verify_range(
@@ -199,7 +199,7 @@ def test_float_conversion_dtype():
 
     for dtype_in, dtype_out in dtype_combin:
         x = x.astype(dtype_in)
-        y = convert(x, dtype_out)
+        y = _convert(x, dtype_out)
         assert y.dtype == cp.dtype(dtype_out)
 
 
@@ -209,5 +209,5 @@ def test_subclass_conversion():
 
     for dtype in float_dtype_list:
         x = x.astype(dtype)
-        y = convert(x, cp.floating)
+        y = _convert(x, cp.floating)
         assert y.dtype == x.dtype

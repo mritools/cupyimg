@@ -8,7 +8,7 @@ import numpy as np
 
 from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage.transform import pyramid_reduce
-from cupyimg.skimage.util.dtype import convert
+from cupyimg.skimage.util.dtype import _convert
 
 
 def resize_flow(flow, shape):
@@ -117,8 +117,8 @@ def coarse_to_fine(
 
     pyramid = list(
         zip(
-            get_pyramid(convert(I0, dtype), downscale, nlevel, min_size),
-            get_pyramid(convert(I1, dtype), downscale, nlevel, min_size),
+            get_pyramid(_convert(I0, dtype), downscale, nlevel, min_size),
+            get_pyramid(_convert(I1, dtype), downscale, nlevel, min_size),
         )
     )
 

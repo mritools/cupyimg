@@ -12,7 +12,12 @@ from ._geometric import (
     _to_ndimage_mode,
 )
 from ..measure import block_reduce
-from .._shared.utils import safe_as_int, warn, convert_to_float
+from .._shared.utils import (
+    safe_as_int,
+    warn,
+    convert_to_float,
+    _validate_interpolation_order,
+)
 
 # from .._shared.utils import get_bound_method_class
 
@@ -26,12 +31,12 @@ HOMOGRAPHY_TRANSFORMS = (
 def resize(
     image,
     output_shape,
-    order=1,
+    order=None,
     mode="reflect",
     cval=0,
     clip=True,
     preserve_range=False,
-    anti_aliasing=True,
+    anti_aliasing=None,
     anti_aliasing_sigma=None,
 ):
     """Resize image to match a certain size.
@@ -59,8 +64,9 @@ def resize(
     Other parameters
     ----------------
     order : int, optional
-        The order of the spline interpolation, default is 1. The order has to
-        be in the range 0-5. See `skimage.transform.warp` for detail.
+        The order of the spline interpolation, default is 0 if
+        image.dtype is bool and 1 otherwise. The order has to be in
+        the range 0-5. See `skimage.transform.warp` for detail.
     mode : {'constant', 'edge', 'symmetric', 'reflect', 'wrap'}, optional
         Points outside the boundaries of the input are filled according
         to the given mode.  Modes match the behaviour of `numpy.pad`.
@@ -76,9 +82,10 @@ def resize(
         image is converted according to the conventions of `img_as_float`.
         Also see https://scikit-image.org/docs/dev/user_guide/data_types.html
     anti_aliasing : bool, optional
-        Whether to apply a Gaussian filter to smooth the image prior to
-        down-scaling. It is crucial to filter when down-sampling the image to
-        avoid aliasing artifacts.
+        Whether to apply a Gaussian filter to smooth the image prior
+        to down-scaling. It is crucial to filter when down-sampling
+        the image to avoid aliasing artifacts. If input image data
+        type is bool, no anti-aliasing is applied.
     anti_aliasing_sigma : {float, tuple of floats}, optional
         Standard deviation for Gaussian filtering to avoid aliasing artifacts.
         By default, this value is chosen as (s - 1) / 2 where s is the
@@ -115,6 +122,20 @@ def resize(
     elif output_ndim < image.ndim - 1:
         raise ValueError(
             "len(output_shape) cannot be smaller than the image " "dimensions"
+        )
+
+    if anti_aliasing is None:
+        anti_aliasing = not image.dtype == bool
+
+    if image.dtype == bool and anti_aliasing:
+        warn(
+            "Input image dtype is bool. Gaussian convolution is not defined "
+            "with bool data type. Please set anti_aliasing to False or "
+            "explicitely cast input image to another data type. Starting "
+            "from version 0.19 a ValueError will be raised instead of this "
+            "warning.",
+            FutureWarning,
+            stacklevel=2,
         )
 
     factors = np.asarray(input_shape, dtype=float) / np.asarray(
@@ -205,6 +226,8 @@ def resize(
         )
 
     else:  # n-dimensional interpolation
+        order = _validate_interpolation_order(image.dtype, order)
+
         coord_arrays = [
             factors[i] * (cupy.arange(d) + 0.5) - 0.5
             for i, d in enumerate(output_shape)
@@ -229,13 +252,13 @@ def resize(
 def rescale(
     image,
     scale,
-    order=1,
+    order=None,
     mode="reflect",
     cval=0,
     clip=True,
     preserve_range=False,
     multichannel=False,
-    anti_aliasing=True,
+    anti_aliasing=None,
     anti_aliasing_sigma=None,
 ):
     """Scale image by a certain factor.
@@ -261,8 +284,9 @@ def rescale(
     Other parameters
     ----------------
     order : int, optional
-        The order of the spline interpolation, default is 1. The order has to
-        be in the range 0-5. See `skimage.transform.warp` for detail.
+        The order of the spline interpolation, default is 0 if
+        image.dtype is bool and 1 otherwise. The order has to be in
+        the range 0-5. See `skimage.transform.warp` for detail.
     mode : {'constant', 'edge', 'symmetric', 'reflect', 'wrap'}, optional
         Points outside the boundaries of the input are filled according
         to the given mode.  Modes match the behaviour of `numpy.pad`.
@@ -282,9 +306,10 @@ def rescale(
         Whether the last axis of the image is to be interpreted as multiple
         channels or another spatial dimension.
     anti_aliasing : bool, optional
-        Whether to apply a Gaussian filter to smooth the image prior to
-        down-scaling. It is crucial to filter when down-sampling the image to
-        avoid aliasing artifacts.
+        Whether to apply a Gaussian filter to smooth the image prior
+        to down-scaling. It is crucial to filter when down-sampling
+        the image to avoid aliasing artifacts. If input image data
+        type is bool, no anti-aliasing is applied.
     anti_aliasing_sigma : {float, tuple of floats}, optional
         Standard deviation for Gaussian filtering to avoid aliasing artifacts.
         By default, this value is chosen as (1 - s) / 2 where s is the
@@ -342,7 +367,7 @@ def rotate(
     angle,
     resize=False,
     center=None,
-    order=1,
+    order=None,
     mode="constant",
     cval=0,
     clip=True,
@@ -374,8 +399,9 @@ def rotate(
     Other parameters
     ----------------
     order : int, optional
-        The order of the spline interpolation, default is 1. The order has to
-        be in the range 0-5. See `skimage.transform.warp` for detail.
+        The order of the spline interpolation, default is 0 if
+        image.dtype is bool and 1 otherwise. The order has to be in
+        the range 0-5. See `skimage.transform.warp` for detail.
     mode : {'constant', 'edge', 'symmetric', 'reflect', 'wrap'}, optional
         Points outside the boundaries of the input are filled according
         to the given mode.  Modes match the behaviour of `numpy.pad`.
@@ -537,7 +563,7 @@ def swirl(
     radius=100,
     rotation=0,
     output_shape=None,
-    order=1,
+    order=None,
     mode="reflect",
     cval=0,
     clip=True,
@@ -570,8 +596,9 @@ def swirl(
         Shape of the output image generated. By default the shape of the input
         image is preserved.
     order : int, optional
-        The order of the spline interpolation, default is 1. The order has to
-        be in the range 0-5. See `skimage.transform.warp` for detail.
+        The order of the spline interpolation, default is 0 if
+        image.dtype is bool and 1 otherwise. The order has to be in
+        the range 0-5. See `skimage.transform.warp` for detail.
     mode : {'constant', 'edge', 'symmetric', 'reflect', 'wrap'}, optional
         Points outside the boundaries of the input are filled according
         to the given mode, with 'constant' used as the default. Modes match
@@ -764,7 +791,7 @@ def warp(
     inverse_map,
     map_args={},
     output_shape=None,
-    order=1,
+    order=None,
     mode="constant",
     cval=0.0,
     clip=True,
@@ -822,6 +849,8 @@ def warp(
          - 3: Bi-cubic
          - 4: Bi-quartic
          - 5: Bi-quintic
+
+         Default is 0 if image.dtype is bool and 1 otherwise.
     mode : {'constant', 'edge', 'symmetric', 'reflect', 'wrap'}, optional
         Points outside the boundaries of the input are filled according
         to the given mode.  Modes match the behaviour of `numpy.pad`.
@@ -911,7 +940,13 @@ def warp(
     if image.size == 0:
         raise ValueError("Cannot warp empty image with dimensions", image.shape)
 
-    image = convert_to_float(image, preserve_range)
+    order = _validate_interpolation_order(image.dtype, order)
+
+    if image.dtype.kind == "c":
+        if not preserve_range:
+            raise NotImplementedError("TODO")
+    else:
+        image = convert_to_float(image, preserve_range)
 
     input_shape = np.array(image.shape)
 

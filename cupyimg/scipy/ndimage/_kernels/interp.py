@@ -32,8 +32,7 @@ def _get_coord_map(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = coords_data[i + {j} * ncoords];
-            """.format(
+    W c_{j} = coords_data[i + {j} * ncoords];""".format(
                 j=j
             )
         )
@@ -60,8 +59,7 @@ def _get_coord_zoom_and_shift(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = zoom_data[{j}] * ((W)in_coord[{j}] - shift_data[{j}]);
-            """.format(
+    W c_{j} = zoom_data[{j}] * ((W)in_coord[{j}] - shift_data[{j}]);""".format(
                 j=j
             )
         )
@@ -87,8 +85,7 @@ def _get_coord_zoom(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = zoom_data[{j}] * (W)in_coord[{j}];
-            """.format(
+    W c_{j} = zoom_data[{j}] * (W)in_coord[{j}];""".format(
                 j=j
             )
         )
@@ -114,8 +111,7 @@ def _get_coord_shift(ndim):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = (W)in_coord[{j}] - shift_data[{j}];
-            """.format(
+    W c_{j} = (W)in_coord[{j}] - shift_data[{j}];""".format(
                 j=j
             )
         )
@@ -147,8 +143,7 @@ def _get_coord_affine(ndim):
     for j in range(ndim):
         ops.append(
             """
-            W c_{j} = (W)0.0;
-            """.format(
+            W c_{j} = (W)0.0;""".format(
                 j=j
             )
         )
@@ -156,15 +151,13 @@ def _get_coord_affine(ndim):
             m_index = ncol * j + k
             ops.append(
                 """
-            c_{j} += mat_data[{m_index}] * (W)in_coord[{k}];
-                """.format(
+            c_{j} += mat_data[{m_index}] * (W)in_coord[{k}];""".format(
                     j=j, k=k, m_index=m_index
                 )
             )
         ops.append(
             """
-            c_{j} += mat_data[{m_index}];
-            """.format(
+            c_{j} += mat_data[{m_index}];""".format(
                 j=j, m_index=ncol * j + ndim
             )
         )

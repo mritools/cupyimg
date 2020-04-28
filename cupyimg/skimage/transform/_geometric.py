@@ -1473,12 +1473,8 @@ class SimilarityTransform(EuclideanTransform):
 
     @property
     def scale(self):
-        if abs(math.cos(self.rotation)) < np.spacing(1):
-            # sin(self.rotation) == 1
-            scale = self.params[1, 0]
-        else:
-            scale = self.params[0, 0] / math.cos(self.rotation)
-        return scale
+        # det = scale**(# of dimensions), therefore scale = det**(1/2)
+        return math.sqrt(np.linalg.det(self.params))
 
 
 class PolynomialTransform(GeometricTransform):
@@ -1684,13 +1680,13 @@ def estimate_transform(ttype, src, dst, **kwargs):
     Examples
     --------
     >>> import numpy as np
-    >>> from skimage import transform as tf
+    >>> from skimage import transform
 
     >>> # estimate transformation parameters
     >>> src = xp.asarray([0, 0, 10, 10]).reshape((2, 2))
     >>> dst = xp.asarray([12, 14, 1, -20]).reshape((2, 2))
 
-    >>> tform = tf.estimate_transform('similarity', src, dst)
+    >>> tform = transform.estimate_transform('similarity', src, dst)
 
     >>> xp.allclose(tform.inverse(tform(src)), src)
     True
@@ -1702,7 +1698,7 @@ def estimate_transform(ttype, src, dst, **kwargs):
     >>> warp(image, inverse_map=tform.inverse) # doctest: +SKIP
 
     >>> # create transformation with explicit parameters
-    >>> tform2 = tf.SimilarityTransform(scale=1.1, rotation=1,
+    >>> tform2 = transform.SimilarityTransform(scale=1.1, rotation=1,
     ...     translation=(10, 20))
 
     >>> # unite transformations, applied in order from left to right

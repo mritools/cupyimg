@@ -4,7 +4,7 @@ import pytest
 
 from skimage import data
 
-# from skimage.draw import circle
+# from skimage.draw import disk
 from skimage._shared._warnings import expected_warnings
 
 # from cupyimg.scipy import ndimage as ndi
@@ -660,7 +660,7 @@ def test_niblack_sauvola_pathological_image():
 #     coords = [(25, 25), (50, 50), (75, 75)]
 #     values = [64, 128, 192]
 #     for coor, val in zip(coords, values):
-#         rr, cc = circle(coor[1], coor[0], 20)
+#         rr, cc = disk(coor[1], coor[0], 20)
 #         image[rr, cc] = val
 #     thresholds = [0, 64, 128]
 #     assert cp.array_equal(thresholds, threshold_multiotsu(image, classes=4))

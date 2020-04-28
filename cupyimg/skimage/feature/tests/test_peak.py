@@ -71,16 +71,16 @@ class TestPeakLocalMax:
         image[1, 1] = 20
         image[3, 3] = 10
         peaks = peak.peak_local_max(image, min_distance=1)
-        assert peaks.tolist() == [[3, 3], [1, 1]]
+        assert peaks.tolist() == [[1, 1], [3, 3]]
 
         image = cp.zeros((3, 10))
         if False:
             # CuPy doesn't support this type of indexing
-            image[1, (1, 3, 5, 7)] = (1, 3, 2, 4)
+            image[1, (1, 3, 5, 7)] = (1, 2, 3, 4)
         else:
             image[1, 1] = 1
-            image[1, 3] = 3
-            image[1, 5] = 2
+            image[1, 3] = 2
+            image[1, 5] = 3
             image[1, 7] = 4
         peaks = peak.peak_local_max(image, min_distance=1)
         assert peaks.tolist() == [[1, 7], [1, 5], [1, 3], [1, 1]]

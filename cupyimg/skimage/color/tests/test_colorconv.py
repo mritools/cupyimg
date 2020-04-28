@@ -13,13 +13,15 @@ import os.path
 
 import cupy as cp
 import numpy as np
+import pytest
 from cupy.testing import assert_array_almost_equal, assert_array_equal
 from numpy.testing import assert_equal
 
 from skimage._shared.testing import TestCase
+from skimage._shared._warnings import expected_warnings
+from skimage.io import imread
 
 from cupyimg.skimage.util import img_as_float, img_as_ubyte, img_as_float32
-from skimage.io import imread
 from cupyimg.skimage.color import (
     rgb2hsv,
     hsv2rgb,
@@ -55,16 +57,30 @@ from cupyimg.skimage.color import (
     rgb2ydbdr,
     ydbdr2rgb,
     rgba2rgb,
+    gray2rgba,
 )
 
-from skimage import data_dir
-from skimage._shared._warnings import expected_warnings
+try:
+    from skimage._shared.testing import fetch
+
+    have_fetch = True
+except ImportError:
+    have_fetch = False
+
+if not have_fetch:
+    from skimage import data_dir
+else:
+    from skimage import data
 
 
 class TestColorconv(TestCase):
 
-    img_rgb = cp.asarray(imread(os.path.join(data_dir, "color.png")))
-    img_grayscale = cp.asarray(imread(os.path.join(data_dir, "camera.png")))
+    if have_fetch:
+        img_rgb = data.colorwheel()
+        img_grayscale = data.camera()
+    else:
+        img_rgb = cp.asarray(imread(os.path.join(data_dir, "color.png")))
+        img_grayscale = cp.asarray(imread(os.path.join(data_dir, "camera.png")))
     # ftm: off
     img_rgba = cp.asarray(
         [[[0, 0.5, 1, 0], [0, 0.5, 1, 1], [0, 0.5, 1, 0.5]]]
@@ -386,7 +402,8 @@ class TestColorconv(TestCase):
             assert rgb2gray(x).ndim == 2
 
     def test_rgb2gray_on_gray(self):
-        rgb2gray(cp.random.rand(5, 5))
+        with expected_warnings(["The behavior of rgb2gray will change"]):
+            rgb2gray(cp.random.rand(5, 5))
 
     def test_rgb2gray_dtype(self):
         img = cp.random.rand(10, 10, 3).astype("float64")
@@ -406,18 +423,28 @@ class TestColorconv(TestCase):
         # Test the conversion with the rest of the illuminants.
         for I in ["d50", "d55", "d65", "d75"]:
             for obs in ["2", "10"]:
-                fname = "lab_array_{0}_{1}.npy".format(I, obs)
-                lab_array_I_obs = np.load(
-                    os.path.join(os.path.dirname(__file__), "data", fname)
-                )
+                if have_fetch:
+                    fname = "color/tests/data/lab_array_{0}_{1}.npy".format(
+                        I, obs
+                    )
+                    lab_array_I_obs = np.load(fetch(fname))
+                else:
+                    fname = "lab_array_{0}_{1}.npy".format(I, obs)
+                    lab_array_I_obs = np.load(
+                        os.path.join(os.path.dirname(__file__), "data", fname)
+                    )
                 assert_array_almost_equal(
                     lab_array_I_obs, xyz2lab(self.xyz_array, I, obs), decimal=2
                 )
         for I in ["a", "e"]:
-            fname = "lab_array_{0}_2.npy".format(I)
-            lab_array_I_obs = np.load(
-                os.path.join(os.path.dirname(__file__), "data", fname)
-            )
+            if have_fetch:
+                fname = "color/tests/data/lab_array_{0}_2.npy".format(I)
+                lab_array_I_obs = np.load(fetch(fname))
+            else:
+                fname = "lab_array_{0}_2.npy".format(I)
+                lab_array_I_obs = np.load(
+                    os.path.join(os.path.dirname(__file__), "data", fname)
+                )
             assert_array_almost_equal(
                 lab_array_I_obs, xyz2lab(self.xyz_array, I, "2"), decimal=2
             )
@@ -437,18 +464,27 @@ class TestColorconv(TestCase):
         # Test the conversion with the rest of the illuminants.
         for I in ["d50", "d55", "d65", "d75"]:
             for obs in ["2", "10"]:
-                fname = "lab_array_{0}_{1}.npy".format(I, obs)
-                lab_array_I_obs = np.load(
-                    os.path.join(os.path.dirname(__file__), "data", fname)
-                )
+                if have_fetch:
+                    fname = "color/tests/data/lab_array_{0}_{1}.npy".format(
+                        I, obs
+                    )
+                    lab_array_I_obs = np.load(fetch(fname))
+                else:
+                    fname = "lab_array_{0}_{1}.npy".format(I, obs)
+                    lab_array_I_obs = np.load(
+                        os.path.join(os.path.dirname(__file__), "data", fname)
+                    )
                 assert_array_almost_equal(
                     lab2xyz(lab_array_I_obs, I, obs), self.xyz_array, decimal=3
                 )
         for I in ["a", "e"]:
             fname = "lab_array_{0}_2.npy".format(I, obs)
-            lab_array_I_obs = np.load(
-                os.path.join(os.path.dirname(__file__), "data", fname)
-            )
+            if have_fetch:
+                lab_array_I_obs = np.load(fetch("color/tests/data/" + fname))
+            else:
+                lab_array_I_obs = np.load(
+                    os.path.join(os.path.dirname(__file__), "data", fname)
+                )
             assert_array_almost_equal(
                 lab2xyz(lab_array_I_obs, I, "2"), self.xyz_array, decimal=3
             )
@@ -526,18 +562,28 @@ class TestColorconv(TestCase):
         # Test the conversion with the rest of the illuminants.
         for I in ["d50", "d55", "d65", "d75"]:
             for obs in ["2", "10"]:
-                fname = "luv_array_{0}_{1}.npy".format(I, obs)
-                luv_array_I_obs = np.load(
-                    os.path.join(os.path.dirname(__file__), "data", fname)
-                )
+                if have_fetch:
+                    fname = "color/tests/data/luv_array_{0}_{1}.npy".format(
+                        I, obs
+                    )
+                    luv_array_I_obs = np.load(fetch(fname))
+                else:
+                    fname = "luv_array_{0}_{1}.npy".format(I, obs)
+                    luv_array_I_obs = np.load(
+                        os.path.join(os.path.dirname(__file__), "data", fname)
+                    )
                 assert_array_almost_equal(
                     luv_array_I_obs, xyz2luv(self.xyz_array, I, obs), decimal=2
                 )
         for I in ["a", "e"]:
-            fname = "luv_array_{0}_2.npy".format(I)
-            luv_array_I_obs = np.load(
-                os.path.join(os.path.dirname(__file__), "data", fname)
-            )
+            if have_fetch:
+                fname = "color/tests/data/luv_array_{0}_2.npy".format(I)
+                luv_array_I_obs = np.load(fetch(fname))
+            else:
+                fname = "luv_array_{0}_2.npy".format(I)
+                luv_array_I_obs = np.load(
+                    os.path.join(os.path.dirname(__file__), "data", fname)
+                )
             assert_array_almost_equal(
                 luv_array_I_obs, xyz2luv(self.xyz_array, I, "2"), decimal=2
             )
@@ -557,18 +603,28 @@ class TestColorconv(TestCase):
         # Test the conversion with the rest of the illuminants.
         for I in ["d50", "d55", "d65", "d75"]:
             for obs in ["2", "10"]:
-                fname = "luv_array_{0}_{1}.npy".format(I, obs)
-                luv_array_I_obs = np.load(
-                    os.path.join(os.path.dirname(__file__), "data", fname)
-                )
+                if have_fetch:
+                    fname = "color/tests/data/luv_array_{0}_{1}.npy".format(
+                        I, obs
+                    )
+                    luv_array_I_obs = np.load(fetch(fname))
+                else:
+                    fname = "luv_array_{0}_{1}.npy".format(I, obs)
+                    luv_array_I_obs = np.load(
+                        os.path.join(os.path.dirname(__file__), "data", fname)
+                    )
                 assert_array_almost_equal(
                     luv2xyz(luv_array_I_obs, I, obs), self.xyz_array, decimal=3
                 )
         for I in ["a", "e"]:
-            fname = "luv_array_{0}_2.npy".format(I, obs)
-            luv_array_I_obs = np.load(
-                os.path.join(os.path.dirname(__file__), "data", fname)
-            )
+            if have_fetch:
+                fname = "color/tests/data/luv_array_{0}_2.npy".format(I, obs)
+                luv_array_I_obs = np.load(fetch(fname))
+            else:
+                fname = "luv_array_{0}_2.npy".format(I, obs)
+                luv_array_I_obs = np.load(
+                    os.path.join(os.path.dirname(__file__), "data", fname)
+                )
             assert_array_almost_equal(
                 luv2xyz(luv_array_I_obs, I, "2"), self.xyz_array, decimal=3
             )
@@ -776,25 +832,106 @@ def test_gray2rgb_alpha():
     x = cp.random.random((5, 5, 4))
     with expected_warnings(["Pass-through of possibly RGB images"]):
         assert_equal(gray2rgb(x, alpha=None).shape, (5, 5, 4))
-    with expected_warnings(["Pass-through of possibly RGB images"]):
+    with expected_warnings(
+        ["Pass-through of possibly RGB images", "alpha argument is deprecated"]
+    ):
         assert_equal(gray2rgb(x, alpha=False).shape, (5, 5, 3))
-    with expected_warnings(["Pass-through of possibly RGB images"]):
+    with expected_warnings(
+        ["Pass-through of possibly RGB images", "alpha argument is deprecated"]
+    ):
         assert_equal(gray2rgb(x, alpha=True).shape, (5, 5, 4))
 
     x = cp.random.random((5, 5, 3))
     with expected_warnings(["Pass-through of possibly RGB images"]):
         assert_equal(gray2rgb(x, alpha=None).shape, (5, 5, 3))
-    with expected_warnings(["Pass-through of possibly RGB images"]):
+    with expected_warnings(
+        ["Pass-through of possibly RGB images", "alpha argument is deprecated"]
+    ):
         assert_equal(gray2rgb(x, alpha=False).shape, (5, 5, 3))
-    with expected_warnings(["Pass-through of possibly RGB images"]):
+    with expected_warnings(
+        ["Pass-through of possibly RGB images", "alpha argument is deprecated"]
+    ):
         assert_equal(gray2rgb(x, alpha=True).shape, (5, 5, 4))
 
-    assert_array_equal(
-        gray2rgb(cp.asarray([[1, 2], [3, 4.0]]), alpha=True)[0, 0, 3], 1
-    )
-    assert_array_equal(
-        gray2rgb(cp.asarray([[1, 2], [3, 4]], dtype=np.uint8), alpha=True)[
-            0, 0, 3
-        ],
-        255,
-    )
+    with expected_warnings(["alpha argument is deprecated"]):
+        assert_array_equal(
+            gray2rgb(cp.asarray([[1, 2], [3, 4.0]]), alpha=True)[0, 0, 3], 1
+        )
+    with expected_warnings(["alpha argument is deprecated"]):
+        assert_array_equal(
+            gray2rgb(cp.asarray([[1, 2], [3, 4]], dtype=np.uint8), alpha=True)[
+                0, 0, 3
+            ],
+            255,
+        )
+
+
+@pytest.mark.parametrize("shape", [(5, 5), (5, 5, 4), (5, 4, 5, 4)])
+def test_gray2rgba(shape):
+    # nD case
+    img = cp.random.random(shape)
+    rgba = gray2rgba(img)
+
+    # Shape check
+    assert_equal(rgba.shape, shape + (4,))
+
+    # dtype check
+    assert rgba.dtype == img.dtype
+
+    # RGB channels check
+    for channel in range(3):
+        assert_array_equal(rgba[..., channel], img)
+
+    # Alpha channel check
+    assert_array_equal(rgba[..., 3], 1.0)
+
+
+def test_gray2rgba_dtype():
+    img_f64 = cp.random.random((5, 5))
+    img_f32 = img_f64.astype("float32")
+    img_u8 = img_as_ubyte(img_f64)
+    img_int = img_u8.astype(int)
+
+    for img in [img_f64, img_f32, img_u8, img_int]:
+        assert gray2rgba(img).dtype == img.dtype
+
+
+def test_gray2rgba_alpha():
+    img = cp.random.random((5, 5))
+    img_u8 = img_as_ubyte(img)
+
+    # Default
+    alpha = None
+    rgba = gray2rgba(img, alpha)
+
+    assert_array_equal(rgba[..., :3], gray2rgb(img))
+    assert_array_equal(rgba[..., 3], 1.0)
+
+    # Scalar
+    alpha = 0.5
+    rgba = gray2rgba(img, alpha)
+
+    assert_array_equal(rgba[..., :3], gray2rgb(img))
+    assert_array_equal(rgba[..., 3], alpha)
+
+    # Array
+    alpha = cp.random.random((5, 5))
+    rgba = gray2rgba(img, alpha)
+
+    assert_array_equal(rgba[..., :3], gray2rgb(img))
+    assert_array_equal(rgba[..., 3], alpha)
+
+    # Warning about alpha cast
+    alpha = 0.5
+    with expected_warnings(["alpha can't be safely cast to image dtype"]):
+        rgba = gray2rgba(img_u8, alpha)
+        assert_array_equal(rgba[..., :3], gray2rgb(img_u8))
+
+    # Invalid shape
+    alpha = cp.random.random((5, 5, 1))
+    # expected_err_msg = ("could not broadcast input array from shape (5,5,1) "
+    #                     "into shape (5,5)")
+
+    with pytest.raises(ValueError):  # as err:
+        rgba = gray2rgba(img, alpha)
+    # assert expected_err_msg == str(err.value)
