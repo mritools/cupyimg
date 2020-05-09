@@ -4,7 +4,7 @@ from ._gaussian import (  # noqa
     _guess_spatial_dimensions,
     difference_of_gaussians,
 )
-from .edges import (
+from .edges import (  # noqa
     sobel,
     sobel_h,
     sobel_v,
@@ -40,9 +40,12 @@ from .thresholding import (
     apply_hysteresis_threshold,
 )
 from .ridges import meijering, sato, frangi, hessian
+
+# from . import rank
 from ._median import median
 from ._unsharp_mask import unsharp_mask
 from ._window import window
+
 
 __all__ = [
     "inverse",
@@ -67,15 +70,11 @@ __all__ = [
     "rank_order",
     "gabor_kernel",
     "gabor",
+    "try_all_threshold",
     "meijering",
     "sato",
     "frangi",
     "hessian",
-    "farid",
-    "farid_h",
-    "farid_v",
-    "unsharp_mask",
-    "window",
     "threshold_otsu",
     "threshold_yen",
     "threshold_isodata",
@@ -88,5 +87,7 @@ __all__ = [
     "threshold_triangle",
     # 'threshold_multiotsu',
     "apply_hysteresis_threshold",
-    "try_all_threshold",
+    # "rank",
+    "unsharp_mask",
+    "window",
 ]

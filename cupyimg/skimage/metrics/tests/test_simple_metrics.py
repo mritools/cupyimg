@@ -1,4 +1,4 @@
-import cupy
+import cupy as cp
 import numpy as np
 import pytest
 
@@ -14,14 +14,14 @@ from cupyimg.skimage.metrics import (
 np.random.seed(
     5
 )  # need exact NumPy seed here. (Don't use CuPy as it won't be identical)
-cam = cupy.asarray(data.camera())
+cam = cp.asarray(data.camera())
 sigma = 20.0
-noise = cupy.asarray(sigma * np.random.randn(*cam.shape))
-cam_noisy = cupy.clip(cam + noise, 0, 255)
+noise = cp.asarray(sigma * np.random.randn(*cam.shape))
+cam_noisy = cp.clip(cam + noise, 0, 255)
 cam_noisy = cam_noisy.astype(cam.dtype)
 
-assert_equal = cupy.testing.assert_array_equal
-assert_almost_equal = cupy.testing.assert_array_almost_equal
+assert_equal = cp.testing.assert_array_equal
+assert_almost_equal = cp.testing.assert_array_almost_equal
 
 
 def test_PSNR_vs_IPOL():
@@ -60,13 +60,13 @@ def test_PSNR_errors():
 
 
 def test_NRMSE():
-    x = cupy.ones(4)
-    y = cupy.asarray([0.0, 2.0, 2.0, 2.0])
+    x = cp.ones(4)
+    y = cp.asarray([0.0, 2.0, 2.0, 2.0])
     assert_equal(
-        normalized_root_mse(y, x, normalization="mean"), 1 / cupy.mean(y)
+        normalized_root_mse(y, x, normalization="mean"), 1 / cp.mean(y)
     )
     assert_equal(
-        normalized_root_mse(y, x, normalization="euclidean"), 1 / cupy.sqrt(3)
+        normalized_root_mse(y, x, normalization="euclidean"), 1 / cp.sqrt(3)
     )
     assert_equal(
         normalized_root_mse(y, x, normalization="min-max"),
@@ -75,14 +75,14 @@ def test_NRMSE():
 
     # mixed precision inputs are allowed
     assert_almost_equal(
-        normalized_root_mse(y, x.astype(cupy.float32), normalization="min-max"),
+        normalized_root_mse(y, x.astype(cp.float32), normalization="min-max"),
         1 / (y.max() - y.min()),
     )
 
 
 def test_NRMSE_no_int_overflow():
-    camf = cam.astype(cupy.float32)
-    cam_noisyf = cam_noisy.astype(cupy.float32)
+    camf = cam.astype(cp.float32)
+    cam_noisyf = cam_noisy.astype(cp.float32)
     assert_almost_equal(
         mean_squared_error(cam, cam_noisy), mean_squared_error(camf, cam_noisyf)
     )
@@ -93,7 +93,7 @@ def test_NRMSE_no_int_overflow():
 
 
 def test_NRMSE_errors():
-    x = cupy.ones(4)
+    x = cp.ones(4)
     # shape mismatch
     with pytest.raises(ValueError):
         normalized_root_mse(x[:-1], x)
@@ -114,8 +114,8 @@ def test_nmi_different_sizes():
 
 
 def test_nmi_random():
-    random1 = cupy.random.random((100, 100))
-    random2 = cupy.random.random((100, 100))
+    random1 = cp.random.random((100, 100))
+    random2 = cp.random.random((100, 100))
     assert_almost_equal(
         normalized_mutual_information(random1, random2, bins=10), 1, decimal=2
     )

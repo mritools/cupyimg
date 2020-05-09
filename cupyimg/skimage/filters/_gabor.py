@@ -1,6 +1,6 @@
 import math
 
-import cupy
+import cupy as cp
 import numpy as np
 
 from cupyimg.scipy import ndimage as ndi
@@ -108,17 +108,17 @@ def gabor_kernel(
             1,
         )
     )
-    y, x = cupy.mgrid[-y0 : y0 + 1, -x0 : x0 + 1]
+    y, x = cp.mgrid[-y0 : y0 + 1, -x0 : x0 + 1]
 
     rotx = x * math.cos(theta) + y * math.sin(theta)
     roty = -x * math.sin(theta) + y * math.cos(theta)
 
-    g = cupy.zeros(y.shape, dtype=np.complex)
-    g[:] = cupy.exp(
+    g = cp.zeros(y.shape, dtype=np.complex)
+    g[:] = cp.exp(
         -0.5 * ((rotx * rotx) / sigma_x ** 2 + (roty * roty) / sigma_y ** 2)
     )
     g /= 2 * np.pi * sigma_x * sigma_y
-    g *= cupy.exp(1j * (2 * np.pi * frequency * rotx + offset))
+    g *= cp.exp(1j * (2 * np.pi * frequency * rotx + offset))
 
     return g
 

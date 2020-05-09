@@ -275,6 +275,7 @@ def _binary_erosion(
     else:
         output = bool
     output = _ni_support._get_output(output, input)
+
     if structure.ndim == 0:
         # kernel doesn't handle ndim=0, so special case it here
         if float(structure):
@@ -292,17 +293,28 @@ def _binary_erosion(
         invert,
         masked,
     )
-
     if iterations == 1:
+        needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
+        if needs_temp:
+            output, temp = (
+                _ni_support._get_output(output.dtype, input),
+                output,
+            )
         if masked:
-            return erode_kernel(input, structure, mask, output)
+            output = erode_kernel(input, structure, mask, output)
         else:
-            return erode_kernel(input, structure, output)
+            output = erode_kernel(input, structure, output)
+        if needs_temp:
+            temp[...] = output
+            output = temp
+        return output
     elif center_is_true and not brute_force:
         raise NotImplementedError(
             "only brute_force iteration has been implemented"
         )
     else:
+        if cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS"):
+            raise ValueError("output and input may not overlap in memory")
         tmp_in = cupy.empty_like(input, dtype=bool)
         tmp_out = output
         if iterations >= 1 and not iterations & 1:

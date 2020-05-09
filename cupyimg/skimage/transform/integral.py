@@ -1,4 +1,4 @@
-import cupy
+import cupy as cp
 import numpy as np
 
 
@@ -96,7 +96,7 @@ def integrate(ii, start, end):
     if scalar_output:
         S = 0
     else:
-        S = cupy.zeros(rows)
+        S = cp.zeros(rows)
     bit_perm = 2 ** ii.ndim
     width = len(bin(bit_perm - 1)[2:])
 
@@ -133,6 +133,7 @@ def integrate(ii, start, end):
             S += sign * ii[tuple(corner_points[0])] if (not bad[0]) else 0
         else:
             for r in range(rows):
+                # add only good rows
                 if not bad[r]:
                     S[r] += sign * ii[tuple(corner_points[r])]
     return S

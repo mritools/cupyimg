@@ -28,7 +28,13 @@ from .pyramids import (
     pyramid_laplacian,
 )
 
+
 __all__ = [
+    "integral_image",
+    "integrate",
+    "warp",
+    "warp_coords",
+    "warp_polar",
     "estimate_transform",
     "matrix_transform",
     "EuclideanTransform",
@@ -39,11 +45,6 @@ __all__ = [
     "FundamentalMatrixTransform",
     "PolynomialTransform",
     "PiecewiseAffineTransform",
-    "integral_image",
-    "integrate",
-    "warp",
-    "warp_coords",
-    "warp_polar",
     "swirl",
     "resize",
     "rotate",

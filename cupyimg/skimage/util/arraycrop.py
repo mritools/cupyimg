@@ -4,8 +4,7 @@ n-dimensional array.
 """
 
 import numpy as np
-
-import cupy
+import cupy as cp
 
 __all__ = ["crop"]
 
@@ -52,14 +51,14 @@ def crop(ar, crop_width, copy=False, order="K"):
     else:
         from numpy.lib.arraypad import _as_pairs
 
-    ar = cupy.array(ar, copy=False)
+    ar = cp.array(ar, copy=False)
     if old_numpy:
         crops = _validate_lengths(ar, crop_width)
     else:
         crops = _as_pairs(crop_width, ar.ndim, as_index=True)
     slices = tuple(slice(a, ar.shape[i] - b) for i, (a, b) in enumerate(crops))
     if copy:
-        cropped = cupy.array(ar[slices], order=order, copy=True)
+        cropped = cp.array(ar[slices], order=order, copy=True)
     else:
         cropped = ar[slices]
     return cropped

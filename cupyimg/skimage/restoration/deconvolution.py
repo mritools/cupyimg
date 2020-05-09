@@ -1,6 +1,6 @@
 """Implementations restoration functions"""
 
-import cupy
+import cupy as cp
 import numpy as np
 import cupy.random as npr
 from cupyimg.scipy.signal import convolve
@@ -55,12 +55,13 @@ def wiener(image, psf, balance, reg=None, is_real=True, clip=True):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import color, data, restoration
     >>> img = color.rgb2gray(data.astronaut())
     >>> from scipy.signal import convolve2d
-    >>> psf = cupy.ones((5, 5)) / 25
+    >>> psf = cp.ones((5, 5)) / 25
     >>> img = convolve2d(img, psf, 'same')
-    >>> img += 0.1 * img.std() * cupy.random.standard_normal(img.shape)
+    >>> img += 0.1 * img.std() * cp.random.standard_normal(img.shape)
     >>> deconvolved_img = restoration.wiener(img, psf, 1100)
 
     Notes
@@ -114,7 +115,7 @@ def wiener(image, psf, balance, reg=None, is_real=True, clip=True):
     """
     if reg is None:
         reg, _ = uft.laplacian(image.ndim, image.shape, is_real=is_real)
-    if not cupy.iscomplexobj(reg):
+    if not cp.iscomplexobj(reg):
         reg = uft.ir2tf(reg, image.shape, is_real=is_real)
 
     if psf.shape != reg.shape:
@@ -122,11 +123,11 @@ def wiener(image, psf, balance, reg=None, is_real=True, clip=True):
     else:
         trans_func = psf
 
-    atf2 = cupy.abs(trans_func)
+    atf2 = cp.abs(trans_func)
     atf2 *= atf2
-    areg2 = cupy.abs(reg)
+    areg2 = cp.abs(reg)
     areg2 *= areg2
-    wiener_filter = cupy.conj(trans_func) / (atf2 + balance * areg2)
+    wiener_filter = cp.conj(trans_func) / (atf2 + balance * areg2)
     if is_real:
         deconv = uft.uirfft2(
             wiener_filter * uft.urfft2(image), shape=image.shape
@@ -202,12 +203,13 @@ def unsupervised_wiener(
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import color, data, restoration
     >>> img = color.rgb2gray(data.astronaut())
     >>> from scipy.signal import convolve2d
-    >>> psf = cupy.ones((5, 5)) / 25
+    >>> psf = cp.ones((5, 5)) / 25
     >>> img = convolve2d(img, psf, 'same')
-    >>> img += 0.1 * img.std() * cupy.random.standard_normal(img.shape)
+    >>> img += 0.1 * img.std() * cp.random.standard_normal(img.shape)
     >>> deconvolved_img = restoration.unsupervised_wiener(img, psf)
 
     Notes
@@ -246,7 +248,7 @@ def unsupervised_wiener(
 
     if reg is None:
         reg, _ = uft.laplacian(image.ndim, image.shape, is_real=is_real)
-    if not cupy.iscomplexobj(reg):
+    if not cp.iscomplexobj(reg):
         reg = uft.ir2tf(reg, image.shape, is_real=is_real)
 
     if psf.shape != reg.shape:
@@ -255,9 +257,9 @@ def unsupervised_wiener(
         trans_fct = psf
 
     # The mean of the object
-    x_postmean = cupy.zeros(trans_fct.shape)
+    x_postmean = cp.zeros(trans_fct.shape)
     # The previous computed mean in the iterative loop
-    prev_x_postmean = cupy.zeros(trans_fct.shape)
+    prev_x_postmean = cp.zeros(trans_fct.shape)
 
     # Difference between two successive mean
     delta = np.NAN
@@ -267,9 +269,9 @@ def unsupervised_wiener(
 
     # The correlation of the object in Fourier space (if size is big,
     # this can reduce computation time in the loop)
-    areg2 = cupy.abs(reg)
+    areg2 = cp.abs(reg)
     areg2 *= areg2
-    atf2 = cupy.abs(trans_fct)
+    atf2 = cp.abs(trans_fct)
     atf2 *= atf2
 
     # The Fourier transform may change the image.size attribute, so we
@@ -287,15 +289,15 @@ def unsupervised_wiener(
         precision = gn_chain[-1] * atf2 + gx_chain[-1] * areg2  # Eq. 29
         excursion = (
             np.sqrt(0.5)
-            / cupy.sqrt(precision)
+            / cp.sqrt(precision)
             * (
-                cupy.random.standard_normal(data_spectrum.shape)
-                + 1j * cupy.random.standard_normal(data_spectrum.shape)
+                cp.random.standard_normal(data_spectrum.shape)
+                + 1j * cp.random.standard_normal(data_spectrum.shape)
             )
         )
 
         # mean Eq. 30 (RLS for fixed gn, gamma0 and gamma1 ...)
-        wiener_filter = gn_chain[-1] * cupy.conj(trans_fct) / precision
+        wiener_filter = gn_chain[-1] * cp.conj(trans_fct) / precision
 
         # sample of X in Fourier space
         x_sample = wiener_filter * data_spectrum + excursion
@@ -326,8 +328,8 @@ def unsupervised_wiener(
             previous = prev_x_postmean / (iteration - params["burnin"] - 1)
 
             delta = (
-                cupy.sum(cupy.abs(current - previous))
-                / cupy.sum(cupy.abs(x_postmean))
+                cp.sum(cp.abs(current - previous))
+                / cp.sum(cp.abs(x_postmean))
                 / (iteration - params["burnin"])
             )
 
@@ -374,12 +376,13 @@ def richardson_lucy(image, psf, iterations=50, clip=True):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import color, data, restoration
     >>> camera = color.rgb2gray(data.camera())
     >>> from scipy.signal import convolve2d
-    >>> psf = cupy.ones((5, 5)) / 25
+    >>> psf = cp.ones((5, 5)) / 25
     >>> camera = convolve2d(camera, psf, 'same')
-    >>> camera += 0.1 * camera.std() * cupy.random.standard_normal(camera.shape)
+    >>> camera += 0.1 * camera.std() * cp.random.standard_normal(camera.shape)
     >>> deconvolved = restoration.richardson_lucy(camera, psf, 5)
 
     References
@@ -388,7 +391,7 @@ def richardson_lucy(image, psf, iterations=50, clip=True):
     """
     image = image.astype(np.float)
     psf = psf.astype(np.float)
-    im_deconv = cupy.full(image.shape, 0.5)
+    im_deconv = cp.full(image.shape, 0.5)
     psf_mirror = psf[::-1, ::-1]
 
     for _ in range(iterations):

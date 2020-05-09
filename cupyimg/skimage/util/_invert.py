@@ -1,4 +1,4 @@
-import cupy
+import cupy as cp
 import numpy as np
 from .dtype import dtype_limits
 
@@ -41,22 +41,23 @@ def invert(image, signed_float=False):
 
     Examples
     --------
-    >>> img = cupy.asarray([[100,  0, 200],
+    >>> import cupy as cp
+    >>> img = cp.asarray([[100,  0, 200],
     ...                     [  0, 50,   0],
     ...                     [ 30,  0, 255]], np.uint8)
     >>> invert(img)
     array([[155, 255,  55],
            [255, 205, 255],
            [225, 255,   0]], dtype=uint8)
-    >>> img2 = cupy.asarray([[ -2, 0, -128],
+    >>> img2 = cp.asarray([[ -2, 0, -128],
     ...                      [127, 0,    5]], np.int8)
     >>> invert(img2)
     array([[   1,   -1,  127],
            [-128,   -1,   -6]], dtype=int8)
-    >>> img3 = cupy.asarray([[ 0., 1., 0.5, 0.75]])
+    >>> img3 = cp.asarray([[ 0., 1., 0.5, 0.75]])
     >>> invert(img3)
     array([[1.  , 0.  , 0.5 , 0.25]])
-    >>> img4 = cupy.asarray([[ 0., 1., -1., -0.25]])
+    >>> img4 = cp.asarray([[ 0., 1., -1., -0.25]])
     >>> invert(img4, signed_float=True)
     array([[-0.  , -1.  ,  1.  ,  0.25]])
     """
@@ -64,12 +65,12 @@ def invert(image, signed_float=False):
         inverted = ~image
     elif np.issubdtype(image.dtype, np.unsignedinteger):
         max_val = dtype_limits(image, clip_negative=False)[1]
-        inverted = cupy.subtract(max_val, image, dtype=image.dtype)
+        inverted = cp.subtract(max_val, image, dtype=image.dtype)
     elif np.issubdtype(image.dtype, np.signedinteger):
-        inverted = cupy.subtract(-1, image, dtype=image.dtype)
+        inverted = cp.subtract(-1, image, dtype=image.dtype)
     else:  # float dtype
         if signed_float:
             inverted = -image
         else:
-            inverted = cupy.subtract(1, image, dtype=image.dtype)
+            inverted = cp.subtract(1, image, dtype=image.dtype)
     return inverted

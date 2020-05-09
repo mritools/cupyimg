@@ -177,8 +177,14 @@ def convolve1d(
         input = input.astype(dtype, copy=False)
         if output is not None:
             output = _ni_support._get_output(output, input)
+            needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
+            if needs_temp:
+                output, temp = (
+                    _ni_support._get_output(output.dtype, input),
+                    output,
+                )
 
-        return _convolve1d_gpu(
+        output = _convolve1d_gpu(
             weights,
             input,
             axis=axis,
@@ -187,6 +193,10 @@ def convolve1d(
             out=output,
             **mode_kwargs,
         )
+        if needs_temp:
+            temp[...] = output[...]
+            output = temp
+        return output
     else:
         if not crop:
             raise ValueError("crop=False requires backend='fast_upfirdn'")
@@ -883,7 +893,12 @@ def _min_or_max_filter_inner(
     fshape = footprint.shape
 
     output = _ni_support._get_output(output, input)
-
+    needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
+    if needs_temp:
+        output, temp = (
+            _ni_support._get_output(output.dtype, input),
+            output,
+        )
     input = cupy.ascontiguousarray(input)
 
     # The kernel needs only the non-zero footprint coordinates
@@ -908,7 +923,7 @@ def _min_or_max_filter_inner(
         nnz = wlocs.shape[1]
 
         if structure is None:
-            return _get_min_or_max_kernel_masked(
+            output = _get_min_or_max_kernel_masked(
                 mode,
                 cval,
                 input.shape,
@@ -919,7 +934,7 @@ def _min_or_max_filter_inner(
                 unsigned_output,
             )(input, wlocs, output)
         else:
-            return _get_min_or_max_kernel_masked_v2(
+            output = _get_min_or_max_kernel_masked_v2(
                 mode,
                 cval,
                 input.shape,
@@ -930,9 +945,13 @@ def _min_or_max_filter_inner(
                 unsigned_output,
             )(input, wlocs, wvals, output)
     else:
-        return _get_min_or_max_kernel(
+        output = _get_min_or_max_kernel(
             mode, cval, input.shape, fshape, origin, minimum, unsigned_output
         )(input, footprint, output)
+    if needs_temp:
+        temp[...] = output
+        output = temp
+    return output
 
 
 def minimum_filter(
@@ -1074,7 +1093,12 @@ def _rank_filter(
     #     raise ValueError("filter footprint must be boolean")
 
     output = _ni_support._get_output(output, input)
-
+    needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
+    if needs_temp:
+        output, temp = (
+            _ni_support._get_output(output.dtype, input),
+            output,
+        )
     input = cupy.ascontiguousarray(input)
 
     # unsigned_output =  output.dtype.kind in ['u', 'b']
@@ -1083,7 +1107,7 @@ def _rank_filter(
         # The kernel needs only the non-zero footprint coordinates
         wlocs = cupy.stack(cupy.nonzero(footprint))  # (ndim, nnz)
 
-        return _get_rank_kernel_masked(
+        output = _get_rank_kernel_masked(
             mode,
             cval,
             input.shape,
@@ -1094,9 +1118,13 @@ def _rank_filter(
         )(input, wlocs, output)
     else:
         footprint = cupy.ascontiguousarray(footprint)
-        return _get_rank_kernel(
+        output = _get_rank_kernel(
             mode, cval, input.shape, footprint.shape, tuple(origin), rank
         )(input, footprint, output)
+    if needs_temp:
+        temp[...] = output[...]
+        output = temp
+    return output
 
 
 def rank_filter(

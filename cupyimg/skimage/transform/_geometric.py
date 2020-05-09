@@ -804,12 +804,7 @@ class ProjectiveTransform(GeometricTransform):
 
     def __nice__(self):
         """common 'paramstr' used by __str__ and __repr__"""
-        try:
-            # cupy case
-            npstring = np.array2string(self.params.get(), separator=", ")
-        except AttributeError:
-            # numpy case
-            npstring = np.array2string(self.params, separator=", ")
+        npstring = np.array2string(cp.asnumpy(self.params), separator=", ")
         paramstr = "matrix=\n" + textwrap.indent(npstring, "    ")
         return paramstr
 
@@ -951,7 +946,10 @@ class AffineTransform(ProjectiveTransform):
             if translation is None:
                 translation = (0, 0)
 
-            sx, sy = scale
+            if np.isscalar(scale):
+                sx = sy = scale
+            else:
+                sx, sy = scale
 
             # fmt: off
             self.params = np.array(
@@ -1046,9 +1044,9 @@ class PiecewiseAffineTransform(GeometricTransform):
         xp = cp.get_array_module(src)
         if xp is cp:
             # TODO: grlee77 :update if spatial.Delaunay is implemented for GPU
-            # transfer to GPU for use of spatial.Delaunay
-            src = src.get()
-            dst = dst.get()
+            # transfer to CPU for use of spatial.Delaunay
+            src = cp.asnumpy(src)
+            dst = cp.asnumpy(dst)
 
         self._tesselation = spatial.Delaunay(src)
         # find affine mapping from source positions to destination

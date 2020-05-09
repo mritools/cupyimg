@@ -6,9 +6,9 @@
 import cupy as cp
 import numpy as np
 
-from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage.transform import pyramid_reduce
 from cupyimg.skimage.util.dtype import _convert
+from cupyimg.scipy import ndimage as ndi
 
 
 def resize_flow(flow, shape):

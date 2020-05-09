@@ -4,10 +4,10 @@ TODO: replacement of .flat in this file not yet done correctly. need to fix it
 
 import itertools
 
-import cupy
+import cupy as cp
 import numpy as np
 
-from .._shared.utils import warn
+from .._shared.utils import warn, change_default_value
 from ..util import img_as_float
 from . import rgb_colors
 from .colorconv import rgb2gray, gray2rgb
@@ -49,7 +49,7 @@ def _rgb_vector(color):
     if isinstance(color, str):
         color = color_dict[color]
     # Slice to handle RGBA colors.
-    return cupy.array(color[:3])
+    return cp.array(color[:3])
 
 
 def _match_label_with_color(label, colors, bg_label, bg_color):
@@ -64,12 +64,11 @@ def _match_label_with_color(label, colors, bg_label, bg_color):
     bg_color = _rgb_vector([bg_color])
 
     # map labels to their ranks among all labels from small to large
-    unique_labels, mapped_labels = cupy.unique(label, return_inverse=True)
+    unique_labels, mapped_labels = cp.unique(label, return_inverse=True)
 
     # get rank of bg_label
-    bg_label_rank_list = mapped_labels[
-        label.ravel() == bg_label
-    ]  # .flat == bg_label]
+    # for CuPy use .ravel() instead of .flat
+    bg_label_rank_list = mapped_labels[label.ravel() == bg_label]
 
     # The rank of each label is the index of the color it is matched to in
     # color cycle. bg_label should always be mapped to the first color, so
@@ -78,7 +77,6 @@ def _match_label_with_color(label, colors, bg_label, bg_color):
     if len(bg_label_rank_list) > 0:
         bg_label_rank = bg_label_rank_list[0]
         mapped_labels[mapped_labels < bg_label_rank] += 1
-        # mapped_labels[label.flat == bg_label] = 0
         mapped_labels[label.ravel() == bg_label] = 0
     else:
         mapped_labels += 1
@@ -90,6 +88,7 @@ def _match_label_with_color(label, colors, bg_label, bg_color):
     return mapped_labels, color_cycle
 
 
+@change_default_value("bg_label", new_value=0, changed_version="0.19")
 def label2rgb(
     label,
     image=None,
@@ -188,7 +187,7 @@ def _label2rgb_overlay(
     colors = [_rgb_vector(c) for c in colors]
 
     if image is None:
-        image = cupy.zeros(label.shape + (3,), dtype=np.float64)
+        image = cp.zeros(label.shape + (3,), dtype=np.float64)
         # Opacity doesn't make sense if no image exists.
         alpha = 1
     else:
@@ -198,7 +197,10 @@ def _label2rgb_overlay(
         if image.min() < 0:
             warn("Negative intensities in `image` are not supported")
 
-        image = img_as_float(rgb2gray(image))
+        if image.ndim > label.ndim:
+            image = img_as_float(rgb2gray(image))
+        else:
+            image = img_as_float(image)
         image = gray2rgb(image) * image_alpha + (1 - image_alpha)
 
     # Ensure that all labels are non-negative so we can index into
@@ -222,7 +224,7 @@ def _label2rgb_overlay(
 
     dense_labels = range(max(mapped_labels_flat).get() + 1)
 
-    label_to_color = cupy.stack(
+    label_to_color = cp.stack(
         [c for i, c in zip(dense_labels, color_cycle)], axis=0
     )
 
@@ -261,8 +263,8 @@ def _label2rgb_avg(label_field, image, bg_label=0, bg_color=(0, 0, 0)):
     out : array, same shape and type as `image`
         The output visualization.
     """
-    out = cupy.zeros_like(image)
-    labels = cupy.unique(label_field)
+    out = cp.zeros_like(image)
+    labels = cp.unique(label_field)
     bg = labels == bg_label
     if bg.any():
         labels = labels[labels != bg_label]

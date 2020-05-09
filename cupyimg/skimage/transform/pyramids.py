@@ -70,7 +70,7 @@ def pyramid_reduce(
 
     References
     ----------
-    .. [1] http://web.mit.edu/persci/people/adelson/pub_pdfs/pyramid83.pdf
+    .. [1] http://persci.mit.edu/pub_pdfs/pyramid83.pdf
 
     """
     _check_factor(downscale)
@@ -143,7 +143,7 @@ def pyramid_expand(
 
     References
     ----------
-    .. [1] http://web.mit.edu/persci/people/adelson/pub_pdfs/pyramid83.pdf
+    .. [1] http://persci.mit.edu/pub_pdfs/pyramid83.pdf
 
     """
     _check_factor(upscale)
@@ -223,7 +223,7 @@ def pyramid_gaussian(
 
     References
     ----------
-    .. [1] http://web.mit.edu/persci/people/adelson/pub_pdfs/pyramid83.pdf
+    .. [1] http://persci.mit.edu/pub_pdfs/pyramid83.pdf
 
     """
     _check_factor(downscale)
@@ -324,7 +324,7 @@ def pyramid_laplacian(
 
     References
     ----------
-    .. [1] http://web.mit.edu/persci/people/adelson/pub_pdfs/pyramid83.pdf
+    .. [1] http://persci.mit.edu/pub_pdfs/pyramid83.pdf
     .. [2] http://sepwww.stanford.edu/data/media/public/sep/morgan/texturematch/paper_html/node3.html
 
     """

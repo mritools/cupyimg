@@ -12,12 +12,8 @@ All rights reserved.
 Original author: Lee Kamentsky
 """
 
-import warnings
-
 import cupy as cp
-import numpy as np
 import cupyimg.scipy.ndimage as ndi
-from scipy.ndimage import label, sum as ndi_sum
 
 from cupyimg.scipy.ndimage import generate_binary_structure, binary_erosion
 from ..filters import gaussian
@@ -121,7 +117,7 @@ def canny(
            Pattern Analysis and Machine Intelligence, 8:679-714, 1986
            :DOI:`10.1109/TPAMI.1986.4767851`
     .. [2] William Green's Canny tutorial
-           http://dasl.unlv.edu/daslDrexel/alumni/bGreen/www.pages.drexel.edu/_weg22/can_tut.html
+           https://en.wikipedia.org/wiki/Canny_edge_detector
 
     Examples
     --------
@@ -295,24 +291,14 @@ def canny(
     # Segment the low-mask, then only keep low-segments that have
     # some high_mask component in them
     #
-    # TODO: grlee77: revisit after implementing ndimage.sum and/or label
-    warnings.warn(
-        "ndimage.label and ndimage.sum not yet implemented on the GPU, so slow "
-        "host/device transfers must be performed"
-    )
-
-    labels, count = label(cp.asnumpy(low_mask), structure=np.ones((3, 3), bool))
+    labels, count = ndi.label(low_mask, structure=cp.ones((3, 3), bool))
     if count == 0:
         return low_mask
 
-    sums = np.array(
-        ndi_sum(
-            cp.asnumpy(high_mask), labels, np.arange(count, dtype=np.int32) + 1
-        ),
-        copy=False,
-        ndmin=1,
+    sums = cp.asarray(
+        ndi.sum(high_mask, labels, cp.arange(count, dtype=cp.int32) + 1),
     )
-    sums = cp.asarray(sums)
+    sums = cp.atleast_1d(sums)
     good_label = cp.zeros((count + 1,), bool)
     good_label[1:] = sums > 0
     output_mask = good_label[labels]

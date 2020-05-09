@@ -5,9 +5,6 @@ from .._shared.utils import check_nD
 import itertools
 
 
-# TODO: moments_hu unimplemented as _moments_cy hasn't been ported to GPU
-
-
 def moments_coords(coords, order=3):
     """Calculate all raw image moments up to a certain order.
 
@@ -127,27 +124,29 @@ def moments_coords_central(coords, center=None, order=3):
     # center the coordinates
     coords = coords.astype(float) - center
 
+    # Note: for efficiency, sum over the last axis (which is memory contiguous)
     # generate all possible exponents for each axis in the given set of points
-    # produces a matrix of shape (N, D, order + 1)
-    coords = coords[..., cp.newaxis] ** cp.arange(order + 1)
+    # produces a matrix of shape (order + 1, D, N)
+    coords = coords.T
+    powers = cp.arange(order + 1)[:, np.newaxis, np.newaxis]
+    coords = coords[cp.newaxis, ...] ** powers
 
     # add extra dimensions for proper broadcasting
-    coords = coords.reshape(coords.shape + (1,) * (ndim - 1))
+    coords = coords.reshape((1,) * (ndim - 1) + coords.shape)
 
-    calc = 1
+    calc = cp.moveaxis(coords[..., 0, :], -2, 0)
 
-    for axis in range(ndim):
+    for axis in range(1, ndim):
         # isolate each point's axis
-        isolated_axis = coords[:, axis]
+        isolated_axis = coords[..., axis, :]
 
         # rotate orientation of matrix for proper broadcasting
-        isolated_axis = cp.moveaxis(isolated_axis, 1, 1 + axis)
+        isolated_axis = cp.moveaxis(isolated_axis, -2, axis)
 
         # calculate the moments for each point, one axis at a time
         calc = calc * isolated_axis
-
     # sum all individual point moments to get our final answer
-    Mc = cp.sum(calc, axis=0)
+    Mc = cp.sum(calc, axis=-1)
 
     return Mc
 
@@ -286,6 +285,12 @@ def moments_normalized(mu, order=3):
            Berlin, 1993.
     .. [4] https://en.wikipedia.org/wiki/Image_moment
 
+    Notes
+    -----
+    Do to the small array sizes, this function should be faster on the CPU.
+    Consider transfering ``mu`` to the host and running
+    ``skimage.measure.moments_normalized``.
+
     Examples
     --------
     >>> image = cp.zeros((20, 20), dtype=cp.double)
@@ -300,7 +305,7 @@ def moments_normalized(mu, order=3):
            [0.        , 0.        , 0.        , 0.        ]])
 
     """
-    if cp.any(cp.array(mu.shape) <= order):
+    if any(s <= order for s in mu.shape):
         raise ValueError("Shape of image moments must be >= `order`")
     nu = cp.zeros_like(mu)
     mu0 = mu.ravel()[0]
@@ -321,12 +326,19 @@ def moments_hu(nu):
     Parameters
     ----------
     nu : (M, M) array
-        Normalized central image moments, where M must be > 4.
+        Normalized central image moments, where M must be >= 4.
 
     Returns
     -------
     nu : (7,) array
         Hu's set of image moments.
+
+    Notes
+    -----
+    Do to the small array sizes, this function will be faster on the CPU.
+    Consider transfering ``nu`` to the host and running
+    ``skimage.measure.moments_hu`` if the moments are not needed on the
+    device.
 
     References
     ----------
@@ -341,16 +353,24 @@ def moments_hu(nu):
            Berlin, 1993.
     .. [5] https://en.wikipedia.org/wiki/Image_moment
 
-
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> image = cp.zeros((20, 20), dtype=np.double)
+    >>> image[13:17, 13:17] = 0.5
+    >>> image[10:12, 10:12] = 1
+    >>> mu = moments_central(image)
+    >>> nu = moments_normalized(mu)
+    >>> moments_hu(nu)
+    array([7.45370370e-01, 3.51165981e-01, 1.04049179e-01, 4.06442107e-02,
+           2.64312299e-03, 2.40854582e-02, 4.33680869e-19])
     """
-    try:
-        from skimage.measure import _moments_cy
 
-        return cp.asarray(
-            _moments_cy.moments_hu(cp.asnumpy(nu).astype(cp.double))
-        )
-    except ImportError:
-        return None
+    from skimage.measure import moments_hu
+
+    # Due to small arrays involved, just transfer to/from the CPU
+    # implementation.
+    return cp.asarray(moments_hu(cp.asnumpy(nu)))
 
 
 def centroid(image):
@@ -365,6 +385,15 @@ def centroid(image):
     -------
     center : tuple of float, length ``image.ndim``
         The centroid of the (nonzero) pixels in ``image``.
+
+    Examples
+    --------
+    >>> import cupy as cp
+    >>> image = cp.zeros((20, 20), dtype=np.double)
+    >>> image[13:17, 13:17] = 0.5
+    >>> image[10:12, 10:12] = 1
+    >>> centroid(image)
+    array([13.16666667, 13.16666667])
     """
     M = moments_central(image, center=(0,) * image.ndim, order=1)
     center = (

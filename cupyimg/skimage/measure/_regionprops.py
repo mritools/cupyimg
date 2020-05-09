@@ -354,7 +354,6 @@ class RegionProperties:
     @property
     @only2d
     def orientation(self):
-        # a, b, b, c = self.inertia_tensor.flat
         a, b, b, c = self.inertia_tensor.ravel()
         if a - c == 0:
             if b < 0:

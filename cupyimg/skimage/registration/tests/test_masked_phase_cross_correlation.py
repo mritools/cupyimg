@@ -1,34 +1,53 @@
-from pathlib import Path
-
 import cupy as cp
 import numpy as np
 import pytest
 from numpy.testing import assert_almost_equal
 from cupyimg.scipy.ndimage import fourier_shift
 from skimage.io import imread
-from skimage.data import camera
+from skimage.data import camera, stereo_motorcycle
+from skimage._shared.testing import expected_warnings
 
 try:
     from skimage._shared.testing import fetch
 
     have_fetch = True
 except ImportError:
+    from pathlib import Path
+
     have_fetch = False
 
 from cupyimg.skimage.registration._phase_cross_correlation import (
     phase_cross_correlation,
 )
-from cupyimg.skimage.feature.masked_register_translation import (
-    masked_register_translation,
+from cupyimg.skimage.registration._masked_phase_cross_correlation import (
+    _masked_phase_cross_correlation as masked_register_translation,
     cross_correlate_masked,
 )
 from cupyimg.skimage._shared.fft import fftmodule as fft
+from cupyimg.skimage.feature import masked_register_translation as _deprecated
 
 if not have_fetch:
     # Location of test images
     # These images are taken from Dirk Padfields' MATLAB package
     # available on his website: www.dirkpadfield.com
     IMAGES_DIR = Path(__file__).parent / "data"
+
+
+def test_detrecated_masked_register_translation():
+    reference_image, moving_image, _ = stereo_motorcycle()
+    ref_mask = np.random.choice(
+        [True, False], reference_image.shape, p=[3 / 4, 1 / 4]
+    )
+    ref_mask = cp.asarray(ref_mask)
+    reference_image = cp.asarray(reference_image)
+    moving_image = cp.asarray(moving_image)
+    with expected_warnings(["Function ``masked_register_translation``"]):
+        cp.testing.assert_array_equal(
+            _deprecated(reference_image, moving_image, ref_mask),
+            phase_cross_correlation(
+                reference_image, moving_image, reference_mask=ref_mask
+            ),
+        )
 
 
 def test_masked_registration_vs_phase_cross_correlation():

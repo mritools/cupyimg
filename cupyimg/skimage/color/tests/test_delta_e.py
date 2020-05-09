@@ -17,6 +17,13 @@ from cupyimg.skimage.color.delta_e import (
     deltaE_cmc,
 )
 
+try:
+    from skimage._shared.testing import fetch
+
+    have_fetch = True
+except ImportError:
+    have_fetch = False
+
 
 def test_ciede2000_dE():
     data = load_ciede2000_data()
@@ -70,7 +77,10 @@ def load_ciede2000_data():
     ]
 
     # note: ciede_test_data.txt contains several intermediate quantities
-    path = pjoin(dirname(abspath(__file__)), "ciede2000_test_data.txt")
+    if have_fetch:
+        path = fetch("color/tests/ciede2000_test_data.txt")
+    else:
+        path = pjoin(dirname(abspath(__file__)), "ciede2000_test_data.txt")
     return np.loadtxt(path, dtype=dtype)
 
 

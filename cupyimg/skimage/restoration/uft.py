@@ -22,7 +22,7 @@ References
 
 import math
 
-import cupy
+import cupy as cp
 
 from .._shared.fft import fftmodule as fft
 
@@ -47,9 +47,10 @@ def ufftn(inarray, dim=None):
 
     Examples
     --------
-    >>> input = cupy.ones((3, 3, 3))
+    >>> import cupy as cp
+    >>> input = cp.ones((3, 3, 3))
     >>> output = ufftn(input)
-    >>> cupy.allclose(cupy.sum(input) / cupy.sqrt(input.size), output[0, 0, 0])
+    >>> cp.allclose(cp.sum(input) / cp.sqrt(input.size), output[0, 0, 0])
     True
     >>> output.shape
     (3, 3, 3)
@@ -78,9 +79,10 @@ def uifftn(inarray, dim=None):
 
     Examples
     --------
-    >>> input = cupy.ones((3, 3, 3))
+    >>> import cupy as cp
+    >>> input = cp.ones((3, 3, 3))
     >>> output = uifftn(input)
-    >>> cupy.allclose(cupy.sum(input) / cupy.sqrt(input.size), output[0, 0, 0])
+    >>> cp.allclose(cp.sum(input) / cp.sqrt(input.size), output[0, 0, 0])
     True
     >>> output.shape
     (3, 3, 3)
@@ -118,9 +120,10 @@ def urfftn(inarray, dim=None):
 
     Examples
     --------
-    >>> input = cupy.ones((5, 5, 5))
+    >>> import cupy as cp
+    >>> input = cp.ones((5, 5, 5))
     >>> output = urfftn(input)
-    >>> cupy.allclose(cupy.sum(input) / cupy.sqrt(input.size), output[0, 0, 0])
+    >>> cp.allclose(cp.sum(input) / cp.sqrt(input.size), output[0, 0, 0])
     True
     >>> output.shape
     (5, 5, 3)
@@ -162,9 +165,10 @@ def uirfftn(inarray, dim=None, shape=None):
 
     Examples
     --------
-    >>> input = cupy.ones((5, 5, 5))
+    >>> import cupy as cp
+    >>> input = cp.ones((5, 5, 5))
     >>> output = uirfftn(urfftn(input), shape=input.shape)
-    >>> cupy.allclose(input, output)
+    >>> cp.allclose(input, output)
     True
     >>> output.shape
     (5, 5, 5)
@@ -196,9 +200,10 @@ def ufft2(inarray):
 
     Examples
     --------
-    >>> input = cupy.ones((10, 128, 128))
+    >>> import cupy as cp
+    >>> input = cp.ones((10, 128, 128))
     >>> output = ufft2(input)
-    >>> cupy.allclose(cupy.sum(input[1, ...]) / cupy.sqrt(input[1, ...].size),
+    >>> cp.allclose(cp.sum(input[1, ...]) / cp.sqrt(input[1, ...].size),
     ...               output[1, 0, 0])
     True
     >>> output.shape
@@ -228,9 +233,10 @@ def uifft2(inarray):
 
     Examples
     --------
-    >>> input = cupy.ones((10, 128, 128))
+    >>> import cupy as cp
+    >>> input = cp.ones((10, 128, 128))
     >>> output = uifft2(input)
-    >>> cupy.allclose(cupy.sum(input[1, ...]) / cupy.sqrt(input[1, ...].size),
+    >>> cp.allclose(cp.sum(input[1, ...]) / cp.sqrt(input[1, ...].size),
     ...               output[0, 0, 0])
     True
     >>> output.shape
@@ -262,9 +268,10 @@ def urfft2(inarray):
 
     Examples
     --------
-    >>> input = cupy.ones((10, 128, 128))
+    >>> import cupy as cp
+    >>> input = cp.ones((10, 128, 128))
     >>> output = urfft2(input)
-    >>> cupy.allclose(cupy.sum(input[1,...]) / cupy.sqrt(input[1,...].size),
+    >>> cp.allclose(cp.sum(input[1,...]) / cp.sqrt(input[1,...].size),
     ...               output[1, 0, 0])
     True
     >>> output.shape
@@ -300,9 +307,10 @@ def uirfft2(inarray, shape=None):
 
     Examples
     --------
-    >>> input = cupy.ones((10, 128, 128))
+    >>> import cupy as cp
+    >>> input = cp.ones((10, 128, 128))
     >>> output = uirfftn(urfftn(input), shape=input.shape)
-    >>> cupy.allclose(input, output)
+    >>> cp.allclose(input, output)
     True
     >>> output.shape
     (10, 128, 128)
@@ -329,21 +337,22 @@ def image_quad_norm(inarray):
 
     Examples
     --------
-    >>> input = cupy.ones((5, 5))
-    >>> image_quad_norm(ufft2(input)) == cupy.sum(cupy.abs(input)**2)
+    >>> import cupy as cp
+    >>> input = cp.ones((5, 5))
+    >>> image_quad_norm(ufft2(input)) == cp.sum(cp.abs(input)**2)
     True
     >>> image_quad_norm(ufft2(input)) == image_quad_norm(urfft2(input))
     True
     """
     # If there is a Hermitian symmetry
-    abs_sq = cupy.abs(inarray)
+    abs_sq = cp.abs(inarray)
     abs_sq *= abs_sq
     if inarray.shape[-1] != inarray.shape[-2]:
-        return 2 * cupy.sum(cupy.sum(abs_sq, axis=-1), axis=-1) - cupy.sum(
-            cupy.abs(inarray[..., 0]) ** 2, axis=-1
+        return 2 * cp.sum(cp.sum(abs_sq, axis=-1), axis=-1) - cp.sum(
+            cp.abs(inarray[..., 0]) ** 2, axis=-1
         )
     else:
-        return cupy.sum(cupy.sum(abs_sq, axis=-1), axis=-1)
+        return cp.sum(cp.sum(abs_sq, axis=-1), axis=-1)
 
 
 def ir2tf(imp_resp, shape, dim=None, is_real=True):
@@ -379,11 +388,12 @@ def ir2tf(imp_resp, shape, dim=None, is_real=True):
 
     Examples
     --------
-    >>> cupy.all(cupy.array([[4, 0], [0, 0]]) == ir2tf(cupy.ones((2, 2)), (2, 2)))
+    >>> import cupy as cp
+    >>> cp.all(cp.array([[4, 0], [0, 0]]) == ir2tf(cp.ones((2, 2)), (2, 2)))
     True
-    >>> ir2tf(cupy.ones((2, 2)), (512, 512)).shape == (512, 257)
+    >>> ir2tf(cp.ones((2, 2)), (512, 512)).shape == (512, 257)
     True
-    >>> ir2tf(cupy.ones((2, 2)), (512, 512), is_real=False).shape == (512, 512)
+    >>> ir2tf(cp.ones((2, 2)), (512, 512), is_real=False).shape == (512, 512)
     True
 
     Notes
@@ -396,13 +406,13 @@ def ir2tf(imp_resp, shape, dim=None, is_real=True):
     if not dim:
         dim = imp_resp.ndim
     # Zero padding and fill
-    irpadded = cupy.zeros(shape)
+    irpadded = cp.zeros(shape)
     irpadded[tuple([slice(0, s) for s in imp_resp.shape])] = imp_resp
     # Roll for zero convention of the fft to avoid the phase
     # problem. Work with odd and even size.
     for axis, axis_size in enumerate(imp_resp.shape):
         if axis >= imp_resp.ndim - dim:
-            irpadded = cupy.roll(
+            irpadded = cp.roll(
                 irpadded, shift=-math.floor(axis_size / 2), axis=axis
             )
     if is_real:
@@ -436,20 +446,21 @@ def laplacian(ndim, shape, is_real=True):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> tf, ir = laplacian(2, (32, 32))
-    >>> cupy.all(ir == cupy.array([[0, -1, 0], [-1, 4, -1], [0, -1, 0]]))
+    >>> cp.all(ir == cp.array([[0, -1, 0], [-1, 4, -1], [0, -1, 0]]))
     True
-    >>> cupy.all(tf == ir2tf(ir, (32, 32)))
+    >>> cp.all(tf == ir2tf(ir, (32, 32)))
     True
     """
-    impr = cupy.zeros([3] * ndim)
+    impr = cp.zeros([3] * ndim)
     for dim in range(ndim):
         idx = tuple(
             [slice(1, 2)] * dim
             + [slice(None)]
             + [slice(1, 2)] * (ndim - dim - 1)
         )
-        impr[idx] = cupy.array([-1.0, 0.0, -1.0]).reshape(
+        impr[idx] = cp.array([-1.0, 0.0, -1.0]).reshape(
             [-1 if i == dim else 1 for i in range(ndim)]
         )
     impr[(slice(1, 2),) * ndim] = 2.0 * ndim

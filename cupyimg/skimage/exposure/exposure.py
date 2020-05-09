@@ -1,9 +1,9 @@
-import cupy
+import cupy as cp
 import numpy as np
 
 from cupyimg import numpy as cnp
 
-from ..color import rgb2gray
+from ..color import rgb2gray, rgba2rgb
 from ..util.dtype import dtype_range, dtype_limits
 from .._shared.utils import warn
 
@@ -85,8 +85,8 @@ def _bincount_histogram(image, source_range):
     elif source_range == "dtype":
         image_min, image_max = dtype_limits(image, clip_negative=False)
     image, offset = _offset_array(image, image_min, image_max)
-    hist = cupy.bincount(image.ravel(), minlength=image_max - image_min + 1)
-    bin_centers = cupy.arange(image_min, image_max + 1)
+    hist = cp.bincount(image.ravel(), minlength=image_max - image_min + 1)
+    bin_centers = cp.arange(image_min, image_max + 1)
     if source_range == "image":
         idx = max(image_min, 0)
         hist = hist[idx:]
@@ -131,9 +131,10 @@ def histogram(image, nbins=256, source_range="image", normalize=False):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data, exposure, img_as_float
     >>> image = img_as_float(data.camera())
-    >>> cupy.histogram(image, bins=2)
+    >>> cp.histogram(image, bins=2)
     (array([107432, 154712]), array([0. , 0.5, 1. ]))
     >>> exposure.histogram(image, nbins=2)
     (array([107432, 154712]), array([0.25, 0.75]))
@@ -153,17 +154,15 @@ def histogram(image, nbins=256, source_range="image", normalize=False):
     else:
         if source_range == "image":
             hist_range = None
-            hist, bin_edges = cnp.histogram(image, bins=nbins)
         elif source_range == "dtype":
             hist_range = dtype_limits(image, clip_negative=False)
-            hist, bin_edges = cnp.histogram(image, bins=nbins, range=hist_range)
         else:
             ValueError("Wrong value for the `source_range` argument")
-
+        hist, bin_edges = cnp.histogram(image, bins=nbins, range=hist_range)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
 
     if normalize:
-        hist = hist / cupy.sum(hist)
+        hist = hist / cp.sum(hist)
     return hist, bin_centers
 
 
@@ -194,11 +193,12 @@ def cumulative_distribution(image, nbins=256):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data, exposure, img_as_float
     >>> image = img_as_float(data.camera())
     >>> hi = exposure.histogram(image)
     >>> cdf = exposure.cumulative_distribution(image)
-    >>> cupy.alltrue(cdf[0] == cupy.cumsum(hi[0])/float(image.size))
+    >>> cp.alltrue(cdf[0] == cp.cumsum(hi[0])/float(image.size))
     True
     """
     hist, bin_centers = histogram(image, nbins)
@@ -238,15 +238,15 @@ def equalize_hist(image, nbins=256, mask=None):
 
     """
     if mask is not None:
-        mask = cupy.array(mask, dtype=bool)
+        mask = cp.array(mask, dtype=bool)
         cdf, bin_centers = cumulative_distribution(image[mask], nbins)
     else:
         cdf, bin_centers = cumulative_distribution(image, nbins)
     if False:
-        out = cupy.interp(image.flat, bin_centers, cdf)
+        out = cp.interp(image.flat, bin_centers, cdf)
     else:
-        # TODO: grlee77: no cupy.interp, so have to transfer
-        out = cupy.asarray(
+        # TODO: grlee77: no cp.interp, so have to transfer
+        out = cp.asarray(
             np.interp(image.get().flat, bin_centers.get(), cdf.get())
         )
     return out.reshape(image.shape)
@@ -386,7 +386,7 @@ def rescale_intensity(image, in_range="image", out_range="dtype"):
     the limits allowed by the image's dtype, since `in_range` defaults to
     'image' and `out_range` defaults to 'dtype':
 
-    >>> image = cupy.asarray([51, 102, 153], dtype=np.uint8)
+    >>> image = cp.asarray([51, 102, 153], dtype=np.uint8)
     >>> rescale_intensity(image)
     array([  0, 127, 255], dtype=uint8)
 
@@ -416,7 +416,7 @@ def rescale_intensity(image, in_range="image", out_range="dtype"):
     just the positive range, use the `out_range` parameter. In that case, the
     output dtype will be float:
 
-    >>> image = cupy.asarray([-10, 0, 10], dtype=np.int8)
+    >>> image = cp.asarray([-10, 0, 10], dtype=np.int8)
     >>> rescale_intensity(image, out_range=(0, 127))
     array([  0. ,  63.5, 127. ])
 
@@ -427,7 +427,7 @@ def rescale_intensity(image, in_range="image", out_range="dtype"):
 
     If the input image is constant, the output will be clipped directly to the
     output range:
-    >>> image = cupy.asarray([130, 130, 130], dtype=np.int32)
+    >>> image = cp.asarray([130, 130, 130], dtype=np.int32)
     >>> rescale_intensity(image, out_range=(0, 127)).astype(np.int32)
     array([127, 127, 127], dtype=int32)
     """
@@ -449,18 +449,18 @@ def rescale_intensity(image, in_range="image", out_range="dtype"):
             stacklevel=2,
         )
 
-    image = cupy.clip(image, imin, imax)
+    image = cp.clip(image, imin, imax)
 
     if imin != imax:
         image = (image - imin) / (imax - imin)
-        return cupy.asarray(image * (omax - omin) + omin, dtype=out_dtype)
+        return cp.asarray(image * (omax - omin) + omin, dtype=out_dtype)
     else:
-        return cupy.clip(image, omin, omax).astype(out_dtype, copy=False)
+        return cp.clip(image, omin, omax).astype(out_dtype, copy=False)
 
 
 def _assert_non_negative(image):
 
-    if cupy.any(image < 0):
+    if cp.any(image < 0):
         raise ValueError(
             "Image Correction methods work correctly only on "
             "images with non-negative values. Use "
@@ -565,7 +565,7 @@ def adjust_log(image, gain=1, inv=False):
         out = (2 ** (image / scale) - 1) * scale * gain
         return out.astype(dtype=dtype, copy=False)
 
-    out = cupy.log2(1 + image / scale) * scale * gain
+    out = cp.log2(1 + image / scale) * scale * gain
     return out.astype(dtype, copy=False)
 
 
@@ -611,10 +611,10 @@ def adjust_sigmoid(image, cutoff=0.5, gain=10, inv=False):
     scale = float(dtype_limits(image, True)[1] - dtype_limits(image, True)[0])
 
     if inv:
-        out = (1 - 1 / (1 + cupy.exp(gain * (cutoff - image / scale)))) * scale
+        out = (1 - 1 / (1 + cp.exp(gain * (cutoff - image / scale)))) * scale
         return out.astype(dtype, copy=False)
 
-    out = (1 / (1 + cupy.exp(gain * (cutoff - image / scale)))) * scale
+    out = (1 / (1 + cp.exp(gain * (cutoff - image / scale)))) * scale
     return out.astype(dtype, copy=False)
 
 
@@ -654,7 +654,8 @@ def is_low_contrast(
 
     Examples
     --------
-    >>> image = cupy.linspace(0, 0.04, 100)
+    >>> import cupy as cp
+    >>> image = cp.linspace(0, 0.04, 100)
     >>> is_low_contrast(image)
     True
     >>> image[-1] = 1
@@ -663,12 +664,15 @@ def is_low_contrast(
     >>> is_low_contrast(image, upper_percentile=100)
     False
     """
-    image = cupy.asanyarray(image)
-    if image.ndim == 3 and image.shape[2] in [3, 4]:
-        image = rgb2gray(image)
+    image = cp.asarray(image)
+    if image.ndim == 3:
+        if image.shape[2] == 4:
+            image = rgba2rgb(image)
+        if image.shape[2] == 3:
+            image = rgb2gray(image)
 
     dlimits = dtype_limits(image, clip_negative=False)
-    limits = cupy.percentile(image, [lower_percentile, upper_percentile])
+    limits = cp.percentile(image, [lower_percentile, upper_percentile])
     ratio = (limits[1] - limits[0]) / (dlimits[1] - dlimits[0])
 
     return ratio < fraction_threshold

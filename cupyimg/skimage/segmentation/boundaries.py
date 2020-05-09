@@ -55,14 +55,14 @@ def find_boundaries(label_img, connectivity=1, mode="thick", background=0):
     label_img : array of int or bool
         An array in which different regions are labeled with either different
         integers or boolean values.
-    connectivity: int in {1, ..., `label_img.ndim`}, optional
+    connectivity : int in {1, ..., `label_img.ndim`}, optional
         A pixel is considered a boundary pixel if any of its neighbors
         has a different label. `connectivity` controls which pixels are
         considered neighbors. A connectivity of 1 (default) means
         pixels sharing an edge (in 2D) or a face (in 3D) will be
         considered neighbors. A connectivity of `label_img.ndim` means
         pixels sharing a corner will be considered neighbors.
-    mode: string in {'thick', 'inner', 'outer', 'subpixel'}
+    mode : string in {'thick', 'inner', 'outer', 'subpixel'}
         How to mark the boundaries:
 
         - thick: any pixel not completely surrounded by pixels of the
@@ -75,7 +75,7 @@ def find_boundaries(label_img, connectivity=1, mode="thick", background=0):
           marked.
         - subpixel: return a doubled image, with pixels *between* the
           original pixels marked as boundary where appropriate.
-    background: int, optional
+    background : int, optional
         For modes 'inner' and 'outer', a definition of a background
         label is required. See `mode` for descriptions of these two.
 
@@ -190,6 +190,8 @@ def mark_boundaries(
     outline_color=None,
     mode="outer",
     background_label=0,
+    *,
+    order=3,
 ):
     """Return image with boundaries between labeled regions highlighted.
 
@@ -209,6 +211,12 @@ def mark_boundaries(
     background_label : int, optional
         Which label to consider background (this is only useful for
         modes ``inner`` and ``outer``).
+
+    Additional Parameters
+    ---------------------
+    order : int
+       The spline interpolation order to use when ``mode="subpixel"``.
+       Unused by other modes.
 
     Returns
     -------
@@ -234,8 +242,8 @@ def mark_boundaries(
         marked = ndi.zoom(
             marked,
             [2 - 1 / s for s in marked.shape[:-1]] + [1],
-            mode="mirror",
-            order=1,
+            mode="reflect",
+            order=order,
         )
     boundaries = find_boundaries(
         label_img, mode=mode, background=background_label

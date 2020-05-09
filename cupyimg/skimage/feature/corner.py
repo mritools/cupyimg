@@ -1,6 +1,6 @@
 from itertools import combinations_with_replacement
 
-import cupy
+import cupy as cp
 import numpy as np
 
 import cupyimg.numpy as cnp
@@ -48,8 +48,9 @@ def hessian_matrix(image, sigma=1, mode="constant", cval=0, order="rc"):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from cupyimg.skimage.feature import hessian_matrix
-    >>> square = cupy.zeros((5, 5))
+    >>> square = cp.zeros((5, 5))
     >>> square[2, 2] = 4
     >>> Hrr, Hrc, Hcc = hessian_matrix(square, sigma=0.1, order='rc')
     >>> Hrc
@@ -96,7 +97,7 @@ def _hessian_matrix_image(H_elems):
         containing the Hessian matrix corresponding to each coordinate.
     """
     image = H_elems[0]
-    hessian_image = cupy.zeros(image.shape + (image.ndim, image.ndim))
+    hessian_image = cp.zeros(image.shape + (image.ndim, image.ndim))
     for idx, (row, col) in enumerate(
         combinations_with_replacement(range(image.ndim), 2)
     ):
@@ -106,8 +107,8 @@ def _hessian_matrix_image(H_elems):
 
 
 def _image_orthogonal_matrix22_eigvals(M00, M01, M11):
-    l1 = (M00 + M11) / 2 + cupy.sqrt(4 * M01 ** 2 + (M00 - M11) ** 2) / 2
-    l2 = (M00 + M11) / 2 - cupy.sqrt(4 * M01 ** 2 + (M00 - M11) ** 2) / 2
+    l1 = (M00 + M11) / 2 + cp.sqrt(4 * M01 ** 2 + (M00 - M11) ** 2) / 2
+    l2 = (M00 + M11) / 2 - cp.sqrt(4 * M01 ** 2 + (M00 - M11) ** 2) / 2
     return l1, l2
 
 
@@ -129,8 +130,9 @@ def hessian_matrix_eigvals(H_elems):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from cupyimg.skimage.feature import hessian_matrix, hessian_matrix_eigvals
-    >>> square = cupy.zeros((5, 5))
+    >>> square = cp.zeros((5, 5))
     >>> square[2, 2] = 4
     >>> H_elems = hessian_matrix(square, sigma=0.1, order='rc')
     >>> hessian_matrix_eigvals(H_elems)[0]
@@ -141,14 +143,14 @@ def hessian_matrix_eigvals(H_elems):
            [ 0.,  0.,  2.,  0.,  0.]])
     """
     if len(H_elems) == 3:  # Use fast Cython code for 2D
-        eigvals = cupy.stack(_image_orthogonal_matrix22_eigvals(*H_elems))
+        eigvals = cp.stack(_image_orthogonal_matrix22_eigvals(*H_elems), axis=0)
     else:
         # TODO: grlee77: avoid host/device transfer.
-        #                (currently cupy.linalg.eigvalsh doesn't handle nd data)
+        #                (currently cp.linalg.eigvalsh doesn't handle nd data)
         matrices = _hessian_matrix_image(H_elems).get()
         # eigvalsh returns eigenvalues in increasing order. We want decreasing
         eigvals = np.linalg.eigvalsh(matrices)[..., ::-1]
         leading_axes = tuple(range(eigvals.ndim - 1))
         eigvals = np.transpose(eigvals, (eigvals.ndim - 1,) + leading_axes)
-        eigvals = cupy.asarray(eigvals)
+        eigvals = cp.asarray(eigvals)
     return eigvals

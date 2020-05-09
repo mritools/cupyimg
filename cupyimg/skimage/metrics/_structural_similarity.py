@@ -1,11 +1,10 @@
-import cupy
+import cupy as cp
 
 from cupyimg.scipy.ndimage import uniform_filter, gaussian_filter
 
 from ..util.dtype import dtype_range
 from ..util.arraycrop import crop
 from .._shared.utils import warn, check_shape_equality
-from cupyimg import convolve_separable
 
 
 __all__ = ["structural_similarity"]
@@ -21,7 +20,7 @@ def structural_similarity(
     multichannel=False,
     gaussian_weights=False,
     full=False,
-    data_dtype=cupy.float64,
+    data_dtype=cp.float64,
     **kwargs,
 ):
     """
@@ -49,11 +48,11 @@ def structural_similarity(
         normalized Gaussian kernel of width sigma=1.5.
     full : bool, optional
         If True, also return the full structural similarity image.
-    data_dtype : {cupy.float64, cupy.float32}
-        The precision to use during SSIM computations.
 
     Other Parameters
     ----------------
+    data_dtype : {cupy.float64, cupy.float32}
+        The precision to use during SSIM computations.
     use_sample_covariance : bool
         If True, normalize covariances by N-1 rather than, N where N is the
         number of pixels within the sliding window.
@@ -113,11 +112,11 @@ def structural_similarity(
         )
         args.update(kwargs)
         nch = im1.shape[-1]
-        mssim = cupy.empty(nch)
+        mssim = cp.empty(nch)
         if gradient:
-            G = cupy.empty(im1.shape)
+            G = cp.empty(im1.shape)
         if full:
-            S = cupy.empty(im1.shape)
+            S = cp.empty(im1.shape)
         for ch in range(nch):
             ch_result = structural_similarity(
                 im1[..., ch], im2[..., ch], **args
@@ -185,7 +184,6 @@ def structural_similarity(
 
     ndim = im1.ndim
 
-    filter_func = convolve_separable
     filter_args = dict(mode="reflect")
     if gaussian_weights:
         filter_func = gaussian_filter

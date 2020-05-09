@@ -1,7 +1,7 @@
 import math
 from warnings import warn
 
-import cupy
+import cupy as cp
 
 
 __all__ = [
@@ -25,26 +25,26 @@ __all__ = [
 # (some of them are platform specific). For the details, see:
 # http://www.unix.org/whitepapers/64bit.html
 _integer_types = (
-    cupy.byte,
-    cupy.ubyte,  # 8 bits
-    cupy.short,
-    cupy.ushort,  # 16 bits
-    cupy.intc,
-    cupy.uintc,  # 16 or 32 or 64 bits
-    cupy.int_,
-    cupy.uint,  # 32 or 64 bits
-    cupy.longlong,
-    cupy.ulonglong,
+    cp.byte,
+    cp.ubyte,  # 8 bits
+    cp.short,
+    cp.ushort,  # 16 bits
+    cp.intc,
+    cp.uintc,  # 16 or 32 or 64 bits
+    cp.int_,
+    cp.uint,  # 32 or 64 bits
+    cp.longlong,
+    cp.ulonglong,
 )  # 64 bits
 _integer_ranges = {
-    t: (cupy.iinfo(t).min, cupy.iinfo(t).max) for t in _integer_types
+    t: (cp.iinfo(t).min, cp.iinfo(t).max) for t in _integer_types
 }
 dtype_range = {
-    cupy.bool_: (False, True),
-    cupy.bool8: (False, True),
-    cupy.float16: (-1, 1),
-    cupy.float32: (-1, 1),
-    cupy.float64: (-1, 1),
+    cp.bool_: (False, True),
+    cp.bool8: (False, True),
+    cp.float16: (-1, 1),
+    cp.float32: (-1, 1),
+    cp.float64: (-1, 1),
 }
 dtype_range.update(_integer_ranges)
 
@@ -93,7 +93,7 @@ def _dtype_itemsize(itemsize, *dtypes):
         First of `dtypes` with itemsize greater than `itemsize`.
 
     """
-    return next(dt for dt in dtypes if cupy.dtype(dt).itemsize >= itemsize)
+    return next(dt for dt in dtypes if cp.dtype(dt).itemsize >= itemsize)
 
 
 def _dtype_bits(kind, bits, itemsize=1):
@@ -120,7 +120,7 @@ def _dtype_bits(kind, bits, itemsize=1):
         if bits < (i * 8) or (bits == (i * 8) and kind == "u")
     )
 
-    return cupy.dtype(kind + str(s))
+    return cp.dtype(kind + str(s))
 
 
 def _scale(a, n, m, copy=True):
@@ -164,8 +164,8 @@ def _scale(a, n, m, copy=True):
     elif n > m:
         # downscale with precision loss
         if copy:
-            b = cupy.empty(a.shape, _dtype_bits(kind, m))
-            cupy.floor_divide(
+            b = cp.empty(a.shape, _dtype_bits(kind, m))
+            cp.floor_divide(
                 a, 2 ** (n - m), out=b, dtype=a.dtype, casting="unsafe"
             )
             return b
@@ -175,8 +175,8 @@ def _scale(a, n, m, copy=True):
     elif m % n == 0:
         # exact upscale to a multiple of `n` bits
         if copy:
-            b = cupy.empty(a.shape, _dtype_bits(kind, m))
-            cupy.multiply(a, (2 ** m - 1) // (2 ** n - 1), out=b, dtype=b.dtype)
+            b = cp.empty(a.shape, _dtype_bits(kind, m))
+            cp.multiply(a, (2 ** m - 1) // (2 ** n - 1), out=b, dtype=b.dtype)
             return b
         else:
             a = a.astype(_dtype_bits(kind, m, a.dtype.itemsize), copy=False)
@@ -187,8 +187,8 @@ def _scale(a, n, m, copy=True):
         # then downscale with precision loss
         o = (m // n + 1) * n
         if copy:
-            b = cupy.empty(a.shape, _dtype_bits(kind, o))
-            cupy.multiply(a, (2 ** o - 1) // (2 ** n - 1), out=b, dtype=b.dtype)
+            b = cp.empty(a.shape, _dtype_bits(kind, o))
+            cp.multiply(a, (2 ** o - 1) // (2 ** n - 1), out=b, dtype=b.dtype)
             b //= 2 ** (o - m)
             return b
         else:
@@ -228,7 +228,7 @@ def _convert(image, dtype, force_copy=False, uniform=False):
         conversion errors.
 
     .. versionchanged :: 0.15
-        ``convert`` no longer warns about possible precision or sign
+        ``_convert`` no longer warns about possible precision or sign
         information loss. See discussions on these warnings at:
         https://github.com/scikit-image/scikit-image/issues/2602
         https://github.com/scikit-image/scikit-image/issues/543#issuecomment-208202228
@@ -246,9 +246,9 @@ def _convert(image, dtype, force_copy=False, uniform=False):
            pp 47-57. Morgan Kaufmann, 1998.
 
     """
-    image = cupy.asarray(image)
+    image = cp.asarray(image)
     dtypeobj_in = image.dtype
-    dtypeobj_out = cupy.dtype(dtype)
+    dtypeobj_out = cp.dtype(dtype)
     dtype_in = dtypeobj_in.type
     dtype_out = dtypeobj_out.type
     kind_in = dtypeobj_in.kind
@@ -262,10 +262,10 @@ def _convert(image, dtype, force_copy=False, uniform=False):
     #
     # - the output and input dtypes are the same or
     # - when the output is specified as a type, and the input dtype
-    #   is a subclass of that type (e.g. `cupy.floating` will allow
+    #   is a subclass of that type (e.g. `cp.floating` will allow
     #   `float32` and `float64` arrays through)
 
-    if cupy.issubdtype(dtype_in, cupy.obj2sctype(dtype)):
+    if cp.issubdtype(dtype_in, cp.obj2sctype(dtype)):
         if force_copy:
             image = image.copy()
         return image
@@ -276,11 +276,11 @@ def _convert(image, dtype, force_copy=False, uniform=False):
         )
 
     if kind_in in "ui":
-        imin_in = cupy.iinfo(dtype_in).min
-        imax_in = cupy.iinfo(dtype_in).max
+        imin_in = cp.iinfo(dtype_in).min
+        imax_in = cp.iinfo(dtype_in).max
     if kind_out in "ui":
-        imin_out = cupy.iinfo(dtype_out).min
-        imax_out = cupy.iinfo(dtype_out).max
+        imin_out = cp.iinfo(dtype_out).min
+        imax_out = cp.iinfo(dtype_out).max
 
     # any -> binary
     if kind_out == "b":
@@ -299,58 +299,54 @@ def _convert(image, dtype, force_copy=False, uniform=False):
             # float -> float
             return image.astype(dtype_out)
 
-        if cupy.min(image) < -1.0 or cupy.max(image) > 1.0:
+        if cp.min(image) < -1.0 or cp.max(image) > 1.0:
             raise ValueError("Images of type float must be between -1 and 1.")
         # floating point -> integer
         # use float type that can represent output integer type
         computation_type = _dtype_itemsize(
-            itemsize_out, dtype_in, cupy.float32, cupy.float64
+            itemsize_out, dtype_in, cp.float32, cp.float64
         )
 
         if not uniform:
             if kind_out == "u":
-                image_out = cupy.multiply(
-                    image, imax_out, dtype=computation_type
-                )
+                image_out = cp.multiply(image, imax_out, dtype=computation_type)
             else:
-                image_out = cupy.multiply(
+                image_out = cp.multiply(
                     image, (imax_out - imin_out) / 2, dtype=computation_type
                 )
                 image_out -= 1.0 / 2.0
-            cupy.rint(image_out, out=image_out)
-            cupy.clip(image_out, imin_out, imax_out, out=image_out)
+            cp.rint(image_out, out=image_out)
+            cp.clip(image_out, imin_out, imax_out, out=image_out)
         elif kind_out == "u":
-            image_out = cupy.multiply(
-                image, imax_out + 1, dtype=computation_type
-            )
-            cupy.clip(image_out, 0, imax_out, out=image_out)
+            image_out = cp.multiply(image, imax_out + 1, dtype=computation_type)
+            cp.clip(image_out, 0, imax_out, out=image_out)
         else:
-            image_out = cupy.multiply(
+            image_out = cp.multiply(
                 image, (imax_out - imin_out + 1.0) / 2.0, dtype=computation_type
             )
-            cupy.floor(image_out, out=image_out)
-            cupy.clip(image_out, imin_out, imax_out, out=image_out)
+            cp.floor(image_out, out=image_out)
+            cp.clip(image_out, imin_out, imax_out, out=image_out)
         return image_out.astype(dtype_out)
 
     # signed/unsigned int -> float
     if kind_out == "f":
         # use float type that can exactly represent input integers
         computation_type = _dtype_itemsize(
-            itemsize_in, dtype_out, cupy.float32, cupy.float64
+            itemsize_in, dtype_out, cp.float32, cp.float64
         )
 
         if kind_in == "u":
-            # using cupy.divide or cupy.multiply doesn't copy the data
+            # using cp.divide or cp.multiply doesn't copy the data
             # until the computation time
-            image = cupy.multiply(image, 1.0 / imax_in, dtype=computation_type)
+            image = cp.multiply(image, 1.0 / imax_in, dtype=computation_type)
             # DirectX uses this conversion also for signed ints
             # if imin_in:
-            #     cupy.maximum(image, -1.0, out=image)
+            #     cp.maximum(image, -1.0, out=image)
         else:
-            image = cupy.add(image, 0.5, dtype=computation_type)
+            image = cp.add(image, 0.5, dtype=computation_type)
             image *= 2 / (imax_in - imin_in)
 
-        return cupy.asarray(image, dtype_out)
+        return cp.asarray(image, dtype_out)
 
     # unsigned int -> signed/unsigned int
     if kind_in == "u":
@@ -365,8 +361,8 @@ def _convert(image, dtype, force_copy=False, uniform=False):
     # signed int -> unsigned int
     if kind_out == "u":
         image = _scale(image, 8 * itemsize_in - 1, 8 * itemsize_out)
-        result = cupy.empty(image.shape, dtype_out)
-        cupy.maximum(image, 0, out=result, dtype=image.dtype, casting="unsafe")
+        result = cp.empty(image.shape, dtype_out)
+        cp.maximum(image, 0, out=result, dtype=image.dtype, casting="unsafe")
         return result
 
     # signed int -> signed int
@@ -403,7 +399,7 @@ def img_as_float32(image, force_copy=False):
     and can be outside the ranges [0.0, 1.0] or [-1.0, 1.0].
 
     """
-    return _convert(image, cupy.float32, force_copy)
+    return _convert(image, cp.float32, force_copy)
 
 
 def img_as_float64(image, force_copy=False):
@@ -429,7 +425,7 @@ def img_as_float64(image, force_copy=False):
     and can be outside the ranges [0.0, 1.0] or [-1.0, 1.0].
 
     """
-    return _convert(image, cupy.float64, force_copy)
+    return _convert(image, cp.float64, force_copy)
 
 
 def img_as_float(image, force_copy=False):
@@ -458,7 +454,7 @@ def img_as_float(image, force_copy=False):
     and can be outside the ranges [0.0, 1.0] or [-1.0, 1.0].
 
     """
-    return _convert(image, cupy.floating, force_copy)
+    return _convert(image, cp.floating, force_copy)
 
 
 def img_as_uint(image, force_copy=False):
@@ -482,7 +478,7 @@ def img_as_uint(image, force_copy=False):
     Positive values are scaled between 0 and 65535.
 
     """
-    return _convert(image, cupy.uint16, force_copy)
+    return _convert(image, cp.uint16, force_copy)
 
 
 def img_as_int(image, force_copy=False):
@@ -507,7 +503,7 @@ def img_as_int(image, force_copy=False):
     the output image will still only have positive values.
 
     """
-    return _convert(image, cupy.int16, force_copy)
+    return _convert(image, cp.int16, force_copy)
 
 
 def img_as_ubyte(image, force_copy=False):
@@ -531,7 +527,7 @@ def img_as_ubyte(image, force_copy=False):
     Positive values are scaled between 0 and 255.
 
     """
-    return _convert(image, cupy.uint8, force_copy)
+    return _convert(image, cp.uint8, force_copy)
 
 
 def img_as_bool(image, force_copy=False):
@@ -555,4 +551,4 @@ def img_as_bool(image, force_copy=False):
     half is False. All negative values (if present) are False.
 
     """
-    return _convert(image, cupy.bool_, force_copy)
+    return _convert(image, cp.bool_, force_copy)

@@ -43,8 +43,8 @@ def approximate_polygon(coords, tolerance):
     while not end_of_chain:
         start, end = pos_stack.pop()
         # determine properties of current line segment
-        r0, c0 = coords[start, :].get()
-        r1, c1 = coords[end, :].get()
+        r0, c0 = cp.asnumpy(coords[start, :])
+        r1, c1 = cp.asnumpy(coords[end, :])
         dr = r1 - r0
         dc = c1 - c0
         segment_angle = -cp.arctan2(dr, dc)

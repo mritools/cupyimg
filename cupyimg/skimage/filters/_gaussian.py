@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-import cupy
+import cupy as cp
 import numpy as np
 from cupyimg.scipy import ndimage as ndi
 
@@ -80,7 +80,8 @@ def gaussian(
     Examples
     --------
 
-    >>> a = cupy.zeros((3, 3))
+    >>> import cupy as cp
+    >>> a = cp.zeros((3, 3))
     >>> a[1, 1] = 1
     >>> a
     array([[0., 0., 0.],
@@ -119,7 +120,7 @@ def gaussian(
         )
         warn(RuntimeWarning(msg))
         multichannel = True
-    # Note: slight refactor to avoid overhead of cupy.any(cupy.asarray(sigma))
+    # Note: slight refactor to avoid overhead of cp.any(cp.asarray(sigma))
     sigma_msg = "Sigma values less than zero are not valid"
     if not isinstance(sigma, Iterable):
         if sigma < 0:
@@ -135,7 +136,7 @@ def gaussian(
         sigma = tuple(sigma)
     image = convert_to_float(image, preserve_range)
     if output is None:
-        output = cupy.empty_like(image)
+        output = cp.empty_like(image)
     elif not np.issubdtype(output.dtype, np.floating):
         raise ValueError("Provided output data type is not float")
     ndi.gaussian_filter(

@@ -5,6 +5,7 @@ import cupy as cp
 import numpy as np
 from cupyimg.scipy import ndimage as ndi
 import cupyimg.numpy as cnp
+from .._shared.utils import _validate_interpolation_order
 
 
 def profile_line(
@@ -13,7 +14,7 @@ def profile_line(
     dst,
     linewidth=1,
     order=None,
-    mode="constant",
+    mode=None,
     cval=0.0,
     *,
     reduce_func=cp.mean,
@@ -22,15 +23,16 @@ def profile_line(
 
     Parameters
     ----------
-    image : numeric array, shape (M, N[, C])
+    image : ndarray, shape (M, N[, C])
         The image, either grayscale (2D array) or multichannel
         (3D array, where the final axis contains the channel
         information).
-    src : 2-tuple of numeric scalar (float or int)
-        The start point of the scan line.
-    dst : 2-tuple of numeric scalar (float or int)
-        The end point of the scan line. The destination point is *included*
-        in the profile, in contrast to standard numpy indexing.
+    src : array_like, shape (2, )
+        The coordinates of the start point of the scan line.
+    dst : array_like, shape (2, )
+        The coordinates of the end point of the scan
+        line. The destination point is *included* in the profile, in
+        contrast to standard numpy indexing.
     linewidth : int, optional
         Width of the scan, perpendicular to the line
     order : int in {0, 1, 2, 3, 4, 5}, optional
@@ -41,6 +43,10 @@ def profile_line(
         How to compute any values falling outside of the image.
     cval : float, optional
         If `mode` is 'constant', what constant value to use outside the image.
+    reduce_func : callable, optional
+        Function used to calculate the aggregation of pixel values
+        perpendicular to the profile_line direction when `linewidth` > 1.
+        If set to None the unreduced array will be returned.
 
     Returns
     -------
@@ -50,6 +56,7 @@ def profile_line(
 
     Examples
     --------
+    >>> import cupy as cp
     >>> x = cp.asarray([[1, 1, 1, 2, 2, 2]])
     >>> img = cp.vstack([cp.zeros_like(x), x, x, x, cp.zeros_like(x)])
     >>> img
@@ -59,31 +66,55 @@ def profile_line(
            [1, 1, 1, 2, 2, 2],
            [0, 0, 0, 0, 0, 0]])
     >>> profile_line(img, (2, 1), (2, 4))
-    array([ 1.,  1.,  2.,  2.])
+    array([1., 1., 2., 2.])
     >>> profile_line(img, (1, 0), (1, 6), cval=4)
-    array([ 1.,  1.,  1.,  2.,  2.,  2.,  4.])
+    array([1., 1., 1., 2., 2., 2., 4.])
 
     The destination point is included in the profile, in contrast to
     standard numpy indexing.
     For example:
 
     >>> profile_line(img, (1, 0), (1, 6))  # The final point is out of bounds
-    array([ 1.,  1.,  1.,  2.,  2.,  2.,  0.])
+    array([1., 1., 1., 2., 2., 2., 0.])
     >>> profile_line(img, (1, 0), (1, 5))  # This accesses the full first row
-    array([ 1.,  1.,  1.,  2.,  2.,  2.])
-    """
-    if order is None:
-        order = 0 if image.dtype == bool else 1
+    array([1., 1., 1., 2., 2., 2.])
 
-    if image.dtype == bool and order != 0:
+    For different reduce_func inputs:
+
+    >>> profile_line(img, (1, 0), (1, 3), linewidth=3, reduce_func=cp.mean)
+    array([0.66666667, 0.66666667, 0.66666667, 1.33333333])
+    >>> profile_line(img, (1, 0), (1, 3), linewidth=3, reduce_func=cp.max)
+    array([1, 1, 1, 2])
+    >>> profile_line(img, (1, 0), (1, 3), linewidth=3, reduce_func=cp.sum)
+    array([2, 2, 2, 4])
+
+    The unreduced array will be returned when `reduce_func` is None or when
+    `reduce_func` acts on each pixel value individually.
+
+    >>> profile_line(img, (1, 2), (4, 2), linewidth=3, order=0,
+    ...     reduce_func=None)
+    array([[1, 1, 2],
+           [1, 1, 2],
+           [1, 1, 2],
+           [0, 0, 0]])
+    >>> profile_line(img, (1, 0), (1, 3), linewidth=3, reduce_func=cp.sqrt)
+    array([[1.        , 1.        , 0.        ],
+           [1.        , 1.        , 0.        ],
+           [1.        , 1.        , 0.        ],
+           [1.41421356, 1.41421356, 0.        ]])
+    """
+
+    order = _validate_interpolation_order(image.dtype, order)
+
+    if mode is None:
         warn(
-            "Input image dtype is bool. Interpolation is not defined "
-            "with bool data type. Please set order to 0 or explicitely "
-            "cast input image to another data type. Starting from version "
-            "0.19 a ValueError will be raised instead of this warning.",
+            "Default out of bounds interpolation mode 'constant' is "
+            "deprecated. In version 0.19 it will be set to 'reflect'. "
+            "To avoid this warning, set `mode=` explicitly.",
             FutureWarning,
             stacklevel=2,
         )
+        mode = "constant"
 
     perp_lines = _line_profile_coordinates(src, dst, linewidth=linewidth)
     if image.ndim == 3:

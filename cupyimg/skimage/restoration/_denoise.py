@@ -1,4 +1,4 @@
-import cupy
+import cupy as cp
 
 from .. import img_as_float
 
@@ -34,9 +34,9 @@ def _denoise_tv_chambolle_nd(image, weight=0.1, eps=2.0e-4, n_iter_max=200):
     """
 
     ndim = image.ndim
-    p = cupy.zeros((image.ndim,) + image.shape, dtype=image.dtype)
-    g = cupy.zeros_like(p)
-    d = cupy.zeros_like(image)
+    p = cp.zeros((image.ndim,) + image.shape, dtype=image.dtype)
+    g = cp.zeros_like(p)
+    d = cp.zeros_like(image)
     i = 0
     slices_g = [slice(None)] * (ndim + 1)
     slices_d = [slice(None)] * ndim
@@ -63,11 +63,11 @@ def _denoise_tv_chambolle_nd(image, weight=0.1, eps=2.0e-4, n_iter_max=200):
         for ax in range(ndim):
             slices_g[ax + 1] = slice(0, -1)
             slices_g[0] = ax
-            g[tuple(slices_g)] = cupy.diff(out, axis=ax)
+            g[tuple(slices_g)] = cp.diff(out, axis=ax)
             slices_g[ax + 1] = slice(None)
 
         norm = (g * g).sum(axis=0, keepdims=True)
-        cupy.sqrt(norm, out=norm)
+        cp.sqrt(norm, out=norm)
         E += weight * norm.sum()
         tau = 1.0 / (2.0 * ndim)
         norm *= tau / weight
@@ -165,7 +165,7 @@ def denoise_tv_chambolle(
         image = img_as_float(image)
 
     if multichannel:
-        out = cupy.zeros_like(image)
+        out = cp.zeros_like(image)
         for c in range(image.shape[-1]):
             out[..., c] = _denoise_tv_chambolle_nd(
                 image[..., c], weight, eps, n_iter_max

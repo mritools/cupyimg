@@ -632,6 +632,7 @@ def test_niblack_sauvola_pathological_image():
     assert not cp.any(cp.isnan(threshold_niblack(src_img)))
 
 
+# TODO: implement multiotsu
 # def test_bimodal_multiotsu_hist():
 #     for name in ['camera', 'moon', 'coins', 'text', 'clock', 'page']:
 #         img = getattr(data, name)()

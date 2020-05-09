@@ -1,4 +1,4 @@
-from .colorconv import (
+from .colorconv import (  # noqa
     convert_colorspace,
     guess_spatial_dimensions,
     rgba2rgb,
@@ -61,12 +61,12 @@ from .colorconv import (
     hpx_from_rgb,
 )
 
-from .colorlabel import color_dict, label2rgb  # TODO: fix
+from .colorlabel import color_dict, label2rgb
 
 from .delta_e import (
     deltaE_cie76,
     deltaE_ciede94,
-    deltaE_ciede2000,  # TODO: fix
+    deltaE_ciede2000,
     deltaE_cmc,
 )
 
@@ -134,8 +134,4 @@ __all__ = [
     "deltaE_ciede94",
     "deltaE_ciede2000",  # TODO: fix
     "deltaE_cmc",
-    "xyz2luv",
-    "luv2xyz",
-    "luv2rgb",
-    "rgb2luv",
 ]

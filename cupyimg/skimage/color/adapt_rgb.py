@@ -1,6 +1,6 @@
 import functools
 
-import cupy
+import cupy as cp
 
 from .. import color
 from ..util.dtype import _convert
@@ -78,6 +78,6 @@ def each_channel(image_filter, image, *args, **kwargs):
         Input image.
     """
     c_new = [
-        image_filter(c, *args, **kwargs) for c in cupy.moveaxis(image, -1, 0)
+        image_filter(c, *args, **kwargs) for c in cp.moveaxis(image, -1, 0)
     ]
-    return cupy.stack(c_new, axis=-1)
+    return cp.stack(c_new, axis=-1)

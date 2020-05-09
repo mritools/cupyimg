@@ -3,7 +3,7 @@
 :license: modified BSD
 """
 
-import cupy
+import cupy as cp
 import numpy as np
 from .._shared.fft import fftmodule as fft
 from .._shared.utils import check_nD
@@ -12,8 +12,8 @@ eps = np.finfo(float).eps
 
 
 def _min_limit(x, val=eps):
-    mask = cupy.abs(x) < eps
-    x[mask] = cupy.sign(x[mask]) * eps
+    mask = cp.abs(x) < eps
+    x[mask] = cp.sign(x[mask]) * eps
 
 
 def _centre(x, oshape):
@@ -35,7 +35,7 @@ def _pad(data, shape):
     shape : (2,) tuple
 
     """
-    out = cupy.zeros(shape)
+    out = cp.zeros(shape)
     out[tuple(slice(0, n) for n in data.shape)] = data
     return out
 
@@ -72,7 +72,7 @@ class LPIFilter2D(object):
         normalization coefficients.
 
         >>> def filt_func(r, c, sigma = 1):
-        ...     return cupy.exp(-cupy.hypot(r, c)/sigma)
+        ...     return cp.exp(-cp.hypot(r, c)/sigma)
         >>> filter = LPIFilter2D(filt_func)
 
         """
@@ -92,7 +92,7 @@ class LPIFilter2D(object):
         oshape = np.array(data.shape) * 2 - 1
 
         if self._cache is None or np.any(self._cache.shape != oshape):
-            coords = cupy.mgrid[[slice(0, float(n)) for n in dshape]]
+            coords = cp.mgrid[[slice(0, float(n)) for n in dshape]]
             # this steps over two sets of coordinates,
             # not over the coordinates individually
             for k, coord in enumerate(coords):
@@ -125,7 +125,7 @@ class LPIFilter2D(object):
         check_nD(data, 2, "data")
         F, G = self._prepare(data)
         out = fft.ifftn(F * G)
-        out = cupy.abs(_centre(out, data.shape))
+        out = cp.abs(_centre(out, data.shape))
         return out
 
 
@@ -155,7 +155,7 @@ def forward(
     Gaussian filter:
 
     >>> def filt_func(r, c):
-    ...     return cupy.exp(-cupy.hypot(r, c)/1)
+    ...     return cp.exp(-cp.hypot(r, c)/1)
     >>>
     >>> from skimage import data
     >>> filtered = forward(data.coins(), filt_func)
@@ -206,10 +206,10 @@ def inverse(
     _min_limit(F)
 
     F = 1 / F
-    mask = cupy.abs(F) > max_gain
-    F[mask] = cupy.sign(F[mask]) * max_gain
+    mask = cp.abs(F) > max_gain
+    F[mask] = cp.sign(F[mask]) * max_gain
 
-    return _centre(cupy.abs(fft.ifftshift(fft.ifftn(G * F))), data.shape)
+    return _centre(cp.abs(fft.ifftshift(fft.ifftn(G * F))), data.shape)
 
 
 def wiener(
@@ -257,7 +257,9 @@ def wiener(
     H_mag_sqr *= H_mag_sqr
     F = 1 / F * H_mag_sqr / (H_mag_sqr + K)
 
-    return _centre(cupy.abs(fft.ifftshift(fft.ifftn(G * F))), data.shape)
+    tmp = fft.ifftn(G * F)
+    tmp = fft.ifftshift(tmp)
+    return _centre(cp.abs(tmp), data.shape)
 
 
 def constrained_least_squares(

@@ -1,7 +1,7 @@
 import numbers
 from warnings import warn
 
-import cupy
+import cupy as cp
 from cupy.lib.stride_tricks import as_strided
 
 
@@ -29,9 +29,9 @@ def view_as_blocks(arr_in, block_shape):
 
     Examples
     --------
-    >>> import cupy
+    >>> import cupy as cp
     >>> from skimage.util.shape import view_as_blocks
-    >>> A = cupy.arange(4*4).reshape(4,4)
+    >>> A = cp.arange(4*4).reshape(4,4)
     >>> A
     array([[ 0,  1,  2,  3],
            [ 4,  5,  6,  7],
@@ -47,7 +47,7 @@ def view_as_blocks(arr_in, block_shape):
     >>> B[1, 0, 1, 1]
     13
 
-    >>> A = cupy.arange(4*4*6).reshape(4,4,6)
+    >>> A = cp.arange(4*4*6).reshape(4,4,6)
     >>> A  # doctest: +NORMALIZE_WHITESPACE
     array([[[ 0,  1,  2,  3,  4,  5],
             [ 6,  7,  8,  9, 10, 11],
@@ -88,7 +88,7 @@ def view_as_blocks(arr_in, block_shape):
     if any(s % bs for s, bs in zip(arr_in.shape, block_shape)):
         raise ValueError("'block_shape' is not compatible with 'arr_in'")
 
-    # Note: This C-contiguous check and call to ascontiguousarray is not in
+    # TODO: This C-contiguous check and call to ascontiguousarray is not in
     #       skimage. Remove it?
     if not arr_in.flags.c_contiguous:  # c_contiguous:
         warn(
@@ -97,7 +97,7 @@ def view_as_blocks(arr_in, block_shape):
                 "input array without copying."
             )
         )
-    arr_in = cupy.ascontiguousarray(arr_in)
+    arr_in = cp.ascontiguousarray(arr_in)
 
     # -- restride the array to build the block view
     new_shape = tuple(
@@ -159,9 +159,9 @@ def view_as_windows(arr_in, window_shape, step=1):
 
     Examples
     --------
-    >>> import cupy
+    >>> import cupy as cp
     >>> from skimage.util.shape import view_as_windows
-    >>> A = cupy.arange(4*4).reshape(4,4)
+    >>> A = cp.arange(4*4).reshape(4,4)
     >>> A
     array([[ 0,  1,  2,  3],
            [ 4,  5,  6,  7],
@@ -176,7 +176,7 @@ def view_as_windows(arr_in, window_shape, step=1):
     array([[1, 2],
            [5, 6]])
 
-    >>> A = cupy.arange(10)
+    >>> A = cp.arange(10)
     >>> A
     array([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
     >>> window_shape = (3,)
@@ -193,7 +193,7 @@ def view_as_windows(arr_in, window_shape, step=1):
            [6, 7, 8],
            [7, 8, 9]])
 
-    >>> A = cupy.arange(5*4).reshape(5, 4)
+    >>> A = cp.arange(5*4).reshape(5, 4)
     >>> A
     array([[ 0,  1,  2,  3],
            [ 4,  5,  6,  7],
@@ -224,7 +224,7 @@ def view_as_windows(arr_in, window_shape, step=1):
     """
 
     # -- basic checks on arguments
-    if not isinstance(arr_in, cupy.ndarray):
+    if not isinstance(arr_in, cp.ndarray):
         raise TypeError("`arr_in` must be a cupy ndarray")
 
     ndim = arr_in.ndim

@@ -8,6 +8,13 @@ from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage import restoration
 from cupyimg.skimage.restoration import uft
 
+try:
+    from skimage._shared.testing import fetch
+
+    have_fetch = True
+except ImportError:
+    have_fetch = False
+
 
 def camera():
     import skimage
@@ -30,7 +37,10 @@ def test_wiener():
 
     deconvolved = restoration.wiener(data, psf, 0.05)
 
-    path = pjoin(dirname(abspath(__file__)), "camera_wiener.npy")
+    if have_fetch:
+        path = fetch("restoration/tests/camera_wiener.npy")
+    else:
+        path = pjoin(dirname(abspath(__file__)), "camera_wiener.npy")
     cp.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3)
 
     _, laplacian = uft.laplacian(2, data.shape)
@@ -42,8 +52,6 @@ def test_wiener():
 
 
 def test_unsupervised_wiener():
-    # grlee77: Note: skip comparisons based on a particular random seed
-
     psf = np.ones((5, 5)) / 25
     data = convolve2d(test_img.get(), psf, "same")
     cp.random.seed(0)
@@ -53,14 +61,17 @@ def test_unsupervised_wiener():
     data = cp.asarray(data)
     deconvolved, _ = restoration.unsupervised_wiener(data, psf)
 
-    # path = pjoin(dirname(abspath(__file__)), 'camera_unsup.npy')
+    # grlee77: Note: skip comparisons based on a particular random seed
+    # if have_fetch:
+    #     path = fetch("restoration/tests/camera_unsup.npy")
+    # else:
+    #     path = pjoin(dirname(abspath(__file__)), 'camera_unsup.npy')
     # cp.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3)
 
     _, laplacian = uft.laplacian(2, data.shape)
     otf = uft.ir2tf(psf, data.shape, is_real=False)
 
     cp.random.seed(0)
-    # deconvolved =
     restoration.unsupervised_wiener(
         data,
         otf,
@@ -68,10 +79,12 @@ def test_unsupervised_wiener():
         is_real=False,
         user_params={"callback": lambda x: None},
     )[0]
-    # path = pjoin(dirname(abspath(__file__)), 'camera_unsup2.npy')
-    # cp.testing.assert_allclose(cp.real(deconvolved),
-    # np.load(path),
-    # rtol=1e-3)
+    # grlee77: Note: skip comparisons based on a particular random seed
+    # if have_fetch:
+    #     path = fetch("restoration/tests/camera_unsup2.npy")
+    # else:
+    #     path = pjoin(dirname(abspath(__file__)), 'camera_unsup2.npy')
+    # cp.testing.assert_allclose(cp.real(deconvolved), np.load(path), rtol=1e-3)
 
 
 def test_image_shape():
@@ -107,5 +120,8 @@ def test_richardson_lucy():
     psf = cp.asarray(psf)
     deconvolved = restoration.richardson_lucy(data, psf, 5)
 
-    path = pjoin(dirname(abspath(__file__)), "camera_rl.npy")
+    if have_fetch:
+        path = fetch("restoration/tests/camera_rl.npy")
+    else:
+        path = pjoin(dirname(abspath(__file__)), "camera_rl.npy")
     cp.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3)

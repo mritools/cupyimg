@@ -218,13 +218,13 @@ def test_reduce_func_lambda_linewidth_3():
         (4, 2),
         linewidth=3,
         order=0,
-        reduce_func=lambda x: x + x ** 2,
+        reduce_func=reduce_func,
         mode="constant",
     )
     expected_prof = apply_along_axis(
         reduce_func, arr=pyth_image[1:5, 1:4], axis=1
     )
-    # The lambda function acts on each pixel value individually.
+
     assert_array_almost_equal(prof, expected_prof)
 
 
@@ -238,7 +238,7 @@ def test_reduce_func_sqrt_linewidth_3():
         (4, 2),
         linewidth=3,
         order=0,
-        reduce_func=lambda x: x ** 0.5,
+        reduce_func=reduce_func,
         mode="constant",
     )
     expected_prof = apply_along_axis(
@@ -257,7 +257,7 @@ def test_reduce_func_sumofsqrt_linewidth_3():
         (4, 2),
         linewidth=3,
         order=0,
-        reduce_func=lambda x: cp.sum(x ** 0.5),
+        reduce_func=reduce_func,
         mode="constant",
     )
     expected_prof = apply_along_axis(

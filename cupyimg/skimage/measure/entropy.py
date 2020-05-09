@@ -1,4 +1,4 @@
-import cupy
+import cupy as cp
 from cupyimg.scipy.stats import entropy as scipy_entropy
 
 
@@ -36,5 +36,5 @@ def shannon_entropy(image, base=2):
     7.047955232423087
     """
 
-    _, counts = cupy.unique(image, return_counts=True)
+    _, counts = cp.unique(image, return_counts=True)
     return scipy_entropy(counts, base=base)

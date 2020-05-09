@@ -1,9 +1,6 @@
 import math
 
 import cupy as cp
-from cupy import sqrt, pi, arctan2, cos, sin, exp
-from skimage import draw
-from skimage.color import gray2rgb
 
 from cupyimg.scipy.ndimage import gaussian_filter
 from .. import img_as_float
@@ -139,8 +136,9 @@ def daisy(
 
     # Compute gradient orientation and magnitude and their contribution
     # to the histograms.
-    grad_mag = sqrt(dx * dx + dy * dy)
-    grad_ori = arctan2(dy, dx)
+    grad_mag = cp.sqrt(dx * dx + dy * dy)
+    grad_ori = cp.arctan2(dy, dx)
+    pi = cp.pi
     orientation_kappa = orientations / pi
     orientation_angles = [
         2 * o * pi / orientations - pi for o in range(orientations)
@@ -148,7 +146,7 @@ def daisy(
     hist = cp.empty((orientations,) + image.shape, dtype=float)
     for i, o in enumerate(orientation_angles):
         # Weigh bin contribution by the circular normal distribution
-        hist[i, :, :] = exp(orientation_kappa * cos(grad_ori - o))
+        hist[i, :, :] = cp.exp(orientation_kappa * cp.cos(grad_ori - o))
         # Weigh bin contribution by the gradient magnitude
         hist[i, :, :] = cp.multiply(hist[i, :, :], grad_mag)
 
@@ -192,15 +190,18 @@ def daisy(
         if normalization == "l1":
             descs /= cp.sum(descs, axis=2)[:, :, cp.newaxis]
         elif normalization == "l2":
-            descs /= sqrt(cp.sum(descs * descs, axis=2))[:, :, cp.newaxis]
+            descs /= cp.sqrt(cp.sum(descs * descs, axis=2))[:, :, cp.newaxis]
         elif normalization == "daisy":
             for i in range(0, desc_dims, orientations):
                 dtmp = descs[:, :, i : i + orientations]
-                norms = sqrt(cp.sum(dtmp * dtmp, axis=2))
+                norms = cp.sqrt(cp.sum(dtmp * dtmp, axis=2))
                 descs[:, :, i : i + orientations] /= norms[:, :, cp.newaxis]
 
     if visualize:
-        image = image.get()
+        from skimage import draw
+        from skimage.color import gray2rgb
+
+        image = cp.asnumpy(image)
         descs_img = gray2rgb(image)
         for i in range(descs.shape[0]):
             for j in range(descs.shape[1]):
@@ -216,8 +217,8 @@ def daisy(
                 for o_num, o in enumerate(orientation_angles):
                     # Draw center histogram bins
                     bin_size = descs[i, j, o_num] / max_bin
-                    dy = sigmas[0] * bin_size * sin(o)
-                    dx = sigmas[0] * bin_size * cos(o)
+                    dy = sigmas[0] * bin_size * math.sin(o)
+                    dx = sigmas[0] * bin_size * math.cos(o)
                     rows, cols, val = draw.line_aa(
                         desc_y, desc_x, int(desc_y + dy), int(desc_x + dx)
                     )

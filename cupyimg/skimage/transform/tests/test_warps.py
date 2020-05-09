@@ -108,7 +108,6 @@ def test_warp_nd():
         assert_array_almost_equal(outx, refx)
 
 
-@pytest.mark.skip(reason="order 3 not supported by cupy yet")
 def test_warp_clip():
     x = cp.zeros((5, 5), dtype=np.double)
     x[2, 2] = 1
@@ -418,17 +417,13 @@ def test_resize_dtype():
 def test_swirl():
     image = img_as_float(cp.asarray(checkerboard()))
 
-    # swirl_params = {"radius": 80, "rotation": 0, "order": 2, "mode": "reflect"}
-    # TODO: grlee77: switched order to 1 as order=2 is unsupported on GPU
-    #                currently
-    swirl_params = {"radius": 80, "rotation": 0, "order": 1, "mode": "reflect"}
+    swirl_params = {"radius": 80, "rotation": 0, "order": 2, "mode": "reflect"}
 
     # with expected_warnings(["Bi-quadratic.*bug"]):
     swirled = swirl(image, strength=10, **swirl_params)
     unswirled = swirl(swirled, strength=-10, **swirl_params)
 
-    # assert cp.mean(cp.abs(image - unswirled)) < 0.01
-    assert cp.mean(cp.abs(image - unswirled)) < 0.02
+    assert cp.mean(cp.abs(image - unswirled)) < 0.01
 
     swirl_params.pop("mode")
 
@@ -436,8 +431,7 @@ def test_swirl():
     swirled = swirl(image, strength=10, **swirl_params)
     unswirled = swirl(swirled, strength=-10, **swirl_params)
 
-    # assert cp.mean(cp.abs(image[1:-1, 1:-1] - unswirled[1:-1, 1:-1])) < 0.01
-    assert cp.mean(cp.abs(image[1:-1, 1:-1] - unswirled[1:-1, 1:-1])) < 0.02
+    assert cp.mean(cp.abs(image[1:-1, 1:-1] - unswirled[1:-1, 1:-1])) < 0.01
 
 
 def test_const_cval_out_of_range():
@@ -453,7 +447,7 @@ def test_warp_identity():
     assert cp.allclose(img, warp(img, AffineTransform(rotation=0)))
     assert not cp.allclose(img, warp(img, AffineTransform(rotation=0.1)))
 
-    img = img.get()  # transfer back to CPU to form rgb_img
+    img = cp.asnumpy(img)
     rgb_img = cp.transpose(
         cp.asarray(np.array([img, np.zeros_like(img), img])), (1, 2, 0)
     )
@@ -509,16 +503,14 @@ def test_downsize_anti_aliasing():
         anti_aliasing=True,
         anti_aliasing_sigma=sigma,
     )
-    if False:
-        # Note: symmetric not currently allowed by CuPy's map_coordinates
-        resize(
-            x,
-            out_size,
-            order=1,
-            mode="symmetric",
-            anti_aliasing=True,
-            anti_aliasing_sigma=sigma,
-        )
+    resize(
+        x,
+        out_size,
+        order=1,
+        mode="symmetric",
+        anti_aliasing=True,
+        anti_aliasing_sigma=sigma,
+    )
     resize(
         x,
         out_size,
@@ -527,17 +519,14 @@ def test_downsize_anti_aliasing():
         anti_aliasing=True,
         anti_aliasing_sigma=sigma,
     )
-    if False:
-        # Note: wrap not currently allowed by CuPy's map_coordinates
-        resize(
-            x,
-            out_size,
-            order=1,
-            mode="wrap",
-            anti_aliasing=True,
-            anti_aliasing_sigma=sigma,
-        )
-
+    resize(
+        x,
+        out_size,
+        order=1,
+        mode="wrap",
+        anti_aliasing=True,
+        anti_aliasing_sigma=sigma,
+    )
     with pytest.raises(ValueError):  # Unknown mode, or cannot translate mode
         resize(
             x,

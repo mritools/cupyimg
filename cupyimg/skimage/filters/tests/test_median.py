@@ -58,6 +58,7 @@ def test_median_warning(
         assert isinstance(rec.message, warning_type)
 
 
+# TODO: update if rank.median implemented
 @pytest.mark.parametrize(
     "behavior, func, params",
     [("ndimage", ndimage.median_filter, {"size": (3, 3)})]
@@ -73,12 +74,14 @@ def test_median_preserve_dtype(image, dtype):
     assert median_image.dtype == dtype
 
 
+# TODO: update if rank.median implemented
 # def test_median_error_ndim():
 #     img = cp.random.randint(0, 10, size=(5, 5, 5), dtype=np.uint8)
 #     with pytest.raises(ValueError):
 #         median(img, behavior='rank')
 
 
+# TODO: update if rank.median implemented
 @pytest.mark.parametrize(
     "img, behavior",
     # (np.random.randint(0, 10, size=(3, 3), dtype=np.uint8), 'rank'),

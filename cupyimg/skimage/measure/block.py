@@ -1,8 +1,8 @@
-import cupy
+import cupy as cp
 from ..util import view_as_blocks
 
 
-def block_reduce(image, block_size, func=cupy.sum, cval=0, func_kwargs=None):
+def block_reduce(image, block_size, func=cp.sum, cval=0, func_kwargs=None):
     """Downsample image by applying function `func` to local blocks.
 
     This function is useful for max and mean pooling, for example.
@@ -23,7 +23,8 @@ def block_reduce(image, block_size, func=cupy.sum, cval=0, func_kwargs=None):
         block size.
     func_kwargs : dict
         Keyword arguments passed to `func`. Notably useful for passing dtype
-        argument to ``cupy.mean``.
+        argument to ``np.mean``. Takes dictionary of inputs, e.g.:
+        ``func_kwargs={'dtype': np.float16})``.
 
     Returns
     -------
@@ -32,8 +33,9 @@ def block_reduce(image, block_size, func=cupy.sum, cval=0, func_kwargs=None):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage.measure import block_reduce
-    >>> image = cupy.arange(3*3*4).reshape(3, 3, 4)
+    >>> image = cp.arange(3*3*4).reshape(3, 3, 4)
     >>> image # doctest: +NORMALIZE_WHITESPACE
     array([[[ 0,  1,  2,  3],
             [ 4,  5,  6,  7],
@@ -44,14 +46,14 @@ def block_reduce(image, block_size, func=cupy.sum, cval=0, func_kwargs=None):
            [[24, 25, 26, 27],
             [28, 29, 30, 31],
             [32, 33, 34, 35]]])
-    >>> block_reduce(image, block_size=(3, 3, 1), func=cupy.mean)
+    >>> block_reduce(image, block_size=(3, 3, 1), func=cp.mean)
     array([[[16., 17., 18., 19.]]])
-    >>> image_max1 = block_reduce(image, block_size=(1, 3, 4), func=cupy.max)
+    >>> image_max1 = block_reduce(image, block_size=(1, 3, 4), func=cp.max)
     >>> image_max1 # doctest: +NORMALIZE_WHITESPACE
     array([[[11]],
            [[23]],
            [[35]]])
-    >>> image_max2 = block_reduce(image, block_size=(3, 1, 4), func=cupy.max)
+    >>> image_max2 = block_reduce(image, block_size=(3, 1, 4), func=cp.max)
     >>> image_max2 # doctest: +NORMALIZE_WHITESPACE
     array([[[27],
             [31],
@@ -80,7 +82,7 @@ def block_reduce(image, block_size, func=cupy.sum, cval=0, func_kwargs=None):
             after_width = 0
         pad_width.append((0, after_width))
 
-    image = cupy.pad(
+    image = cp.pad(
         image, pad_width=pad_width, mode="constant", constant_values=cval
     )
 

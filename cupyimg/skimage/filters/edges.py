@@ -9,7 +9,7 @@ All rights reserved.
 Original author: Lee Kamentsky
 
 """
-import cupy
+import cupy as cp
 import math
 import numpy as np
 
@@ -20,36 +20,36 @@ from cupyimg.scipy import ndimage as ndi
 from ..restoration.uft import laplacian
 
 # n-dimensional filter weights
-SOBEL_EDGE = cupy.asarray([1, 0, -1])
-SOBEL_SMOOTH = cupy.asarray([1, 2, 1]) / 4
+SOBEL_EDGE = np.array([1, 0, -1])
+SOBEL_SMOOTH = np.array([1, 2, 1]) / 4
 HSOBEL_WEIGHTS = SOBEL_EDGE.reshape((3, 1)) * SOBEL_SMOOTH.reshape((1, 3))
 VSOBEL_WEIGHTS = HSOBEL_WEIGHTS.T
 
-SCHARR_EDGE = cupy.asarray([1, 0, -1])
-SCHARR_SMOOTH = cupy.array([3, 10, 3]) / 16
+SCHARR_EDGE = np.array([1, 0, -1])
+SCHARR_SMOOTH = np.array([3, 10, 3]) / 16
 HSCHARR_WEIGHTS = SCHARR_EDGE.reshape((3, 1)) * SCHARR_SMOOTH.reshape((1, 3))
 VSCHARR_WEIGHTS = HSCHARR_WEIGHTS.T
 
-PREWITT_EDGE = cupy.asarray([1, 0, -1])
-PREWITT_SMOOTH = cupy.full((3,), 1 / 3)
+PREWITT_EDGE = np.array([1, 0, -1])
+PREWITT_SMOOTH = np.full((3,), 1 / 3)
 HPREWITT_WEIGHTS = PREWITT_EDGE.reshape((3, 1)) * PREWITT_SMOOTH.reshape((1, 3))
 VPREWITT_WEIGHTS = HPREWITT_WEIGHTS.T
 
 # 2D-only filter weights
-ROBERTS_PD_WEIGHTS = cupy.asarray([[1, 0], [0, -1]], dtype=np.double)
-ROBERTS_ND_WEIGHTS = cupy.asarray([[0, 1], [-1, 0]], dtype=np.double)
+ROBERTS_PD_WEIGHTS = np.array([[1, 0], [0, -1]], dtype=np.double)
+ROBERTS_ND_WEIGHTS = np.array([[0, 1], [-1, 0]], dtype=np.double)
 
 # These filter weights can be found in Farid & Simoncelli (2004),
 # Table 1 (3rd and 4th row). Additional decimal places were computed
 # using the code found at https://www.cs.dartmouth.edu/farid/
 # fmt: off
-p = cupy.asarray([[0.0376593171958126, 0.249153396177344, 0.426374573253687,
-                   0.249153396177344, 0.0376593171958126]])
-d1 = cupy.asarray([[0.109603762960254, 0.276690988455557, 0,
-                    -0.276690988455557, -0.109603762960254]])
+p = np.array([[0.0376593171958126, 0.249153396177344, 0.426374573253687,
+               0.249153396177344, 0.0376593171958126]])
+d1 = np.asarray([[0.109603762960254, 0.276690988455557, 0,
+                 -0.276690988455557, -0.109603762960254]])
 # fmt: on
 HFARID_WEIGHTS = d1.T * p
-VFARID_WEIGHTS = cupy.copy(HFARID_WEIGHTS.T)
+VFARID_WEIGHTS = np.copy(HFARID_WEIGHTS.T)
 
 
 def _mask_filter_result(result, mask):
@@ -129,7 +129,7 @@ def _generic_edge_filter(
     image,
     *,
     smooth_weights,
-    edge_weights=cupy.asarray([1, 0, -1]),
+    edge_weights=[1, 0, -1],
     axis=None,
     mode="reflect",
     cval=0.0,
@@ -177,12 +177,12 @@ def _generic_edge_filter(
         axes = axis
     return_magnitude = len(axes) > 1
 
-    output = cupy.zeros(image.shape, dtype=float)
+    output = cp.zeros(image.shape, dtype=float)
 
-    # Note: added these to cupy.asarray calls not present in skimage
+    # Note: added these to cp.asarray calls not present in skimage
     #       may want to remove, but will probably require updating the tests.
-    edge_weights = cupy.asarray(edge_weights)
-    smooth_weights = cupy.asarray(smooth_weights)
+    edge_weights = cp.asarray(edge_weights)
+    smooth_weights = cp.asarray(smooth_weights)
 
     for edge_dim in axes:
         kernel = _reshape_nd(edge_weights, ndim, edge_dim)
@@ -196,7 +196,7 @@ def _generic_edge_filter(
 
     if return_magnitude:
         output /= ndim
-        output = cupy.sqrt(output, out=output)
+        output = cp.sqrt(output, out=output)
     return output
 
 
@@ -641,7 +641,7 @@ def roberts_pos_diag(image, mask=None):
     """
     check_nD(image, 2)
     image = img_as_float(image)
-    result = ndi.convolve(image, ROBERTS_PD_WEIGHTS)
+    result = ndi.convolve(image, cp.asarray(ROBERTS_PD_WEIGHTS))
     return _mask_filter_result(result, mask)
 
 
@@ -675,7 +675,7 @@ def roberts_neg_diag(image, mask=None):
     """
     check_nD(image, 2)
     image = img_as_float(image)
-    result = ndi.convolve(image, ROBERTS_ND_WEIGHTS)
+    result = ndi.convolve(image, cp.asarray(ROBERTS_ND_WEIGHTS))
     return _mask_filter_result(result, mask)
 
 
@@ -801,7 +801,7 @@ def farid_h(image, *, mask=None):
     """
     check_nD(image, 2)
     image = img_as_float(image)
-    result = ndi.convolve(image, HFARID_WEIGHTS)
+    result = ndi.convolve(image, cp.asarray(HFARID_WEIGHTS))
     return _mask_filter_result(result, mask)
 
 
@@ -834,5 +834,5 @@ def farid_v(image, *, mask=None):
     """
     check_nD(image, 2)
     image = img_as_float(image)
-    result = ndi.convolve(image, VFARID_WEIGHTS)
+    result = ndi.convolve(image, cp.asarray(VFARID_WEIGHTS))
     return _mask_filter_result(result, mask)

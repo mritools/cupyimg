@@ -66,7 +66,8 @@ def _tvl1(
         cp.meshgrid(
             *[cp.arange(n, dtype=dtype) for n in reference_image.shape],
             indexing="ij",
-        )
+        ),
+        axis=0,
     )
 
     dt = 0.5 / reference_image.ndim

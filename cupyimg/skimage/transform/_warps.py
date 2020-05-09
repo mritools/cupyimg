@@ -2,8 +2,7 @@ import math
 
 import numpy as np
 from cupyimg.scipy import ndimage as ndi
-import cupy
-from cupyimg.scipy.ndimage import gaussian_filter
+import cupy as cp
 
 from ._geometric import (
     SimilarityTransform,
@@ -115,7 +114,7 @@ def resize(
     if output_ndim > image.ndim:
         # append dimensions to input_shape
         input_shape = input_shape + (1,) * (output_ndim - image.ndim)
-        image = cupy.reshape(image, input_shape)
+        image = cp.reshape(image, input_shape)
     elif output_ndim == image.ndim - 1:
         # multichannel case: append shape of last axis
         output_shape = output_shape + (image.shape[-1],)
@@ -160,7 +159,7 @@ def resize(
                     "not down-sampling along all axes"
                 )
 
-        # Translate modes used by np.pad to those used by gaussian_filter
+        # Translate modes used by np.pad to those used by ndi.gaussian_filter
         np_pad_to_ndimage = {
             "constant": "constant",
             "edge": "nearest",
@@ -178,7 +177,7 @@ def resize(
                 "documentation of numpy.pad for more info."
             )
 
-        image = gaussian_filter(
+        image = ndi.gaussian_filter(
             image, anti_aliasing_sigma, cval=cval, mode=ndi_mode
         )
 
@@ -212,7 +211,7 @@ def resize(
         tform.params[1, 0] = 0
 
         # transfer the Affine to the GPU
-        tform.params = cupy.asarray(tform.params)
+        tform.params = cp.asarray(tform.params)
 
         out = warp(
             image,
@@ -229,12 +228,12 @@ def resize(
         order = _validate_interpolation_order(image.dtype, order)
 
         coord_arrays = [
-            factors[i] * (cupy.arange(d) + 0.5) - 0.5
+            factors[i] * (cp.arange(d) + 0.5) - 0.5
             for i, d in enumerate(output_shape)
         ]
 
-        coord_map = cupy.stack(
-            cupy.meshgrid(*coord_arrays, sparse=False, indexing="ij")
+        coord_map = cp.stack(
+            cp.meshgrid(*coord_arrays, sparse=False, indexing="ij")
         )
 
         image = convert_to_float(image, preserve_range)
@@ -312,7 +311,7 @@ def rescale(
         type is bool, no anti-aliasing is applied.
     anti_aliasing_sigma : {float, tuple of floats}, optional
         Standard deviation for Gaussian filtering to avoid aliasing artifacts.
-        By default, this value is chosen as (1 - s) / 2 where s is the
+        By default, this value is chosen as (s - 1) / 2 where s is the
         down-scaling factor.
 
     Notes
@@ -476,7 +475,7 @@ def rotate(
     tform.params[2] = (0, 0, 1)
 
     # transfer the coordinate transform to the GPU
-    tform.params = cupy.asarray(tform.params)
+    tform.params = cp.asarray(tform.params)
     return warp(
         image,
         tform,
@@ -523,7 +522,8 @@ def downscale_local_mean(image, factors, cval=0, clip=True):
 
     Examples
     --------
-    >>> a = cupy.arange(15).reshape(3, 5)
+    >>> import cupy as cp
+    >>> a = cp.arange(15).reshape(3, 5)
     >>> a
     array([[ 0,  1,  2,  3,  4],
            [ 5,  6,  7,  8,  9],
@@ -533,7 +533,7 @@ def downscale_local_mean(image, factors, cval=0, clip=True):
            [5.5, 4.5]])
 
     """
-    return block_reduce(image, factors, cupy.mean, cval)
+    return block_reduce(image, factors, cp.mean, cval)
 
 
 def _swirl_mapping(xy, center, rotation, strength, radius):
@@ -541,17 +541,17 @@ def _swirl_mapping(xy, center, rotation, strength, radius):
     x0, y0 = center
     xdiff = x - x0
     ydiff = y - y0
-    rho = cupy.sqrt(xdiff * xdiff + ydiff * ydiff)
+    rho = cp.sqrt(xdiff * xdiff + ydiff * ydiff)
 
     # Ensure that the transformation decays to approximately 1/1000-th
     # within the specified radius.
     radius = radius / 5 * math.log(2)
 
-    theta = rotation + strength * cupy.exp(-rho / radius)
-    theta += cupy.arctan2(ydiff, xdiff)
+    theta = rotation + strength * cp.exp(-rho / radius)
+    theta += cp.arctan2(ydiff, xdiff)
 
-    xy[..., 0] = x0 + rho * cupy.cos(theta)
-    xy[..., 1] = y0 + rho * cupy.sin(theta)
+    xy[..., 0] = x0 + rho * cp.cos(theta)
+    xy[..., 1] = y0 + rho * cp.sin(theta)
 
     return xy
 
@@ -701,11 +701,12 @@ def warp_coords(coord_map, shape, dtype=np.float64):
     --------
     Produce a coordinate map that shifts an image up and to the right:
 
+    >>> import cupy as cp
     >>> from skimage import data
     >>> from scipy.ndimage import map_coordinates
     >>>
     >>> def shift_up10_left20(xy):
-    ...     return xy - cupy.array([-20, 10])[None, :]
+    ...     return xy - cp.array([-20, 10])[None, :]
     >>>
     >>> image = data.astronaut().astype(np.float32)
     >>> coords = warp_coords(shift_up10_left20, image.shape)
@@ -717,10 +718,10 @@ def warp_coords(coord_map, shape, dtype=np.float64):
     coords_shape = [len(shape), rows, cols]
     if len(shape) == 3:
         coords_shape.append(shape[2])
-    coords = cupy.empty(coords_shape, dtype=dtype)
+    coords = cp.empty(coords_shape, dtype=dtype)
 
     # Reshape grid coordinates into a (P, 2) array of (row, col) pairs
-    tf_coords = cupy.indices((cols, rows), dtype=dtype).reshape(2, -1).T
+    tf_coords = cp.indices((cols, rows), dtype=dtype).reshape(2, -1).T
 
     # Map each (row, col) pair to the source image according to
     # the user-provided mapping
@@ -736,7 +737,7 @@ def warp_coords(coord_map, shape, dtype=np.float64):
     _stackcopy(coords[0, ...], tf_coords[1, ...])
 
     if len(shape) == 3:
-        coords[2, ...] = cupy.arange(shape[2], dtype=coords.dtype)
+        coords[2, ...] = cp.arange(shape[2], dtype=coords.dtype)
 
     return coords
 
@@ -780,7 +781,7 @@ def _clip_warp_output(input_image, output_image, order, mode, cval, clip):
         if preserve_cval:
             cval_mask = output_image == cval
 
-        cupy.clip(output_image, min_val, max_val, out=output_image)
+        cp.clip(output_image, min_val, max_val, out=output_image)
 
         if preserve_cval:
             output_image[cval_mask] = cval
@@ -904,7 +905,8 @@ def warp(
 
     Use a transformation matrix to warp an image (fast):
 
-    >>> matrix = cupy.asarray([[1, 0, 0], [0, 1, -10], [0, 0, 1]])
+    >>> import cupy as cp
+    >>> matrix = cp.asarray([[1, 0, 0], [0, 1, -10], [0, 0, 1]])
     >>> warped = warp(image, matrix)
     >>> from skimage.transform import ProjectiveTransform
     >>> warped = warp(image, ProjectiveTransform(matrix=matrix))
@@ -917,16 +919,16 @@ def warp(
     coordinates in the input image for every element in the output image. E.g.
     if you want to rescale a 3-D cube, you can do:
 
-    >>> cube_shape = cupy.asarray([30, 30, 30])
-    >>> cube = cupy.random.rand(*cube_shape)
+    >>> cube_shape = cp.asarray([30, 30, 30])
+    >>> cube = cp.random.rand(*cube_shape)
 
     Setup the coordinate array, that defines the scaling:
 
     >>> scale = 0.1
     >>> output_shape = (scale * cube_shape).astype(int)
-    >>> coords0, coords1, coords2 = cupy.mgrid[:output_shape[0],
+    >>> coords0, coords1, coords2 = cp.mgrid[:output_shape[0],
     ...                    :output_shape[1], :output_shape[2]]
-    >>> coords = cupy.asarray([coords0, coords1, coords2])
+    >>> coords = cp.asarray([coords0, coords1, coords2])
 
     Assume that the cube contains spatial data, where the first array element
     center is at coordinate (0.5, 0.5, 0.5) in real space, i.e. we have to
@@ -970,56 +972,15 @@ def warp(
             "to use bi-linear or bi-cubic interpolation instead."
         )
 
-    """ _warp_fast equivalent not implemented on the GPU.
-
-    if order in (0, 1, 3) and not map_args:
-        # use fast Cython version for specific interpolation orders and input
-
-        matrix = None
-
-        if isinstance(inverse_map, np.ndarray) and inverse_map.shape == (3, 3):
-            # inverse_map is a transformation matrix as numpy array
-            matrix = inverse_map
-
-        elif isinstance(inverse_map, HOMOGRAPHY_TRANSFORMS):
-            # inverse_map is a homography
-            matrix = inverse_map.params
-
-        elif (hasattr(inverse_map, '__name__') and
-              inverse_map.__name__ == 'inverse' and
-              get_bound_method_class(inverse_map) in HOMOGRAPHY_TRANSFORMS):
-            # inverse_map is the inverse of a homography
-            matrix = np.linalg.inv(inverse_map.__self__.params)
-
-        if matrix is not None:
-            matrix = matrix.astype(image.dtype)
-            ctype = 'float32_t' if image.dtype == np.float32 else 'float64_t'
-            if image.ndim == 2:
-                warped = _warp_fast[ctype](image, matrix,
-                                           output_shape=output_shape,
-                                           order=order, mode=mode, cval=cval)
-            elif image.ndim == 3:
-                dims = []
-                for dim in range(image.shape[2]):
-                    dims.append(_warp_fast[ctype](image[..., dim], matrix,
-                                                  output_shape=output_shape,
-                                                  order=order, mode=mode,
-                                                  cval=cval))
-                warped = np.dstack(dims)
-    """
-
     if warped is None:
         # use ndi.map_coordinates
 
-        if isinstance(inverse_map, cupy.ndarray) and inverse_map.shape == (
-            3,
-            3,
-        ):
+        if isinstance(inverse_map, cp.ndarray) and inverse_map.shape == (3, 3,):
             # inverse_map is a transformation matrix as numpy array,
             # this is only used for order >= 4.
             inverse_map = ProjectiveTransform(matrix=inverse_map)
 
-        if isinstance(inverse_map, cupy.ndarray):
+        if isinstance(inverse_map, cp.ndarray):
             # inverse_map is directly given as coordinates
             coords = inverse_map
         else:
@@ -1068,7 +1029,7 @@ def warp(
 
 
 def _linear_polar_mapping(output_coords, k_angle, k_radius, center):
-    """Inverse mapping function to convert from cartesion to polar coordinates
+    """Inverse mapping function to convert from Cartesian to polar coordinates
 
     Parameters
     ----------
@@ -1092,14 +1053,14 @@ def _linear_polar_mapping(output_coords, k_angle, k_radius, center):
         correspond to the `output_coords` given as input.
     """
     angle = output_coords[:, 1] / k_angle
-    rr = ((output_coords[:, 0] / k_radius) * cupy.sin(angle)) + center[0]
-    cc = ((output_coords[:, 0] / k_radius) * cupy.cos(angle)) + center[1]
-    coords = cupy.column_stack((cc, rr))
+    rr = ((output_coords[:, 0] / k_radius) * cp.sin(angle)) + center[0]
+    cc = ((output_coords[:, 0] / k_radius) * cp.cos(angle)) + center[1]
+    coords = cp.column_stack((cc, rr))
     return coords
 
 
 def _log_polar_mapping(output_coords, k_angle, k_radius, center):
-    """Inverse mapping function to convert from cartesion to polar coordinates
+    """Inverse mapping function to convert from Cartesian to polar coordinates
 
     Parameters
     ----------
@@ -1123,13 +1084,9 @@ def _log_polar_mapping(output_coords, k_angle, k_radius, center):
         correspond to the `output_coords` given as input.
     """
     angle = output_coords[:, 1] / k_angle
-    rr = (
-        (cupy.exp(output_coords[:, 0] / k_radius)) * cupy.sin(angle)
-    ) + center[0]
-    cc = (
-        (cupy.exp(output_coords[:, 0] / k_radius)) * cupy.cos(angle)
-    ) + center[1]
-    coords = cupy.column_stack((cc, rr))
+    rr = ((cp.exp(output_coords[:, 0] / k_radius)) * cp.sin(angle)) + center[0]
+    cc = ((cp.exp(output_coords[:, 0] / k_radius)) * cp.cos(angle)) + center[1]
+    coords = cp.column_stack((cc, rr))
     return coords
 
 
@@ -1143,7 +1100,7 @@ def warp_polar(
     multichannel=False,
     **kwargs,
 ):
-    """Remap image to polor or log-polar coordinates space.
+    """Remap image to polar or log-polar coordinates space.
 
     Parameters
     ----------

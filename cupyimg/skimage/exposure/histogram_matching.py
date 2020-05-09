@@ -1,4 +1,4 @@
-import cupy
+import cupy as cp
 import numpy as np
 
 
@@ -7,27 +7,25 @@ def _match_cumulative_cdf(source, template):
     Return modified source array so that the cumulative density function of
     its values matches the cumulative density function of the template.
     """
-    src_values, src_unique_indices, src_counts = cupy.unique(
+    src_values, src_unique_indices, src_counts = cp.unique(
         source.ravel(), return_inverse=True, return_counts=True
     )
-    tmpl_values, tmpl_counts = cupy.unique(template.ravel(), return_counts=True)
+    tmpl_values, tmpl_counts = cp.unique(template.ravel(), return_counts=True)
 
     # calculate normalized quantiles for each array
-    src_quantiles = cupy.cumsum(src_counts) / source.size
-    tmpl_quantiles = cupy.cumsum(tmpl_counts) / template.size
+    src_quantiles = cp.cumsum(src_counts) / source.size
+    tmpl_quantiles = cp.cumsum(tmpl_counts) / template.size
 
-    # TODO: grlee77: cupy.interp does not exist, so have to transfer to CPU
-    if not hasattr(cupy, "interp"):
+    # TODO: grlee77: cp.interp does not exist, so have to transfer to CPU
+    if not hasattr(cp, "interp"):
         src_quantiles = src_quantiles.get()
         tmpl_quantiles = tmpl_quantiles.get()
         tmpl_values = tmpl_values.get()
-        interp_a_values = cupy.asarray(
+        interp_a_values = cp.asarray(
             np.interp(src_quantiles, tmpl_quantiles, tmpl_values)
         )
     else:
-        interp_a_values = cupy.interp(
-            src_quantiles, tmpl_quantiles, tmpl_values
-        )
+        interp_a_values = cp.interp(src_quantiles, tmpl_quantiles, tmpl_values)
     return interp_a_values[src_unique_indices].reshape(source.shape)
 
 
@@ -74,7 +72,7 @@ def match_histograms(image, reference, *, multichannel=False):
                 "reference image must match!"
             )
 
-        matched = cupy.empty(image.shape, dtype=image.dtype)
+        matched = cp.empty(image.shape, dtype=image.dtype)
         for channel in range(image.shape[-1]):
             matched_channel = _match_cumulative_cdf(
                 image[..., channel], reference[..., channel]

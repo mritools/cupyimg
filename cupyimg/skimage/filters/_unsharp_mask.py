@@ -1,4 +1,4 @@
-import cupy
+import cupy as cp
 import numpy as np
 
 from cupyimg.scipy.ndimage.filters import gaussian_filter
@@ -12,7 +12,7 @@ def _unsharp_mask_single_channel(image, radius, amount, vrange):
 
     result = image + (image - blurred) * amount
     if vrange is not None:
-        return cupy.clip(result, vrange[0], vrange[1], out=result)
+        return cp.clip(result, vrange[0], vrange[1], out=result)
     return result
 
 
@@ -41,7 +41,7 @@ def unsharp_mask(
     multichannel : bool, optional
         If True, the last ``image`` dimension is considered as a color channel,
         otherwise as spatial. Color channels are processed individually.
-    preserve_range: bool, optional
+    preserve_range : bool, optional
         Whether to keep the original range of values. Otherwise, the input
         image is converted according to the conventions of ``img_as_float``.
         Also see https://scikit-image.org/docs/dev/user_guide/data_types.html
@@ -74,7 +74,8 @@ def unsharp_mask(
 
     Examples
     --------
-    >>> array = cupy.ones(shape=(5,5), dtype=np.uint8)*100
+    >>> import cupy as cp
+    >>> array = cp.ones(shape=(5,5), dtype=np.uint8)*100
     >>> array[2,2] = 120
     >>> array
     array([[100, 100, 100, 100, 100],
@@ -82,23 +83,23 @@ def unsharp_mask(
            [100, 100, 120, 100, 100],
            [100, 100, 100, 100, 100],
            [100, 100, 100, 100, 100]], dtype=uint8)
-    >>> cupy.around(unsharp_mask(array, radius=0.5, amount=2),2)
+    >>> cp.around(unsharp_mask(array, radius=0.5, amount=2),2)
     array([[0.39, 0.39, 0.39, 0.39, 0.39],
            [0.39, 0.39, 0.38, 0.39, 0.39],
            [0.39, 0.38, 0.53, 0.38, 0.39],
            [0.39, 0.39, 0.38, 0.39, 0.39],
            [0.39, 0.39, 0.39, 0.39, 0.39]])
 
-    >>> array = cupy.ones(shape=(5,5), dtype=np.int8)*100
+    >>> array = cp.ones(shape=(5,5), dtype=np.int8)*100
     >>> array[2,2] = 127
-    >>> cupy.around(unsharp_mask(array, radius=0.5, amount=2),2)
+    >>> cp.around(unsharp_mask(array, radius=0.5, amount=2),2)
     array([[0.79, 0.79, 0.79, 0.79, 0.79],
            [0.79, 0.78, 0.75, 0.78, 0.79],
            [0.79, 0.75, 1.  , 0.75, 0.79],
            [0.79, 0.78, 0.75, 0.78, 0.79],
            [0.79, 0.79, 0.79, 0.79, 0.79]])
 
-    >>> cupy.around(unsharp_mask(array, radius=0.5, amount=2, preserve_range=True), 2)
+    >>> cp.around(unsharp_mask(array, radius=0.5, amount=2, preserve_range=True), 2)
     array([[100.  , 100.  ,  99.99, 100.  , 100.  ],
            [100.  ,  99.39,  95.48,  99.39, 100.  ],
            [ 99.99,  95.48, 147.59,  95.48,  99.99],
@@ -120,14 +121,14 @@ def unsharp_mask(
         fimg = image.astype(np.float)
     else:
         fimg = img_as_float(image)
-        negative = cupy.any(fimg < 0)
+        negative = cp.any(fimg < 0)
         if negative:
             vrange = [-1.0, 1.0]
         else:
             vrange = [0.0, 1.0]
 
     if multichannel:
-        result = cupy.empty_like(fimg, dtype=np.float)
+        result = cp.empty_like(fimg, dtype=np.float)
         for channel in range(image.shape[-1]):
             result[..., channel] = _unsharp_mask_single_channel(
                 fimg[..., channel], radius, amount, vrange

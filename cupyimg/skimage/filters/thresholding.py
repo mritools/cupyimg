@@ -66,6 +66,7 @@ def _try_all(image, methods=None, figsize=None, num_cols=2, verbose=True):
         num_rows, num_cols, figsize=figsize, sharex=True, sharey=True
     )
     ax = ax.ravel()
+
     ax[0].imshow(cp.asnumpy(image), cmap=plt.cm.gray)
     ax[0].set_title("Original")
 
@@ -555,7 +556,7 @@ def _cross_entropy(image, threshold, bins=_DEFAULT_ENTROPY_BINS):
            :DOI:`10.1016/S0167-8655(98)00057-9`
     """
     bins = cp.asarray(bins)  # required for _DEFAULT_ENTROPY_BINS tuple
-    histogram, bin_edges = cp.histogram(image, bins=bins, density=True)
+    histogram, bin_edges = cnp.histogram(image, bins=bins, density=True)
     bin_centers = cnp.convolve(bin_edges, [0.5, 0.5], mode="valid")
     t = cp.flatnonzero(bin_centers > threshold)[0]
     m0a = cp.sum(histogram[:t])  # 0th moment, background
@@ -753,7 +754,7 @@ def threshold_minimum(image, nbins=256, max_iter=10000):
         direction = 1
 
         # better to transfer hist back to cpu?
-        hist = hist.get()  # synchronize
+        hist = hist.get()  # device synchronize
 
         for i in range(hist.shape[0] - 1):
             if direction > 0:

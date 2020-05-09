@@ -4,7 +4,7 @@ import functools
 from skimage.util.dtype import dtype_range
 from skimage._shared.utils import warn, check_shape_equality
 
-import cupy
+import cupy as cp
 from cupyimg.scipy.stats import entropy
 from cupyimg import numpy as cnp
 
@@ -22,10 +22,10 @@ def _as_floats(image0, image1):
     Promote im1, im2 to nearest appropriate floating point precision.
     """
     float_type = functools.reduce(
-        cupy.promote_types, [image0.dtype, image1.dtype, cupy.float32]
+        cp.promote_types, [image0.dtype, image1.dtype, cp.float32]
     )
-    image0 = cupy.asarray(image0, dtype=float_type)
-    image1 = cupy.asarray(image1, dtype=float_type)
+    image0 = cp.asarray(image0, dtype=float_type)
+    image1 = cp.asarray(image1, dtype=float_type)
     return image0, image1
 
 
@@ -53,7 +53,7 @@ def mean_squared_error(image0, image1):
     check_shape_equality(image0, image1)
     image0, image1 = _as_floats(image0, image1)
     diff = image0 - image1
-    return cupy.mean(diff * diff, dtype=cupy.float64)
+    return cp.mean(diff * diff, dtype=cp.float64)
 
 
 def normalized_root_mse(image_true, image_test, *, normalization="euclidean"):
@@ -107,16 +107,14 @@ def normalized_root_mse(image_true, image_test, *, normalization="euclidean"):
     # Ensure that both 'Euclidean' and 'euclidean' match
     normalization = normalization.lower()
     if normalization == "euclidean":
-        denom = cupy.sqrt(
-            cupy.mean((image_true * image_true), dtype=cupy.float64)
-        )
+        denom = cp.sqrt(cp.mean((image_true * image_true), dtype=cp.float64))
     elif normalization == "min-max":
         denom = image_true.max() - image_true.min()
     elif normalization == "mean":
         denom = image_true.mean()
     else:
         raise ValueError("Unsupported norm_type")
-    return cupy.sqrt(mean_squared_error(image_true, image_test)) / denom
+    return cp.sqrt(mean_squared_error(image_true, image_test)) / denom
 
 
 def peak_signal_noise_ratio(image_true, image_test, *, data_range=None):
@@ -160,7 +158,7 @@ def peak_signal_noise_ratio(image_true, image_test, *, data_range=None):
                 stacklevel=2,
             )
         dmin, dmax = dtype_range[image_true.dtype.type]
-        true_min, true_max = cupy.min(image_true), cupy.max(image_true)
+        true_min, true_max = cp.min(image_true), cp.max(image_true)
         if true_max > dmax or true_min < dmin:
             raise ValueError(
                 "im_true has intensity values outside the range expected for "
@@ -175,7 +173,7 @@ def peak_signal_noise_ratio(image_true, image_test, *, data_range=None):
     image_true, image_test = _as_floats(image_true, image_test)
 
     err = mean_squared_error(image_true, image_test)
-    return 10 * cupy.log10((data_range * data_range) / err)
+    return 10 * cp.log10((data_range * data_range) / err)
 
 
 def _pad_to(arr, shape):
@@ -203,7 +201,7 @@ def _pad_to(arr, shape):
             "Target shape must be strictly greater " "than input shape."
         )
     padding = [(0, s - i) for s, i in zip(shape, arr.shape)]
-    return cupy.pad(arr, pad_width=padding, mode="constant", constant_values=0)
+    return cp.pad(arr, pad_width=padding, mode="constant", constant_values=0)
 
 
 def normalized_mutual_information(im_true, im_test, *, bins=100):
@@ -270,13 +268,11 @@ def normalized_mutual_information(im_true, im_test, *, bins=100):
         padded_true, padded_test = im_true, im_test
 
     hist, bin_edges = cnp.histogramdd(
-        [cupy.ravel(padded_true), cupy.ravel(padded_test)],
-        bins=bins,
-        density=True,
+        [cp.ravel(padded_true), cp.ravel(padded_test)], bins=bins, density=True,
     )
 
-    H_im_true = entropy(cupy.sum(hist, axis=0))
-    H_im_test = entropy(cupy.sum(hist, axis=1))
-    H_true_test = entropy(cupy.ravel(hist))
+    H_im_true = entropy(cp.sum(hist, axis=0))
+    H_im_test = entropy(cp.sum(hist, axis=1))
+    H_true_test = entropy(cp.ravel(hist))
 
     return (H_im_true + H_im_test) / H_true_test

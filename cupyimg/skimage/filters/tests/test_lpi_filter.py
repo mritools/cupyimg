@@ -1,22 +1,9 @@
 import cupy as cp
-import numpy as np
 import pytest
-import scipy
-from distutils.version import LooseVersion as Version
 import unittest
 
 from skimage import data
 from cupyimg.skimage.filters import LPIFilter2D, inverse, wiener
-from skimage._shared._warnings import expected_warnings
-
-
-if (
-    Version(np.__version__) >= "1.15.0"
-    and Version(scipy.__version__) <= "1.1.0"
-):
-    SCIPY_ND_INDEXING_WARNING = "non-tuple sequence for multidimensional"
-else:
-    SCIPY_ND_INDEXING_WARNING = None
 
 
 class TestLPIFilter2D(unittest.TestCase):
@@ -43,32 +30,30 @@ class TestLPIFilter2D(unittest.TestCase):
             yield (self.tst_shape, self.img[:, c_slice])
 
     def test_inverse(self):
-        with expected_warnings([SCIPY_ND_INDEXING_WARNING]):
-            F = self.f(self.img)
-            g = inverse(F, predefined_filter=self.f)
-            assert g.shape == self.img.shape
+        F = self.f(self.img)
+        g = inverse(F, predefined_filter=self.f)
+        assert g.shape == self.img.shape
 
-            g1 = inverse(F[::-1, ::-1], predefined_filter=self.f)
-            assert (g - g1[::-1, ::-1]).sum() < 55
+        g1 = inverse(F[::-1, ::-1], predefined_filter=self.f)
+        assert (g - g1[::-1, ::-1]).sum() < 55
 
-            # test cache
-            g1 = inverse(F[::-1, ::-1], predefined_filter=self.f)
-            assert (g - g1[::-1, ::-1]).sum() < 55
+        # test cache
+        g1 = inverse(F[::-1, ::-1], predefined_filter=self.f)
+        assert (g - g1[::-1, ::-1]).sum() < 55
 
-            g1 = inverse(F[::-1, ::-1], self.filt_func)
-            assert (g - g1[::-1, ::-1]).sum() < 55
+        g1 = inverse(F[::-1, ::-1], self.filt_func)
+        assert (g - g1[::-1, ::-1]).sum() < 55
 
     def test_wiener(self):
-        with expected_warnings([SCIPY_ND_INDEXING_WARNING]):
-            F = self.f(self.img)
-            g = wiener(F, predefined_filter=self.f)
-            assert g.shape == self.img.shape
+        F = self.f(self.img)
+        g = wiener(F, predefined_filter=self.f)
+        assert g.shape == self.img.shape
 
-            g1 = wiener(F[::-1, ::-1], predefined_filter=self.f)
-            assert (g - g1[::-1, ::-1]).sum() < 1
+        g1 = wiener(F[::-1, ::-1], predefined_filter=self.f)
+        assert (g - g1[::-1, ::-1]).sum() < 1
 
-            g1 = wiener(F[::-1, ::-1], self.filt_func)
-            assert (g - g1[::-1, ::-1]).sum() < 1
+        g1 = wiener(F[::-1, ::-1], self.filt_func)
+        assert (g - g1[::-1, ::-1]).sum() < 1
 
     def test_non_callable(self):
         with pytest.raises(ValueError):
