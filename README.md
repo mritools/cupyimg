@@ -353,6 +353,7 @@ thus not available in `cupyimg` either.
 - compare_ssim
 - inertia_tensor
 - inertia_tensor_eigenvals
+- label
 - moments
 - moments_central
 - moments_coords
