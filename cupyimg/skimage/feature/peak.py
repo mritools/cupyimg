@@ -4,15 +4,15 @@ import cupy as cp
 import numpy as np
 from skimage import measure as cpu_measure
 from scipy.ndimage import find_objects as cpu_find_objects
+from cupyimg.skimage import measure
 
 import cupyimg.scipy.ndimage as ndi
 
 # from .. import measure
 from ..filters import rank_order
 
-# TODO: update once GPU implementations of the following are completed
+# TODO: update if GPU implementations of the following are completed/improved
 # scipy.ndimage.find_objects
-# skimage.measure.label
 # skimage.measure.regionprops
 
 
@@ -344,13 +344,21 @@ def _prominent_peaks(
         "host/device transfer required. TODO: implement measure.label"
     )
 
-    if True:
+    if False:
         label_img = cpu_measure.label(cp.asnumpy(img_t))
     else:
-        # TODO: can use ndi.label instead?
-        label_img, _ = ndi.label(img_t)
+        # can use cupyimg.ndimage.label instead.
+        # have to specify structure to match skimage's default connectivity
+        label_img, _ = ndi.label(img_t, structure=cp.ones((3, 3)))
+        # props = measure.regionprops(label_img, img_max)
+
+    regionprops_on_cpu = False
+    if regionprops_on_cpu:
+        img_max = cp.asnumpy(img_max)
         label_img = cp.asnumpy(label_img)
-    props = cpu_measure.regionprops(label_img, cp.asnumpy(img_max))
+        props = cpu_measure.regionprops(label_img, img_max)
+    else:
+        props = measure.regionprops(label_img, img_max)
 
     # Sort the list of peaks by intensity, not left-right, so larger peaks
     # in Hough space cannot be arbitrarily suppressed by smaller neighbors
