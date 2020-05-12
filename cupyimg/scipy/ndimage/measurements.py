@@ -1282,47 +1282,77 @@ def _kernel_init():
     )
 
 
-def _kernel_connect():
-    return cupy.ElementwiseKernel(
-        "raw int32 shape, raw int32 dirs, int32 ndirs, int32 ndim",
-        "raw Y y",
-        """
+def _kernel_connect(greyscale_mode=False, int_t="int"):  # cas_dtype='int'):
+    """
+    Notes
+    -----
+    dirs is a (n_neig//2, ndim) of relative offsets to the neighboring voxels.
+    For example, for structure = np.ones((3, 3)):
+        dirs = array([[-1, -1],
+                      [-1,  0],
+                      [-1,  1],
+                      [ 0, -1]], dtype=int32)
+    (Implementation assumes a centro-symmetric structure)
+    ndirs = dirs.shape[0]
+
+    In the dirs loop below, there is a loop over the ndim neighbors:
+        Here, index j corresponds to the current pixel and k is the current
+        neighbor location.
+    """
+    in_params = "raw int32 shape, raw int32 dirs, int32 ndirs, int32 ndim"
+    if greyscale_mode:
+        # greyscale mode -> different values receive different labels
+        x_condition = "if (x[k] != x[j]) continue;"
+        in_params = "raw X x, " + in_params
+    else:
+        # binary mode -> all non-background voxels treated the same
+        x_condition = ""
+
+    # Note: atomicCAS is implemented for int, unsigned short, unsigned int, and
+    # unsigned long long
+
+    code = """
         if (y[i] < 0) continue;
-        for (int dr = 0; dr < ndirs; dr++) {
-            int j = i;
-            int rest = j;
-            int stride = 1;
-            int k = 0;
-            for (int dm = ndim-1; dm >= 0; dm--) {
+        for (int dr = 0; dr < ndirs; dr++) {{
+            {int_t} j = i;
+            {int_t} rest = j;
+            {int_t} stride = 1;
+            {int_t} k = 0;
+            for (int dm = ndim-1; dm >= 0; dm--) {{
                 int pos = rest % shape[dm] + dirs[dm + dr * ndim];
-                if (pos < 0 || pos >= shape[dm]) {
+                if (pos < 0 || pos >= shape[dm]) {{
                     k = -1;
                     break;
-                }
+                }}
                 k += pos * stride;
                 rest /= shape[dm];
                 stride *= shape[dm];
-            }
+            }}
             if (k < 0) continue;
             if (y[k] < 0) continue;
-            while (1) {
-                while (j != y[j]) { j = y[j]; }
-                while (k != y[k]) { k = y[k]; }
+            {x_condition}
+            while (1) {{
+                while (j != y[j]) {{ j = y[j]; }}
+                while (k != y[k]) {{ k = y[k]; }}
                 if (j == k) break;
-                if (j < k) {
-                    int old = atomicCAS( &y[k], k, j );
+                if (j < k) {{
+                    {int_t} old = atomicCAS( &y[k], (Y)k, (Y)j );
                     if (old == k) break;
                     k = old;
-                }
-                else {
-                    int old = atomicCAS( &y[j], j, k );
+                }}
+                else {{
+                    {int_t} old = atomicCAS( &y[j], (Y)j, (Y)k );
                     if (old == j) break;
                     j = old;
-                }
-            }
-        }
-        """,
-        "cupyx_nd_label_connect",
+                }}
+            }}
+        }}
+        """.format(
+        x_condition=x_condition, int_t=int_t
+    )
+
+    return cupy.ElementwiseKernel(
+        in_params, "raw Y y", code, "cupyx_nd_label_connect",
     )
 
 
@@ -1379,7 +1409,15 @@ def _kernel_finalize():
     )
 
 
-def _label(x, structure, y):
+int_types = {
+    "i": "int",
+    "H": "unsigned short",
+    "I": "unsigned int",
+    "L": "unsigned long long",
+}
+
+
+def _label(x, structure, y, greyscale_mode=False):
     elems = numpy.where(structure != 0)
     vecs = [elems[dm] - 1 for dm in range(x.ndim)]
     offset = vecs[0]
@@ -1392,7 +1430,22 @@ def _label(x, structure, y):
     y_shape = cupy.array(y.shape, dtype=numpy.int32)
     count = cupy.zeros(2, dtype=numpy.int32)
     _kernel_init()(x, y)
-    _kernel_connect()(y_shape, dirs, ndirs, x.ndim, y, size=y.size)
+    try:
+        int_t = int_types[y.dtype.char]
+    except KeyError:
+        raise ValueError("y must have int32, uint16, uint32 or uint64 dtype")
+    if int_t != "int":
+        raise NotImplementedError(
+            "Currently only 32-bit integer case is implemented"
+        )
+    if greyscale_mode:
+        _kernel_connect(True, int_t)(
+            x, y_shape, dirs, ndirs, x.ndim, y, size=y.size
+        )
+    else:
+        _kernel_connect(False, int_t)(
+            y_shape, dirs, ndirs, x.ndim, y, size=y.size
+        )
     _kernel_count()(y, count, size=y.size)
     maxlabel = int(count[0])  # synchronize
     labels = cupy.empty(maxlabel, dtype=numpy.int32)
@@ -1401,7 +1454,7 @@ def _label(x, structure, y):
     return maxlabel
 
 
-def label(input, structure=None, output=None):
+def label(input, structure=None, output=None, *, greyscale_mode=False):
     """Labels features in an array
 
     Args:
@@ -1412,6 +1465,9 @@ def label(input, structure=None, output=None):
             connectivity equal to one.
         output (cupy.ndarray, dtype or None): The array in which to place the
             output.
+        greyscale_mode (boolean): If True, the function will behave like
+            ``skimage.measure.label`` where differening non-background values
+            will receive different labels.
 
     Returns:
         label (cupy.ndarray): An integer array where each unique feature in
@@ -1461,7 +1517,7 @@ def label(input, structure=None, output=None):
             y = cupy.empty(input.shape, numpy.int32)
         else:
             y = output
-        maxlabel = _label(input, structure, y)
+        maxlabel = _label(input, structure, y, greyscale_mode=greyscale_mode)
         if output.dtype != numpy.int32:
             output[...] = y[...]
 

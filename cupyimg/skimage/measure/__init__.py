@@ -13,11 +13,9 @@ from ._moments import (
     inertia_tensor,
     inertia_tensor_eigvals,
 )
-
-# moments_hu not implemented on GPU
-
 from .profile import profile_line
 from .block import block_reduce
+from ._label import label
 from .entropy import shannon_entropy
 
 
@@ -38,6 +36,7 @@ __all__ = [
     "inertia_tensor",
     "inertia_tensor_eigvals",
     "profile_line",
+    "label",
     "compare_ssim",
     "compare_mse",
     "compare_nrmse",
