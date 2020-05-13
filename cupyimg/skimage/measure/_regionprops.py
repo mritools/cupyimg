@@ -5,26 +5,10 @@ from warnings import warn
 import cupy as cp
 import numpy as np
 from scipy.ndimage import find_objects as cpu_find_objects
-from skimage.measure import label as cpu_label
+from ._label import label
 
-# from ._label import label
 from cupyimg.scipy import ndimage as ndi
 from . import _moments
-
-
-# TODO: implement measure.label on the GPU
-def label(
-    input, neighbors=None, background=None, return_num=False, connectivity=None
-):
-    # warn("host/device transfer: measure.label only implemented on GPU")
-    labels, num = cpu_label(
-        cp.asnumpy(input),
-        neighbors=neighbors,
-        background=background,
-        return_num=return_num,
-        connectivity=connectivity,
-    )
-    return cp.asarray(labels), num
 
 
 __all__ = ["regionprops", "perimeter"]
@@ -296,7 +280,7 @@ class RegionProperties:
         return self._intensity_image[self.slice] * self.image
 
     def _intensity_image_double(self):
-        return self.intensity_image.astype(cp.double)
+        return self.intensity_image.astype(cp.double, copy=False)
 
     @property
     def local_centroid(self):
