@@ -3,3 +3,11 @@ from cupyimg.scipy.special._convex_analysis import kl_div  # NOQA
 from cupyimg.scipy.special._convex_analysis import rel_entr  # NOQA
 from cupyimg.scipy.special._convex_analysis import huber  # NOQA
 from cupyimg.scipy.special._convex_analysis import pseudo_huber  # NOQA
+from cupyimg.scipy.special._gammainc import gammainc  # NOQA
+from cupyimg.scipy.special._gammainc import gammaincc  # NOQA
+from cupyimg.scipy.special._gammainc import gammainccinv  # NOQA
+from cupyimg.scipy.special._gammainc import gammaincinv  # NOQA
+from cupyimg.scipy.special._gammasgn import gammasgn  # NOQA
+from cupyimg.scipy.special._lpmv import lpmv  # NOQA
+from cupyimg.scipy.special._poch import poch  # NOQA
+from cupyimg.scipy.special._sph_harm import sph_harm  # NOQA
