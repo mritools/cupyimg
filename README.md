@@ -270,10 +270,19 @@ thus not available in `cupyimg` either.
 **cupyimg.scipy.special**:
 
 - entr  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
-- kl_div  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
-- rel_entr  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
+- gammainc
+- gammaincc
+- gammainccinv
+- gammaincinv
+- gammasgn
 - huber  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
+- kl_div  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
+- log1p
+- lpmv
+- poch
 - pseudo_huber  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
+- rel_entr  (upstream PR: [2861](https://github.com/cupy/cupy/pull/2861))
+- sph_harm
 
 **cupyimg.scipy.stats**:
 
