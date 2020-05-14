@@ -3,7 +3,15 @@ import unittest
 
 import cupy
 import numpy
+import pytest
 from cupy import testing
+from cupy.testing import (
+    assert_allclose,
+    assert_array_equal,
+    assert_array_almost_equal,
+)
+from numpy.testing import suppress_warnings
+
 import scipy.special  # NOQA
 import scipy.special._ufuncs as cephes
 
@@ -17,8 +25,8 @@ class TestSpecialConvex(unittest.TestCase):
     def test_huber_basic(self):
         huber = cupyimg.scipy.special.huber
         assert huber(-1, 1.5) == cupy.inf
-        testing.assert_allclose(huber(2, 1.5), 0.5 * 1.5 ** 2)
-        testing.assert_allclose(huber(2, 2.5), 2 * (2.5 - 0.5 * 2))
+        assert_allclose(huber(2, 1.5), 0.5 * 1.5 ** 2)
+        assert_allclose(huber(2, 2.5), 2 * (2.5 - 0.5 * 2))
 
     @testing.for_dtypes(["e", "f", "d"])
     @numpy_cupyimg_allclose(scipy_name="scp")
@@ -66,9 +74,9 @@ class TestLegendreFunctions(unittest.TestCase):
     def test_lpmv_basic(self):
         scp = cupyimg.scipy
         lp = scp.special.lpmv(0, 2, 0.5)
-        cupy.testing.assert_array_almost_equal(lp, -0.125, 7)
+        assert_array_almost_equal(lp, -0.125, 7)
         lp = scp.special.lpmv(0, 40, 0.001)
-        cupy.testing.assert_array_almost_equal(lp, 0.1252678976534484, 7)
+        assert_array_almost_equal(lp, 0.1252678976534484, 7)
 
         # XXX: this is outside the domain of the current implementation,
         #      so ensure it returns a NaN rather than a wrong answer.
@@ -83,7 +91,7 @@ class TestLegendreFunctions(unittest.TestCase):
 def test_gammasgn_vs_cephes():
     vals = cupy.asarray([-4, -3.5, -2.3, 1, 4.2], cupy.float64)
     scp = cupyimg.scipy
-    cupy.testing.assert_array_equal(
+    assert_array_equal(
         scp.special.gammasgn(vals),
         numpy.sign(cephes.rgamma(cupy.asnumpy(vals))),
     )
@@ -97,3 +105,35 @@ class TestBasic(unittest.TestCase):
     def test_gammasgn(self, xp, scp, dtype):
         vals = xp.asarray([-4, -3.5, -2.3, 1, 4.2], dtype=dtype)
         return scp.special.gammasgn(vals)
+
+
+def test_log1p():
+    log1p = cupyimg.scipy.special.log1p
+    inf = cupy.inf
+    nan = cupy.nan
+    assert_array_equal(log1p(0), 0.0)
+    assert_array_equal(log1p(-1), -inf)
+    assert_array_equal(log1p(-2), nan)
+    assert_array_equal(log1p(inf), inf)
+
+
+@pytest.mark.skip(reason="complex not currently supported in log1p")
+def test_log1p_complex():
+    log1p = cupyimg.scipy.special.log1p
+    c = complex
+    inf, nan, pi = cupy.inf, cupy.nan, cupy.pi
+    assert_array_equal(log1p(0 + 0j), 0 + 0j)
+    assert_array_equal(log1p(c(-1, 0)), c(-inf, 0))
+    with suppress_warnings() as sup:
+        sup.filter(RuntimeWarning, "invalid value encountered in multiply")
+        assert_allclose(log1p(c(1, inf)), c(inf, pi / 2))
+        assert_array_equal(log1p(c(1, nan)), c(nan, nan))
+        assert_allclose(log1p(c(-inf, 1)), c(inf, pi))
+        assert_array_equal(log1p(c(inf, 1)), c(inf, 0))
+        assert_allclose(log1p(c(-inf, inf)), c(inf, 3 * pi / 4))
+        assert_allclose(log1p(c(inf, inf)), c(inf, pi / 4))
+        assert_array_equal(log1p(c(inf, nan)), c(inf, nan))
+        assert_array_equal(log1p(c(-inf, nan)), c(inf, nan))
+        assert_array_equal(log1p(c(nan, inf)), c(inf, nan))
+        assert_array_equal(log1p(c(nan, 1)), c(nan, nan))
+        assert_array_equal(log1p(c(nan, nan)), c(nan, nan))

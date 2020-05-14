@@ -1122,6 +1122,12 @@ log1p = core.create_ufunc(
     preamble=_misc_preamble + _unity_c_partial,
     doc="""Elementwise function for scipy.special.log1p
 
+    Calculates log(1 + x) for use when `x` is near zero.
+
+    Notes
+    -----
+    This implementation currently does not support complex-valued `x`.
+
     .. seealso:: :meth:`scipy.special.log1p`
 
     """,
@@ -1135,8 +1141,9 @@ gammaincc = core.create_ufunc(
     preamble=_igam_preamble,
     doc="""Elementwise function for scipy.special.gammaincc
 
-    .. seealso:: :meth:`scipy.special.gammaincc`
+    Regularized upper incomplete gamma function.
 
+    .. seealso:: :meth:`scipy.special.gammaincc`
     """,
 )
 
@@ -1148,8 +1155,9 @@ gammainc = core.create_ufunc(
     preamble=_igam_preamble,
     doc="""Elementwise function for scipy.special.gammainc
 
-    .. seealso:: :meth:`scipy.special.gammainc`
+    Regularized lower incomplete gamma function.
 
+    .. seealso:: :meth:`scipy.special.gammainc`
     """,
 )
 
@@ -1161,8 +1169,9 @@ gammainccinv = core.create_ufunc(
     preamble=_igami_preamble,
     doc="""Elementwise function for scipy.special.gammainccinv
 
-    .. seealso:: :meth:`scipy.special.gammainccinv`
+    Inverse to gammaincc.
 
+    .. seealso:: :meth:`scipy.special.gammainccinv`
     """,
 )
 
@@ -1174,7 +1183,8 @@ gammaincinv = core.create_ufunc(
     preamble=_igami_preamble,
     doc="""Elementwise function for scipy.special.gammaincinv
 
-    .. seealso:: :meth:`scipy.special.gammaincinv`
+    Inverse to gammainc.
 
+    .. seealso:: :meth:`scipy.special.gammaincinv`
     """,
 )

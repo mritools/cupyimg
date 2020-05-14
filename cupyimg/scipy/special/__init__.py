@@ -7,6 +7,7 @@ from cupyimg.scipy.special._gammainc import gammainc  # NOQA
 from cupyimg.scipy.special._gammainc import gammaincc  # NOQA
 from cupyimg.scipy.special._gammainc import gammainccinv  # NOQA
 from cupyimg.scipy.special._gammainc import gammaincinv  # NOQA
+from cupyimg.scipy.special._gammainc import log1p  # NOQA
 from cupyimg.scipy.special._gammasgn import gammasgn  # NOQA
 from cupyimg.scipy.special._lpmv import lpmv  # NOQA
 from cupyimg.scipy.special._poch import poch  # NOQA
