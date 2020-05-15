@@ -48,7 +48,10 @@ class _PerfCaseResult(object):
 def repeat(func, args=(), kwargs={}, n=10000, *, name=None, n_warmup=10):
     util.experimental("cupyx.time.repeat")
     if name is None:
-        name = func.__name__
+        try:
+            name = func.__name__
+        except AttributeError:
+            name = "unknown"
 
     if not callable(func):
         raise ValueError("`func` should be a callable object.")
