@@ -11,6 +11,7 @@ from .dtype import (
 from .shape import view_as_blocks, view_as_windows
 from .arraycrop import crop
 from ._invert import invert
+from ._map_array import map_array
 
 
 __all__ = [
@@ -25,5 +26,6 @@ __all__ = [
     "view_as_blocks",
     "view_as_windows",
     "crop",
+    "map_array",
     "invert",
 ]

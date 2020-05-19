@@ -237,8 +237,6 @@ def mark_boundaries(
         # the RGB information. ``ndi.zoom`` then performs the (cubic)
         # interpolation, filling in the values of the interposed pixels
 
-        # TODO: grlee77: For now had to switch to mode="mirror", order=1,
-        #                but skimage uses mode="reflect", order=3
         marked = ndi.zoom(
             marked,
             [2 - 1 / s for s in marked.shape[:-1]] + [1],
