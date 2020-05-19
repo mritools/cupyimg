@@ -126,7 +126,7 @@ def test_mark_boundaries_subpixel():
     )
     np.random.seed(0)
     # Note: use np.random to have same seed as NumPy
-    # Note: use np.round until cp.round is implemented upstream
+    # Note: use np.round until cp.around is fixed upstream
     image = cp.asarray(np.round(np.random.rand(*labels.shape), 2))
     marked = mark_boundaries(image, labels, color=white, mode="subpixel")
     marked_proj = cp.asarray(np.round(cp.mean(marked, axis=-1).get(), 2))
@@ -145,8 +145,11 @@ def test_mark_boundaries_subpixel():
     # fmt: on
 
     # TODO: get fully equivalent interpolation/boundary as skimage
-
-    # Note: grlee77: only test locations of ones, due to different default
-    #                interpolation settings in CuPy version of mark_boundaries
-    # assert_allclose(marked_proj, ref_result, atol=0.01)
-    assert_allclose(marked_proj == 1, ref_result == 1, atol=0.01)
+    #       I think this requires fixing mode='reflect' upstream in SciPy
+    if False:
+        assert_allclose(marked_proj, ref_result, atol=0.01)
+    else:
+        # Note: grlee77: only test locations of ones, due to different default
+        #                interpolation settings in CuPy version of mark
+        #                 boundaries
+        assert_allclose(marked_proj == 1, ref_result == 1, atol=0.01)
