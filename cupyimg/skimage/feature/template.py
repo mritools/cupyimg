@@ -1,17 +1,19 @@
+import cupy as cp
 import numpy as np
-from scipy.signal import fftconvolve
+from cupyimg._misc import _prod
+from cupyimg.scipy.signal import fftconvolve
 
 from .._shared.utils import check_nD
 
 
 def _window_sum_2d(image, window_shape):
 
-    window_sum = np.cumsum(image, axis=0)
+    window_sum = cp.cumsum(image, axis=0)
     window_sum = (
         window_sum[window_shape[0] : -1] - window_sum[: -window_shape[0] - 1]
     )
 
-    window_sum = np.cumsum(window_sum, axis=1)
+    window_sum = cp.cumsum(window_sum, axis=1)
     window_sum = (
         window_sum[:, window_shape[1] : -1]
         - window_sum[:, : -window_shape[1] - 1]
@@ -24,7 +26,7 @@ def _window_sum_3d(image, window_shape):
 
     window_sum = _window_sum_2d(image, window_shape)
 
-    window_sum = np.cumsum(window_sum, axis=2)
+    window_sum = cp.cumsum(window_sum, axis=2)
     window_sum = (
         window_sum[:, :, window_shape[2] : -1]
         - window_sum[:, :, : -window_shape[2] - 1]
@@ -75,6 +77,9 @@ def match_template(
     presents similar derivations but the approximation presented in this
     reference is not used in our implementation.
 
+    This CuPy implementation does not force the image to float64 internally,
+    but will use float32 for single-precision inputs.
+
     References
     ----------
     .. [1] J. P. Lewis, "Fast Normalized Cross-Correlation", Industrial Light
@@ -85,13 +90,14 @@ def match_template(
 
     Examples
     --------
-    >>> template = np.zeros((3, 3))
+    >>> import cupy as cp
+    >>> template = cp.zeros((3, 3))
     >>> template[1, 1] = 1
     >>> template
     array([[ 0.,  0.,  0.],
            [ 0.,  1.,  0.],
            [ 0.,  0.,  0.]])
-    >>> image = np.zeros((6, 6))
+    >>> image = cp.zeros((6, 6))
     >>> image[1, 1] = 1
     >>> image[4, 4] = -1
     >>> image
@@ -102,13 +108,13 @@ def match_template(
            [ 0.,  0.,  0.,  0., -1.,  0.],
            [ 0.,  0.,  0.,  0.,  0.,  0.]])
     >>> result = match_template(image, template)
-    >>> np.round(result, 3)
+    >>> cp.round(result, 3)
     array([[ 1.   , -0.125,  0.   ,  0.   ],
            [-0.125, -0.125,  0.   ,  0.   ],
            [ 0.   ,  0.   ,  0.125,  0.125],
            [ 0.   ,  0.   ,  0.125, -1.   ]])
     >>> result = match_template(image, template, pad_input=True)
-    >>> np.round(result, 3)
+    >>> cp.round(result, 3)
     array([[-0.125, -0.125, -0.125,  0.   ,  0.   ,  0.   ],
            [-0.125,  1.   , -0.125,  0.   ,  0.   ,  0.   ],
            [-0.125, -0.125, -0.125,  0.   ,  0.   ,  0.   ],
@@ -123,36 +129,40 @@ def match_template(
             "Dimensionality of template must be less than or "
             "equal to the dimensionality of image."
         )
-    if np.any(np.less(image.shape, template.shape)):
+    if any(si < st for si, st in zip(image.shape, template.shape)):
         raise ValueError("Image must be larger than template.")
 
     image_shape = image.shape
 
-    image = np.array(image, dtype=np.float64, copy=False)
+    float_dtype = cp.promote_types(image.dtype, cp.float32)
+    image = cp.asarray(image, dtype=float_dtype)
+    template = cp.asarray(template, dtype=float_dtype)
 
     pad_width = tuple((width, width) for width in template.shape)
     if mode == "constant":
-        image = np.pad(
+        image = cp.pad(
             image,
             pad_width=pad_width,
             mode=mode,
             constant_values=constant_values,
         )
     else:
-        image = np.pad(image, pad_width=pad_width, mode=mode)
+        image = cp.pad(image, pad_width=pad_width, mode=mode)
 
     # Use special case for 2-D images for much better performance in
     # computation of integral images
     if image.ndim == 2:
         image_window_sum = _window_sum_2d(image, template.shape)
-        image_window_sum2 = _window_sum_2d(image ** 2, template.shape)
+        image_window_sum2 = _window_sum_2d(image * image, template.shape)
     elif image.ndim == 3:
         image_window_sum = _window_sum_3d(image, template.shape)
-        image_window_sum2 = _window_sum_3d(image ** 2, template.shape)
+        image_window_sum2 = _window_sum_3d(image * image, template.shape)
 
     template_mean = template.mean()
-    template_volume = np.prod(template.shape)
-    template_ssd = np.sum((template - template_mean) ** 2)
+    template_volume = _prod(template.shape)
+    template_ssd = template - template_mean
+    template_ssd *= template_ssd
+    template_ssd = cp.sum(template_ssd)
 
     if image.ndim == 2:
         xcorr = fftconvolve(image, template[::-1, ::-1], mode="valid")[
@@ -166,19 +176,19 @@ def match_template(
     numerator = xcorr - image_window_sum * template_mean
 
     denominator = image_window_sum2
-    np.multiply(image_window_sum, image_window_sum, out=image_window_sum)
-    np.divide(image_window_sum, template_volume, out=image_window_sum)
+    cp.multiply(image_window_sum, image_window_sum, out=image_window_sum)
+    cp.divide(image_window_sum, template_volume, out=image_window_sum)
     denominator -= image_window_sum
     denominator *= template_ssd
-    np.maximum(
+    cp.maximum(
         denominator, 0, out=denominator
     )  # sqrt of negative number not allowed
-    np.sqrt(denominator, out=denominator)
+    cp.sqrt(denominator, out=denominator)
 
-    response = np.zeros_like(xcorr, dtype=np.float64)
+    response = cp.zeros_like(xcorr, dtype=np.float64)
 
     # avoid zero-division
-    mask = denominator > np.finfo(np.float64).eps
+    mask = denominator > cp.finfo(np.float64).eps
 
     response[mask] = numerator[mask] / denominator[mask]
 

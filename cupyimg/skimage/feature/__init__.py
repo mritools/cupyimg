@@ -5,6 +5,7 @@ from ._daisy import daisy
 
 from .peak import peak_local_max
 from .corner import hessian_matrix, hessian_matrix_eigvals
+from .template import match_template
 
 
 @deprecated(
@@ -45,6 +46,7 @@ __all__ = [
     "peak_local_max",
     "hessian_matrix",
     "hessian_matrix_eigvals",
+    "match_template",
     "register_translation",
     "masked_register_translation",
 ]
