@@ -35,7 +35,7 @@ from .thresholding import (
     threshold_triangle,
     threshold_niblack,
     threshold_sauvola,
-    # threshold_multiotsu,
+    threshold_multiotsu,
     try_all_threshold,
     apply_hysteresis_threshold,
 )
@@ -85,7 +85,7 @@ __all__ = [
     "threshold_niblack",
     "threshold_sauvola",
     "threshold_triangle",
-    # 'threshold_multiotsu',
+    "threshold_multiotsu",
     "apply_hysteresis_threshold",
     # "rank",
     "unsharp_mask",

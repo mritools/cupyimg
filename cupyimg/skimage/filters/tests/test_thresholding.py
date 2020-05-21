@@ -4,13 +4,14 @@ import pytest
 
 from skimage import data
 
-# from skimage.draw import disk
+from skimage.draw import disk
 from skimage._shared._warnings import expected_warnings
 
 # from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage import util
 
-# from cupyimg.skimage.color import rgb2gray
+from cupyimg.skimage.color import rgb2gray
+
 # from cupyimg.skimage.exposure import histogram
 from cupyimg.skimage.filters.thresholding import (
     threshold_local,
@@ -23,7 +24,7 @@ from cupyimg.skimage.filters.thresholding import (
     threshold_mean,
     threshold_triangle,
     threshold_minimum,
-    # threshold_multiotsu,
+    threshold_multiotsu,
     # try_all_threshold,
     # _mean_std,
     _cross_entropy,
@@ -632,57 +633,56 @@ def test_niblack_sauvola_pathological_image():
     assert not cp.any(cp.isnan(threshold_niblack(src_img)))
 
 
-# TODO: implement multiotsu
-# def test_bimodal_multiotsu_hist():
-#     for name in ['camera', 'moon', 'coins', 'text', 'clock', 'page']:
-#         img = getattr(data, name)()
-#         assert threshold_otsu(img) == threshold_multiotsu(img, 2)
+def test_bimodal_multiotsu_hist():
+    for name in ["camera", "moon", "coins", "text", "clock", "page"]:
+        img = cp.asarray(getattr(data, name)())
+        assert threshold_otsu(img) == threshold_multiotsu(img, 2)
 
-#     for name in ['chelsea', 'coffee', 'astronaut', 'rocket']:
-#         img = rgb2gray(getattr(data, name)())
-#         assert threshold_otsu(img) == threshold_multiotsu(img, 2)
-
-
-# def test_check_multiotsu_results():
-#     # fmt: off
-#     image = 0.25 * cp.asarray([[0, 1, 2, 3, 4],
-#                                [0, 1, 2, 3, 4],
-#                                [0, 1, 2, 3, 4],
-#                                [0, 1, 2, 3, 4]])
-#     # fmt: on
-#     for idx in range(3, 6):
-#         thr_multi = threshold_multiotsu(image,
-#                                         classes=idx)
-#         assert len(thr_multi) == idx-1
+    for name in ["chelsea", "coffee", "astronaut", "rocket"]:
+        img = cp.asarray(rgb2gray(getattr(data, name)()))
+        assert threshold_otsu(img) == threshold_multiotsu(img, 2)
 
 
-# def test_multiotsu_output():
-#     image = cp.zeros((100, 100), dtype='int')
-#     coords = [(25, 25), (50, 50), (75, 75)]
-#     values = [64, 128, 192]
-#     for coor, val in zip(coords, values):
-#         rr, cc = disk(coor[1], coor[0], 20)
-#         image[rr, cc] = val
-#     thresholds = [0, 64, 128]
-#     assert cp.array_equal(thresholds, threshold_multiotsu(image, classes=4))
+def test_check_multiotsu_results():
+    # fmt: off
+    image = 0.25 * cp.asarray([[0, 1, 2, 3, 4],
+                               [0, 1, 2, 3, 4],
+                               [0, 1, 2, 3, 4],
+                               [0, 1, 2, 3, 4]])
+    # fmt: on
+    for idx in range(3, 6):
+        thr_multi = threshold_multiotsu(image, classes=idx)
+        assert len(thr_multi) == idx - 1
 
 
-# def test_multiotsu_astro_image():
-#     img = util.img_as_ubyte(astronaut)
-#     with expected_warnings(['grayscale']):
-#         assert_array_almost_equal(threshold_multiotsu(img), [58, 149])
+def test_multiotsu_output():
+    image = cp.zeros((100, 100), dtype="int")
+    coords = [(25, 25), (50, 50), (75, 75)]
+    values = [64, 128, 192]
+    for coor, val in zip(coords, values):
+        rr, cc = disk(coor, 20)
+        rr, cc = cp.asarray(rr), cp.asarray(cc)
+        image[rr, cc] = val
+    thresholds = [0, 64, 128]
+    assert_array_equal(thresholds, threshold_multiotsu(image, classes=4))
 
 
-# def test_multiotsu_more_classes_then_values():
-#     img = cp.ones((10, 10), dtype=cp.uint8)
-#     with testing.raises(ValueError):
-#         threshold_multiotsu(img, classes=2)
-#     img[:, 3:] = 2
-#     with testing.raises(ValueError):
-#         threshold_multiotsu(img, classes=3)
-#     img[:, 6:] = 3
-#     with testing.raises(ValueError):
-#         threshold_multiotsu(img, classes=4)
+def test_multiotsu_astro_image():
+    img = util.img_as_ubyte(astronautd)
+    with expected_warnings(["grayscale"]):
+        assert_array_almost_equal(threshold_multiotsu(img), [58, 149])
+
+
+def test_multiotsu_more_classes_then_values():
+    img = cp.ones((10, 10), dtype=cp.uint8)
+    with testing.raises(ValueError):
+        threshold_multiotsu(img, classes=2)
+    img[:, 3:] = 2
+    with testing.raises(ValueError):
+        threshold_multiotsu(img, classes=3)
+    img[:, 6:] = 3
+    with testing.raises(ValueError):
+        threshold_multiotsu(img, classes=4)
 
 
 # @pytest.mark.parametrize("thresholding, lower, upper", [
@@ -698,19 +698,3 @@ def test_niblack_sauvola_pathological_image():
 #     import dask.array as da
 #     dask_camera = da.from_array(camera, chunks=(256, 256))
 #     assert lower < float(thresholding(dask_camera)) < upper
-
-
-# def test_multiotsu_lut():
-#     for classes in [2, 3, 4]:
-#         for name in ['camera', 'moon', 'coins', 'text', 'clock', 'page']:
-#             img = getattr(data, name)()
-#             prob, bin_centers = histogram(img.ravel(),
-#                                           nbins=256,
-#                                           source_range='image',
-#                                           normalize=True)
-#             prob = prob.astype('float32')
-
-#             result_lut = _get_multiotsu_thresh_indices_lut(prob, classes - 1)
-#             result = _get_multiotsu_thresh_indices(prob, classes - 1)
-
-#             assert cp.array_equal(result_lut, result)
