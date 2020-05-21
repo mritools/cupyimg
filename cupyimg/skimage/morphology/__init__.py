@@ -23,6 +23,7 @@ from .selem import (
     octagon,
     star,
 )
+from .greyreconstruct import reconstruction
 from .misc import remove_small_objects, remove_small_holes
 
 __all__ = [
@@ -45,6 +46,7 @@ __all__ = [
     "ball",
     "octagon",
     "star",
+    "reconstruction",
     "remove_small_objects",
     "remove_small_holes",
 ]
