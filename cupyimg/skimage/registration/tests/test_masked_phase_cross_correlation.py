@@ -144,13 +144,13 @@ def test_masked_registration_padfield_data():
         if have_fetch:
             fixed_image = imread(
                 fetch(
-                    "feature/tests/data/OriginalX{:d}Y{:d}.png"
+                    "registration/tests/data/OriginalX{:d}Y{:d}.png"
                     "".format(xi, yi)
                 )
             )
             moving_image = imread(
                 fetch(
-                    "feature/tests/data/TransformedX{:d}Y{:d}.png"
+                    "registration/tests/data/TransformedX{:d}Y{:d}.png"
                     "".format(xi, yi)
                 )
             )

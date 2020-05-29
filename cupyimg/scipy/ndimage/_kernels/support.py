@@ -167,7 +167,7 @@ def _masked_loop_init(mode, xshape, fshape, origin, nnz):
     return ops
 
 
-def _pixelmask_to_buffer(mode, cval, xshape, fshape, origin, nnz):
+def _pixelmask_to_buffer(mode, cval, xshape, fshape, origin, nnz, masked=False):
     """Declares and initializes the contents of an array called "selected".
 
     selected will contain the pixel values falling within a local footprint.
@@ -189,6 +189,9 @@ def _pixelmask_to_buffer(mode, cval, xshape, fshape, origin, nnz):
     # GRL: end of different middle section here
 
     _cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
+    if masked:
+        # mask argument used by skimage.filters.rank module
+        _cond = _cond + " || (mask_data[ix] > 0)"
     _expr = " + ".join(["ix_{0}".format(j) for j in range(ndim)])
 
     ops.append(
@@ -209,7 +212,9 @@ def _pixelmask_to_buffer(mode, cval, xshape, fshape, origin, nnz):
     return ops
 
 
-def _pixelregion_to_buffer(mode, cval, xshape, fshape, origin, nnz):
+def _pixelregion_to_buffer(
+    mode, cval, xshape, fshape, origin, nnz, masked=False
+):
     """Declares and initializes the contents of an array called "selected".
 
     selected will contain the pixel values falling within a local footprint.
@@ -229,8 +234,10 @@ def _pixelregion_to_buffer(mode, cval, xshape, fshape, origin, nnz):
     ops += _nested_loops_init(mode, xshape, fshape, origin)
 
     # GRL: end of different middle section here
-
     _cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
+    if masked:
+        # mask argument used by skimage.filters.rank module
+        _cond = _cond + " || (mask_data[ix] > 0)"
     _expr = " + ".join(["ix_{0}".format(j) for j in range(ndim)])
 
     ops.append(

@@ -76,8 +76,8 @@ else:
 class TestColorconv(TestCase):
 
     if have_fetch:
-        img_rgb = data.colorwheel()
-        img_grayscale = data.camera()
+        img_rgb = cp.asarray(data.colorwheel())
+        img_grayscale = cp.asarray(data.camera())
     else:
         img_rgb = cp.asarray(imread(os.path.join(data_dir, "color.png")))
         img_grayscale = cp.asarray(imread(os.path.join(data_dir, "camera.png")))
