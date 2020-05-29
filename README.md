@@ -372,7 +372,6 @@ thus not available in `cupyimg` either.
 
 - mean_squared_error
 - normalized_root_mse
-- normalized_mutual_information
 - peak_signal_noise_ratio
 - structural_similarity
 
@@ -403,7 +402,6 @@ thus not available in `cupyimg` either.
 
 **skimage.registration**:
 
-- affine
 - cross_correlate_masked
 - optical_flow_tvl1
 - phase_cross_correlation
