@@ -136,3 +136,17 @@ def test_check_factor():
         pyramids._check_factor(0.99)
     with pytest.raises(ValueError):
         pyramids._check_factor(-2)
+
+
+@pytest.mark.parametrize(
+    "dtype, expected",
+    zip(
+        ["float32", "float64", "uint8", "int64"],
+        ["float32", "float64", "float64", "float64"],
+    ),
+)
+def test_pyramid_gaussian_dtype_support(dtype, expected):
+    img = cp.random.randn(32, 8).astype(dtype)
+    pyramid = pyramids.pyramid_gaussian(img)
+
+    assert all([im.dtype == expected for im in pyramid])

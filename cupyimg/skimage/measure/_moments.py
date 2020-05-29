@@ -303,7 +303,6 @@ def moments_normalized(mu, order=3):
            [       nan, 0.        , 0.        , 0.        ],
            [0.078125  , 0.        , 0.00610352, 0.        ],
            [0.        , 0.        , 0.        , 0.        ]])
-
     """
     if any(s <= order for s in mu.shape):
         raise ValueError("Shape of image moments must be >= `order`")

@@ -9,6 +9,7 @@ from .dtype import (
     dtype_limits,
 )
 from .shape import view_as_blocks, view_as_windows
+from .noise import random_noise
 from .arraycrop import crop
 from ._invert import invert
 from ._map_array import map_array
@@ -27,5 +28,6 @@ __all__ = [
     "view_as_windows",
     "crop",
     "map_array",
+    "random_noise",
     "invert",
 ]

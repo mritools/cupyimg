@@ -1107,6 +1107,7 @@ def _rank_filter(
         # The kernel needs only the non-zero footprint coordinates
         wlocs = cupy.stack(cupy.nonzero(footprint))  # (ndim, nnz)
 
+        # TODO: refactor to remove input.shape as done for convolution cases
         output = _get_rank_kernel_masked(
             mode,
             cval,
@@ -1118,6 +1119,7 @@ def _rank_filter(
         )(input, wlocs, output)
     else:
         footprint = cupy.ascontiguousarray(footprint)
+        # TODO: refactor to remove input.shape as done for convolution cases
         output = _get_rank_kernel(
             mode, cval, input.shape, footprint.shape, tuple(origin), rank
         )(input, footprint, output)

@@ -2,7 +2,6 @@ from functools import reduce
 import math
 
 import cupy as cp
-import numpy as np
 
 from cupyimg.scipy import ndimage as ndi
 from ..transform import resize
@@ -11,7 +10,7 @@ from .._shared.utils import convert_to_float
 
 def _smooth(image, sigma, mode, cval, multichannel=None):
     """Return image with each channel smoothed by the Gaussian filter."""
-    smoothed = cp.empty(image.shape, dtype=np.double)
+    smoothed = cp.empty_like(image)
 
     # apply Gaussian filter to all channels independently
     if multichannel:

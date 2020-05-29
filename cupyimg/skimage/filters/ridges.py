@@ -388,8 +388,6 @@ def frangi(
     sigmas=range(1, 10, 2),
     scale_range=None,
     scale_step=None,
-    beta1=None,
-    beta2=None,
     alpha=0.5,
     beta=0.5,
     gamma=15,
@@ -422,10 +420,10 @@ def frangi(
     alpha : float, optional
         Frangi correction constant that adjusts the filter's
         sensitivity to deviation from a plate-like structure.
-    beta = beta1 : float, optional
+    beta : float, optional
         Frangi correction constant that adjusts the filter's
         sensitivity to deviation from a blob-like structure.
-    gamma = beta2 : float, optional
+    gamma : float, optional
         Frangi correction constant that adjusts the filter's
         sensitivity to areas of high variance/texture/structure.
     black_ridges : boolean, optional
@@ -464,24 +462,6 @@ def frangi(
     .. [2] Kroon, D. J.: Hessian based Frangi vesselness filter.
     .. [3] Ellis, D. G.: https://github.com/ellisdg/frangi3d/tree/master/frangi
     """
-
-    # Check deprecated keyword parameters
-    if beta1 is not None:
-        warn(
-            "Use keyword parameter `beta` instead of `beta1` which "
-            "will be removed in version 0.17.",
-            stacklevel=2,
-        )
-        beta = beta1
-
-    if beta2 is not None:
-        warn(
-            "Use keyword parameter `gamma` instead of `beta2` which "
-            "will be removed in version 0.17.",
-            stacklevel=2,
-        )
-        gamma = beta2
-
     if scale_range is not None and scale_step is not None:
         warn(
             "Use keyword parameter `sigmas` instead of `scale_range` and "
@@ -558,8 +538,6 @@ def hessian(
     sigmas=range(1, 10, 2),
     scale_range=None,
     scale_step=None,
-    beta1=None,
-    beta2=None,
     alpha=0.5,
     beta=0.5,
     gamma=15,
@@ -588,10 +566,10 @@ def hessian(
         The range of sigmas used.
     scale_step : float, optional
         Step size between sigmas.
-    beta = beta1 : float, optional
+    beta : float, optional
         Frangi correction constant that adjusts the filter's
         sensitivity to deviation from a blob-like structure.
-    gamma = beta2 : float, optional
+    gamma : float, optional
         Frangi correction constant that adjusts the filter's
         sensitivity to areas of high variance/texture/structure.
     black_ridges : boolean, optional
@@ -645,8 +623,6 @@ def hessian(
         sigmas=sigmas,
         scale_range=scale_range,
         scale_step=scale_step,
-        beta1=beta1,
-        beta2=beta2,
         alpha=alpha,
         beta=beta,
         gamma=gamma,
