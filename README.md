@@ -332,6 +332,7 @@ thus not available in `cupyimg` either.
 - threshold_local
 - threshold_mean
 - threshold_minimum
+- threshold_multiotsu
 - threshold_niblack
 - threshold_otsu
 - threshold_sauvola
@@ -392,6 +393,7 @@ thus not available in `cupyimg` either.
 - octagon
 - octahedron
 - opening
+- reconstruct
 - rectangle
 - remove_small_holes
 - remove_small_objects
@@ -402,10 +404,13 @@ thus not available in `cupyimg` either.
 **skimage.registration**:
 
 - affine
+- cross_correlate_masked
 - optical_flow_tvl1
+- phase_cross_correlation
 
 **skimage.restoration**:
 
+- calibrate_denoiser
 - denoise_tv_chambolle
 - richardson_lucy
 - unsupervised_wiener
