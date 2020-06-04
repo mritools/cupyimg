@@ -33,13 +33,8 @@ def _interpolate_image(image, *, multichannel=False):
     conv_filter /= conv_filter.sum()
 
     if multichannel:
-        interp = cp.zeros_like(image)
-        for i in range(image.shape[-1]):
-            interp[..., i] = ndi.convolve(
-                image[..., i], conv_filter, mode="mirror"
-            )
-    else:
-        interp = ndi.convolve(image, conv_filter, mode="mirror")
+        conv_filter = conv_filter[..., np.newaxis]
+    interp = ndi.convolve(image, conv_filter, mode="mirror")
     return interp
 
 
