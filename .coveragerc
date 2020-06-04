@@ -1,0 +1,3 @@
+[run]
+omit =
+    cupyimg/version.py

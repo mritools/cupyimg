@@ -1,0 +1,16 @@
+repos:
+# -   repo: https://github.com/timothycrosley/isort
+#     rev: 4.3.21
+#     hooks:
+#       - id: isort
+-   repo: https://github.com/psf/black
+    rev: stable
+    hooks:
+      - id: black
+        #language_version: python3.6
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v2.3.0
+    hooks:
+    - id: flake8
+      # args: ['--config=setup.cfg']  # setup.cfg doesn't seem to work with pre-commit
+      args: ['--ignore=W503,W605,E203,E741,E501', '--max-line-length=80']
