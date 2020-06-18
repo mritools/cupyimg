@@ -1,11 +1,106 @@
+from warnings import warn
+
 from itertools import combinations_with_replacement
 
 import cupy as cp
 import numpy as np
+from scipy import spatial  # TODO: use RAPIDS cuSpatial?
 
 import cupyimg.numpy as cnp
 from cupyimg.scipy import ndimage as ndi
+from .peak import peak_local_max
+from .util import _prepare_grayscale_input_2D
+
+# from ..transform import integral_image
 from .. import img_as_float
+
+
+def _compute_derivatives(image, mode="constant", cval=0):
+    """Compute derivatives in x and y direction using the Sobel operator.
+
+    Parameters
+    ----------
+    image : ndarray
+        Input image.
+    mode : {'constant', 'reflect', 'wrap', 'nearest', 'mirror'}, optional
+        How to handle values outside the image borders.
+    cval : float, optional
+        Used in conjunction with mode 'constant', the value outside
+        the image boundaries.
+
+    Returns
+    -------
+    imx : ndarray
+        Derivative in x-direction.
+    imy : ndarray
+        Derivative in y-direction.
+
+    """
+
+    imy = ndi.sobel(image, axis=0, mode=mode, cval=cval)
+    imx = ndi.sobel(image, axis=1, mode=mode, cval=cval)
+
+    return imx, imy
+
+
+def structure_tensor(image, sigma=1, mode="constant", cval=0):
+    """Compute structure tensor using sum of squared differences.
+
+    The structure tensor A is defined as::
+
+        A = [Axx Axy]
+            [Axy Ayy]
+
+    which is approximated by the weighted sum of squared differences in a local
+    window around each pixel in the image.
+
+    Parameters
+    ----------
+    image : ndarray
+        Input image.
+    sigma : float, optional
+        Standard deviation used for the Gaussian kernel, which is used as a
+        weighting function for the local summation of squared differences.
+    mode : {'constant', 'reflect', 'wrap', 'nearest', 'mirror'}, optional
+        How to handle values outside the image borders.
+    cval : float, optional
+        Used in conjunction with mode 'constant', the value outside
+        the image boundaries.
+
+    Returns
+    -------
+    Axx : ndarray
+        Element of the structure tensor for each pixel in the input image.
+    Axy : ndarray
+        Element of the structure tensor for each pixel in the input image.
+    Ayy : ndarray
+        Element of the structure tensor for each pixel in the input image.
+
+    Examples
+    --------
+    >>> from skimage.feature import structure_tensor
+    >>> square = np.zeros((5, 5))
+    >>> square[2, 2] = 1
+    >>> Axx, Axy, Ayy = structure_tensor(square, sigma=0.1)
+    >>> Axx
+    array([[0., 0., 0., 0., 0.],
+           [0., 1., 0., 1., 0.],
+           [0., 4., 0., 4., 0.],
+           [0., 1., 0., 1., 0.],
+           [0., 0., 0., 0., 0.]])
+
+    """
+
+    image = _prepare_grayscale_input_2D(image)
+
+    imx, imy = _compute_derivatives(image, mode=mode, cval=cval)
+
+    # structure tensore
+    Axx = ndi.gaussian_filter(imx * imx, sigma, mode=mode, cval=cval)
+    Axy = ndi.gaussian_filter(imx * imy, sigma, mode=mode, cval=cval)
+    Ayy = ndi.gaussian_filter(imy * imy, sigma, mode=mode, cval=cval)
+
+    return Axx, Axy, Ayy
 
 
 def hessian_matrix(image, sigma=1, mode="constant", cval=0, order="rc"):
@@ -106,10 +201,123 @@ def _hessian_matrix_image(H_elems):
     return hessian_image
 
 
+def hessian_matrix_det(image, sigma=1, approximate=True):
+    """Compute the approximate Hessian Determinant over an image.
+
+    The 2D approximate method uses box filters over integral images to
+    compute the approximate Hessian Determinant, as described in [1]_.
+
+    Parameters
+    ----------
+    image : array
+        The image over which to compute Hessian Determinant.
+    sigma : float, optional
+        Standard deviation used for the Gaussian kernel, used for the Hessian
+        matrix.
+    approximate : bool, optional
+        If ``True`` and the image is 2D, use a much faster approximate
+        computation. This argument has no effect on 3D and higher images.
+
+    Returns
+    -------
+    out : array
+        The array of the Determinant of Hessians.
+
+    References
+    ----------
+    .. [1] Herbert Bay, Andreas Ess, Tinne Tuytelaars, Luc Van Gool,
+           "SURF: Speeded Up Robust Features"
+           ftp://ftp.vision.ee.ethz.ch/publications/articles/eth_biwi_00517.pdf
+
+    Notes
+    -----
+    For 2D images when ``approximate=True``, the running time of this method
+    only depends on size of the image. It is independent of `sigma` as one
+    would expect. The downside is that the result for `sigma` less than `3`
+    is not accurate, i.e., not similar to the result obtained if someone
+    computed the Hessian and took its determinant.
+    """
+    image = img_as_float(image)
+    if image.ndim == 2 and approximate:
+        raise NotImplementedError("approximate=True case not implemented")
+        # integral = integral_image(image)
+        # return np.array(_hessian_matrix_det(integral, sigma))
+    else:  # slower brute-force implementation for nD images
+        hessian_mat_array = _hessian_matrix_image(hessian_matrix(image, sigma))
+        return np.linalg.det(hessian_mat_array)
+
+
 def _image_orthogonal_matrix22_eigvals(M00, M01, M11):
+    """
+    analytical formula below optimized for in-place computations.
+    It corresponds to::
+
     l1 = (M00 + M11) / 2 + cp.sqrt(4 * M01 ** 2 + (M00 - M11) ** 2) / 2
     l2 = (M00 + M11) / 2 - cp.sqrt(4 * M01 ** 2 + (M00 - M11) ** 2) / 2
+    """
+    tmp1 = M01 * M01
+    tmp1 *= 4
+
+    tmp2 = M00 - M11
+    tmp2 *= tmp2
+    tmp2 += tmp1
+    cp.sqrt(tmp2, out=tmp2)
+    tmp2 /= 2
+
+    tmp1 = M00 + M11
+    tmp1 /= 2
+    l1 = tmp1 + tmp2
+    l2 = tmp1 - tmp2
     return l1, l2
+
+
+"""
+TODO: add an _image_symmetric_real33_eigvals() based on:
+Oliver K. Smith. 1961.
+Eigenvalues of a symmetric 3 × 3 matrix.
+Commun. ACM 4, 4 (April 1961), 168.
+DOI:https://doi.org/10.1145/355578.366316
+
+def _image_symmetric_real33_eigvals(M00, M01, M02, M11, M12, M22):
+
+"""
+
+
+def structure_tensor_eigvals(Axx, Axy, Ayy):
+    """Compute Eigen values of structure tensor.
+
+    Parameters
+    ----------
+    Axx : ndarray
+        Element of the structure tensor for each pixel in the input image.
+    Axy : ndarray
+        Element of the structure tensor for each pixel in the input image.
+    Ayy : ndarray
+        Element of the structure tensor for each pixel in the input image.
+
+    Returns
+    -------
+    l1 : ndarray
+        Larger eigen value for each input matrix.
+    l2 : ndarray
+        Smaller eigen value for each input matrix.
+
+    Examples
+    --------
+    >>> from skimage.feature import structure_tensor, structure_tensor_eigvals
+    >>> square = np.zeros((5, 5))
+    >>> square[2, 2] = 1
+    >>> Axx, Axy, Ayy = structure_tensor(square, sigma=0.1)
+    >>> structure_tensor_eigvals(Axx, Axy, Ayy)[0]
+    array([[0., 0., 0., 0., 0.],
+           [0., 2., 4., 2., 0.],
+           [0., 4., 0., 4., 0.],
+           [0., 2., 4., 2., 0.],
+           [0., 0., 0., 0., 0.]])
+
+    """
+
+    return _image_orthogonal_matrix22_eigvals(Axx, Axy, Ayy)
 
 
 def hessian_matrix_eigvals(H_elems):
@@ -154,3 +362,510 @@ def hessian_matrix_eigvals(H_elems):
         eigvals = np.transpose(eigvals, (eigvals.ndim - 1,) + leading_axes)
         eigvals = cp.asarray(eigvals)
     return eigvals
+
+
+def shape_index(image, sigma=1, mode="constant", cval=0):
+    """Compute the shape index.
+
+    The shape index, as defined by Koenderink & van Doorn [1]_, is a
+    single valued measure of local curvature, assuming the image as a 3D plane
+    with intensities representing heights.
+
+    It is derived from the eigen values of the Hessian, and its
+    value ranges from -1 to 1 (and is undefined (=NaN) in *flat* regions),
+    with following ranges representing following shapes:
+
+    .. table:: Ranges of the shape index and corresponding shapes.
+
+      ===================  =============
+      Interval (s in ...)  Shape
+      ===================  =============
+      [  -1, -7/8)         Spherical cup
+      [-7/8, -5/8)         Through
+      [-5/8, -3/8)         Rut
+      [-3/8, -1/8)         Saddle rut
+      [-1/8, +1/8)         Saddle
+      [+1/8, +3/8)         Saddle ridge
+      [+3/8, +5/8)         Ridge
+      [+5/8, +7/8)         Dome
+      [+7/8,   +1]         Spherical cap
+      ===================  =============
+
+    Parameters
+    ----------
+    image : ndarray
+        Input image.
+    sigma : float, optional
+        Standard deviation used for the Gaussian kernel, which is used for
+        smoothing the input data before Hessian eigen value calculation.
+    mode : {'constant', 'reflect', 'wrap', 'nearest', 'mirror'}, optional
+        How to handle values outside the image borders
+    cval : float, optional
+        Used in conjunction with mode 'constant', the value outside
+        the image boundaries.
+
+    Returns
+    -------
+    s : ndarray
+        Shape index
+
+    References
+    ----------
+    .. [1] Koenderink, J. J. & van Doorn, A. J.,
+           "Surface shape and curvature scales",
+           Image and Vision Computing, 1992, 10, 557-564.
+           :DOI:`10.1016/0262-8856(92)90076-F`
+
+    Examples
+    --------
+    >>> from skimage.feature import shape_index
+    >>> square = np.zeros((5, 5))
+    >>> square[2, 2] = 4
+    >>> s = shape_index(square, sigma=0.1)
+    >>> s
+    array([[ nan,  nan, -0.5,  nan,  nan],
+           [ nan, -0. ,  nan, -0. ,  nan],
+           [-0.5,  nan, -1. ,  nan, -0.5],
+           [ nan, -0. ,  nan, -0. ,  nan],
+           [ nan,  nan, -0.5,  nan,  nan]])
+    """
+
+    H = hessian_matrix(image, sigma=sigma, mode=mode, cval=cval, order="rc")
+    l1, l2 = hessian_matrix_eigvals(H)
+
+    return (2.0 / np.pi) * np.arctan((l2 + l1) / (l2 - l1))
+
+
+def corner_kitchen_rosenfeld(image, mode="constant", cval=0):
+    """Compute Kitchen and Rosenfeld corner measure response image.
+
+    The corner measure is calculated as follows::
+
+        (imxx * imy**2 + imyy * imx**2 - 2 * imxy * imx * imy)
+            / (imx**2 + imy**2)
+
+    Where imx and imy are the first and imxx, imxy, imyy the second
+    derivatives.
+
+    Parameters
+    ----------
+    image : ndarray
+        Input image.
+    mode : {'constant', 'reflect', 'wrap', 'nearest', 'mirror'}, optional
+        How to handle values outside the image borders.
+    cval : float, optional
+        Used in conjunction with mode 'constant', the value outside
+        the image boundaries.
+
+    Returns
+    -------
+    response : ndarray
+        Kitchen and Rosenfeld response image.
+
+    References
+    ----------
+    .. [1] Kitchen, L., & Rosenfeld, A. (1982). Gray-level corner detection.
+           Pattern recognition letters, 1(2), 95-102.
+           :DOI:`10.1016/0167-8655(82)90020-4`
+    """
+
+    imx, imy = _compute_derivatives(image, mode=mode, cval=cval)
+    imxx, imxy = _compute_derivatives(imx, mode=mode, cval=cval)
+    imyx, imyy = _compute_derivatives(imy, mode=mode, cval=cval)
+
+    # numerator = imxx * imy ** 2 + imyy * imx ** 2 - 2 * imxy * imx * imy
+    numerator = imxx * imy
+    numerator *= imy
+    tmp = imyy * imx
+    tmp *= imx
+    numerator += tmp
+    tmp = 2 * imxy
+    tmp *= imx
+    tmp *= imy
+    numerator -= tmp
+
+    # denominator = imx ** 2 + imy ** 2
+    denominator = imx * imx
+    denominator += imy * imy
+
+    response = cp.zeros_like(image, dtype=np.double)
+
+    mask = denominator != 0
+    response[mask] = numerator[mask] / denominator[mask]
+
+    return response
+
+
+def corner_harris(image, method="k", k=0.05, eps=1e-6, sigma=1):
+    """Compute Harris corner measure response image.
+
+    This corner detector uses information from the auto-correlation matrix A::
+
+        A = [(imx**2)   (imx*imy)] = [Axx Axy]
+            [(imx*imy)   (imy**2)]   [Axy Ayy]
+
+    Where imx and imy are first derivatives, averaged with a gaussian filter.
+    The corner measure is then defined as::
+
+        det(A) - k * trace(A)**2
+
+    or::
+
+        2 * det(A) / (trace(A) + eps)
+
+    Parameters
+    ----------
+    image : ndarray
+        Input image.
+    method : {'k', 'eps'}, optional
+        Method to compute the response image from the auto-correlation matrix.
+    k : float, optional
+        Sensitivity factor to separate corners from edges, typically in range
+        `[0, 0.2]`. Small values of k result in detection of sharp corners.
+    eps : float, optional
+        Normalisation factor (Noble's corner measure).
+    sigma : float, optional
+        Standard deviation used for the Gaussian kernel, which is used as
+        weighting function for the auto-correlation matrix.
+
+    Returns
+    -------
+    response : ndarray
+        Harris response image.
+
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Corner_detection
+
+    Examples
+    --------
+    >>> from cupyimg.skimage.feature import corner_harris, corner_peaks
+    >>> square = cp.zeros([10, 10])
+    >>> square[2:8, 2:8] = 1
+    >>> square.astype(int)
+    array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
+    >>> corner_peaks(corner_harris(square), min_distance=1, threshold_rel=0)
+    array([[2, 2],
+           [2, 7],
+           [7, 2],
+           [7, 7]])
+
+    """
+
+    Axx, Axy, Ayy = structure_tensor(image, sigma)
+
+    # determinant
+    detA = Axx * Ayy
+    detA -= Axy * Axy
+
+    # trace
+    traceA = Axx + Ayy
+
+    if method == "k":
+        response = detA - k * traceA * traceA
+    else:
+        response = 2 * detA / (traceA + eps)
+
+    return response
+
+
+def corner_shi_tomasi(image, sigma=1):
+    """Compute Shi-Tomasi (Kanade-Tomasi) corner measure response image.
+
+    This corner detector uses information from the auto-correlation matrix A::
+
+        A = [(imx**2)   (imx*imy)] = [Axx Axy]
+            [(imx*imy)   (imy**2)]   [Axy Ayy]
+
+    Where imx and imy are first derivatives, averaged with a gaussian filter.
+    The corner measure is then defined as the smaller eigenvalue of A::
+
+        ((Axx + Ayy) - sqrt((Axx - Ayy)**2 + 4 * Axy**2)) / 2
+
+    Parameters
+    ----------
+    image : ndarray
+        Input image.
+    sigma : float, optional
+        Standard deviation used for the Gaussian kernel, which is used as
+        weighting function for the auto-correlation matrix.
+
+    Returns
+    -------
+    response : ndarray
+        Shi-Tomasi response image.
+
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Corner_detection
+
+    Examples
+    --------
+    >>> from cupyimg.skimage.feature import corner_shi_tomasi, corner_peaks
+    >>> square = cp.zeros([10, 10])
+    >>> square[2:8, 2:8] = 1
+    >>> square.astype(int)
+    array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
+    >>> corner_peaks(corner_shi_tomasi(square), min_distance=1,
+    ...              threshold_rel=0)
+    array([[2, 2],
+           [2, 7],
+           [7, 2],
+           [7, 7]])
+
+    """
+
+    Axx, Axy, Ayy = structure_tensor(image, sigma)
+
+    # minimum eigenvalue of A
+
+    # response = ((Axx + Ayy) - np.sqrt((Axx - Ayy) ** 2 + 4 * Axy ** 2)) / 2
+    tmp = Axx - Ayy
+    tmp *= tmp
+    tmp2 = 4 * Axy
+    tmp2 *= Axy
+    tmp += tmp2
+    cp.sqrt(tmp, out=tmp)
+    tmp /= 2
+    response = Axx + Ayy
+    response -= tmp
+
+    return response
+
+
+def corner_foerstner(image, sigma=1):
+    """Compute Foerstner corner measure response image.
+
+    This corner detector uses information from the auto-correlation matrix A::
+
+        A = [(imx**2)   (imx*imy)] = [Axx Axy]
+            [(imx*imy)   (imy**2)]   [Axy Ayy]
+
+    Where imx and imy are first derivatives, averaged with a gaussian filter.
+    The corner measure is then defined as::
+
+        w = det(A) / trace(A)           (size of error ellipse)
+        q = 4 * det(A) / trace(A)**2    (roundness of error ellipse)
+
+    Parameters
+    ----------
+    image : ndarray
+        Input image.
+    sigma : float, optional
+        Standard deviation used for the Gaussian kernel, which is used as
+        weighting function for the auto-correlation matrix.
+
+    Returns
+    -------
+    w : ndarray
+        Error ellipse sizes.
+    q : ndarray
+        Roundness of error ellipse.
+
+    References
+    ----------
+    .. [1] Förstner, W., & Gülch, E. (1987, June). A fast operator for detection and
+           precise location of distinct points, corners and centres of circular
+           features. In Proc. ISPRS intercommission conference on fast processing of
+           photogrammetric data (pp. 281-305).
+           https://cseweb.ucsd.edu/classes/sp02/cse252/foerstner/foerstner.pdf
+    .. [2] https://en.wikipedia.org/wiki/Corner_detection
+
+    Examples
+    --------
+    >>> from cupyimg.skimage.feature import corner_foerstner, corner_peaks
+    >>> square = cp.zeros([10, 10])
+    >>> square[2:8, 2:8] = 1
+    >>> square.astype(int)
+    array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
+    >>> w, q = corner_foerstner(square)
+    >>> accuracy_thresh = 0.5
+    >>> roundness_thresh = 0.3
+    >>> foerstner = (q > roundness_thresh) * (w > accuracy_thresh) * w
+    >>> corner_peaks(foerstner, min_distance=1, threshold_rel=0)
+    array([[2, 2],
+           [2, 7],
+           [7, 2],
+           [7, 7]])
+
+    """
+
+    Axx, Axy, Ayy = structure_tensor(image, sigma)
+
+    # determinant
+    detA = Axx * Ayy
+    detA -= Axy * Axy
+    # trace
+    traceA = Axx + Ayy
+
+    w = cp.zeros_like(image, dtype=np.double)
+    q = cp.zeros_like(image, dtype=np.double)
+
+    mask = traceA != 0
+
+    w[mask] = detA[mask] / traceA[mask]
+    tsq = traceA[mask]
+    tsq *= tsq
+    q[mask] = 4 * detA[mask] / tsq
+
+    return w, q
+
+
+def corner_peaks(
+    image,
+    min_distance=1,
+    threshold_abs=None,
+    threshold_rel=None,
+    exclude_border=True,
+    indices=True,
+    num_peaks=np.inf,
+    footprint=None,
+    labels=None,
+    *,
+    num_peaks_per_label=np.inf,
+    p_norm=np.inf,
+):
+    """Find peaks in corner measure response image.
+
+    This differs from `skimage.feature.peak_local_max` in that it suppresses
+    multiple connected peaks with the same accumulator value.
+
+    Parameters
+    ----------
+    image : ndarray
+        Input image.
+    min_distance : int, optional
+        The minimal allowed distance separating peaks.
+    * : *
+        See :py:meth:`skimage.feature.peak_local_max`.
+    p_norm : float
+        Which Minkowski p-norm to use. Should be in the range [1, inf].
+        A finite large p may cause a ValueError if overflow can occur.
+        ``inf`` corresponds to the Chebyshev distance and 2 to the
+        Euclidean distance.
+
+    Returns
+    -------
+    output : ndarray or ndarray of bools
+
+        * If `indices = True`  : (row, column, ...) coordinates of peaks.
+        * If `indices = False` : Boolean array shaped like `image`, with peaks
+          represented by True values.
+
+    See also
+    --------
+    skimage.feature.peak_local_max
+
+    Notes
+    -----
+    The `num_peaks` limit is applied before suppression of
+    connected peaks. If you want to limit the number of peaks
+    after suppression, you should set `num_peaks=np.inf` and
+    post-process the output of this function.
+
+    Examples
+    --------
+    >>> from cupyimg.skimage.feature import peak_local_max
+    >>> response = cp.zeros((5, 5))
+    >>> response[2:4, 2:4] = 1
+    >>> response
+    array([[0., 0., 0., 0., 0.],
+           [0., 0., 0., 0., 0.],
+           [0., 0., 1., 1., 0.],
+           [0., 0., 1., 1., 0.],
+           [0., 0., 0., 0., 0.]])
+    >>> peak_local_max(response)
+    array([[2, 2],
+           [2, 3],
+           [3, 2],
+           [3, 3]])
+    >>> corner_peaks(response, threshold_rel=0)
+    array([[2, 2]])
+
+    """
+    if threshold_rel is None:
+        threshold_rel = 0.1
+        warn(
+            "Until version 0.16, threshold_rel was set to 0.1 by default. "
+            "Starting from version 0.16, the default value is set to None. "
+            "Until version 0.18, a None value corresponds to a threshold "
+            "value of 0.1. The default behavior will match "
+            "skimage.feature.peak_local_max. To avoid this warning, set "
+            "threshold_rel=0.",
+            category=FutureWarning,
+            stacklevel=2,
+        )
+
+    if cp.isinf(num_peaks):
+        num_peaks = None
+
+    # Get the coordinates of the detected peaks
+    coords = peak_local_max(
+        image,
+        min_distance=min_distance,
+        threshold_abs=threshold_abs,
+        threshold_rel=threshold_rel,
+        exclude_border=exclude_border,
+        indices=True,
+        num_peaks=np.inf,
+        footprint=footprint,
+        labels=labels,
+        num_peaks_per_label=num_peaks_per_label,
+    )
+
+    if len(coords):
+        # TODO: modify to do KDTree on the GPU (cuSpatial?)
+        coords = cp.asnumpy(coords)
+
+        # Use KDtree to find the peaks that are too close to each other
+        tree = spatial.cKDTree(coords)
+
+        rejected_peaks_indices = set()
+        for idx, point in enumerate(coords):
+            if idx not in rejected_peaks_indices:
+                candidates = tree.query_ball_point(
+                    point, r=min_distance, p=p_norm
+                )
+                candidates.remove(idx)
+                rejected_peaks_indices.update(candidates)
+
+        # Remove the peaks that are too close to each other
+        coords = np.delete(coords, tuple(rejected_peaks_indices), axis=0)[
+            :num_peaks
+        ]
+        coords = cp.asarray(coords)
+
+    if indices:
+        return coords
+
+    peaks = cp.zeros_like(image, dtype=bool)
+    peaks[tuple(coords.T)] = True
+
+    return peaks

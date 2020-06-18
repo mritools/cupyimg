@@ -296,6 +296,24 @@ thus not available in `cupyimg` either.
 - match_histograms
 - rescale_intensity
 
+**skimage.feature**:
+
+- canny
+- corner_harris
+- corner_kitchen_rosenfeld
+- corner_shi_tomasi
+- corner_foerstner
+- corner_peaks
+- daisy
+- hessian_matrix
+- hessian_matrix_det
+- hessian_matrix_eigvals
+- match_template
+- peak_local_max
+- shape_index
+- structure_tensor
+- structure_tensor_eigvals
+
 **skimage.filters**:
 
 - apply_hysteresis_threshold

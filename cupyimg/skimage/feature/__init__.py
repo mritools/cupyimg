@@ -4,7 +4,23 @@ from ._canny import canny
 from ._daisy import daisy
 
 from .peak import peak_local_max
-from .corner import hessian_matrix, hessian_matrix_eigvals
+from .corner import (
+    corner_kitchen_rosenfeld,
+    corner_harris,
+    corner_shi_tomasi,
+    corner_foerstner,
+    # corner_subpix,
+    corner_peaks,
+    # corner_fast,
+    structure_tensor,
+    structure_tensor_eigvals,
+    hessian_matrix,
+    hessian_matrix_eigvals,
+    hessian_matrix_det,
+    # corner_moravec,
+    # corner_orientations,
+    shape_index,
+)
 from .template import match_template
 
 
@@ -44,8 +60,21 @@ __all__ = [
     "canny",
     "daisy",
     "peak_local_max",
+    "structure_tensor",
+    "structure_tensor_eigvals",
     "hessian_matrix",
+    "hessian_matrix_det",
     "hessian_matrix_eigvals",
+    "shape_index",
+    "corner_kitchen_rosenfeld",
+    "corner_harris",
+    "corner_shi_tomasi",
+    "corner_foerstner",
+    # 'corner_subpix',
+    "corner_peaks",
+    # 'corner_moravec',
+    # 'corner_fast',
+    # 'corner_orientations',
     "match_template",
     "register_translation",
     "masked_register_translation",
