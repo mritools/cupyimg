@@ -483,9 +483,8 @@ def _freq_domain_conv(in1, in2, axes, shape, calc_fast_len=False):
         fft, ifft = sp_fft.fftn, sp_fft.ifftn
 
     sp1 = fft(in1, fshape, axes=axes)
-    sp2 = fft(in2, fshape, axes=axes)
-
-    ret = ifft(sp1 * sp2, fshape, axes=axes)
+    sp1 *= fft(in2, fshape, axes=axes)
+    ret = ifft(sp1, fshape, axes=axes)
 
     if calc_fast_len:
         fslice = tuple([slice(sz) for sz in shape])
@@ -1396,8 +1395,6 @@ def convolve(in1, in2, mode="full", method="auto"):
 
     if method == "auto":
         method = choose_conv_method(volume, kernel, mode=mode)
-    print(f"method={method}")
-
     if method == "fft":
         out = fftconvolve(volume, kernel, mode=mode)
         result_type = np.result_type(volume.dtype, kernel.dtype)
