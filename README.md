@@ -247,8 +247,8 @@ thus not available in `cupyimg` either.
 - black_tophat
 - generate_binary_structure
 - grey_closing (see also: [PR 3239](https://github.com/cupy/cupy/pull/3239))
-- grey_dilation
-- grey_erosion
+- grey_dilation (see also: [PR 3216](https://github.com/cupy/cupy/pull/3216))
+- grey_erosion (see also: [PR 3216](https://github.com/cupy/cupy/pull/3216))
 - grey_opening (see also: [PR 3239](https://github.com/cupy/cupy/pull/3239))
 - iterate_structure
 - morphological_gradient
