@@ -1,3 +1,5 @@
+import warnings
+
 import cupy
 from .support import _generate_boundary_condition_ops
 from .filters import _get_correlate_kernel_masked
@@ -151,7 +153,7 @@ def _check_mode(mode):
 def _convert_1d_args(ndim, weights, origin, axis):
     if weights.ndim != 1 or weights.size < 1:
         raise RuntimeError("incorrect filter size")
-    axis = _ni_support._check_axis(axis, ndim)
+    axis = cupy.util._normalize_axis_index(axis, ndim)
     wshape = [1] * ndim
     wshape[axis] = weights.size
     weights = weights.reshape(wshape)
@@ -341,27 +343,25 @@ def _generate_indices_ops(ndim, int_type, xsize="x.shape()[{j}]", extras=None):
 
 
 def _check_size_or_ftprnt(ndim, size, ftprnt, stacklevel, check_sep=False):
-    import warnings
-
-    if (size is not None) and (ftprnt is not None):
-        warnings.warn(
-            "ignoring size because footprint is set",
-            UserWarning,
-            stacklevel=stacklevel + 1,
-        )
     if ftprnt is None:
         if size is None:
             raise RuntimeError("no footprint or filter size provided")
         sizes = _fix_sequence_arg(size, ndim, "size", int)
         if check_sep:
-            return sizes, None, True
+            return sizes, None
         ftprnt = cupy.ones(sizes, dtype=bool)
     else:
-        ftprnt = cupy.ascontiguousarray(ftprnt, dtype=bool)
+        if size is not None:
+            warnings.warn(
+                "ignoring size because footprint is set",
+                UserWarning,
+                stacklevel=stacklevel + 1,
+            )
+        ftprnt = cupy.array(ftprnt, bool, True, "C")
         if not ftprnt.any():
             raise ValueError("All-zero footprint is not supported.")
         if check_sep:
             if ftprnt.all():
-                return ftprnt.shape, None, True
-            return None, ftprnt, False
+                return ftprnt.shape, None
+            return None, ftprnt
     return ftprnt
