@@ -167,7 +167,7 @@ thus not available in `cupyimg` either.
 **cupyimg.numpy**:
 
 - apply_along_axis
-- convolve
+- convolve  (upstream PR: [3371](https://github.com/cupy/cupy/pull/3371))
 - correlate
 - gradient
 - histogram  (upstream PR: [3124](https://github.com/cupy/cupy/pull/3124))
@@ -183,28 +183,28 @@ thus not available in `cupyimg` either.
 
 **cupyimg.scipy.ndimage.filters**:
 
-- convolve  (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
-- convolve1d  (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
-- correlate  (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
-- correlate1d  (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
-- gaussian_filter
-- gaussian_filter1d
-- gaussian_laplace
-- gaussian_gradient_magnitude
-- generic_laplace
-- generic_gradient_magnitude
-- laplace
-- prewitt
-- sobel
-- uniform_filter
-- uniform_filter1d
-- maximum_filter
-- maximum_filter1d
-- median_filter
-- minimum_filter
-- minimum_filter1d
-- percentile_filter
-- rank_filter
+- convolve (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
+- convolve1d (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
+- correlate (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
+- correlate1d (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184))
+- gaussian_filter (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- gaussian_filter1d (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- gaussian_laplace (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- gaussian_gradient_magnitude (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- generic_laplace (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- generic_gradient_magnitude (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- laplace (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- prewitt (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- sobel (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- uniform_filter (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- uniform_filter1d (see also: [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- maximum_filter (see also: [PR 3239](https://github.com/cupy/cupy/pull/3239))
+- maximum_filter1d (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184),  [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- median_filter (see also: [PR 3500](https://github.com/cupy/cupy/pull/3505))
+- minimum_filter (see also: [PR 3239](https://github.com/cupy/cupy/pull/3239))
+- minimum_filter1d (see also: [PR 3184](https://github.com/cupy/cupy/pull/3184),  [PR 3505](https://github.com/cupy/cupy/pull/3505))
+- percentile_filter (see also: [PR 3500](https://github.com/cupy/cupy/pull/3505))
+- rank_filter (see also: [PR 3500](https://github.com/cupy/cupy/pull/3505))
 
 **cupyimg.scipy.ndimage.fourier**:
 
@@ -227,13 +227,13 @@ thus not available in `cupyimg` either.
 - labeled_comprehension
 - maximum
 - maximum_position
-- mean
+- mean (see also: [PR 3259](https://github.com/cupy/cupy/pull/3259), [PR 3419](https://github.com/cupy/cupy/pull/3419))
 - median
 - minimum
 - minimum_position
-- standard_deviation
-- sum
-- variance
+- standard_deviation (see also: [PR 3259](https://github.com/cupy/cupy/pull/3259), [PR 3419](https://github.com/cupy/cupy/pull/3419))
+- sum (see also: [PR 3259](https://github.com/cupy/cupy/pull/3259), [PR 3419](https://github.com/cupy/cupy/pull/3419), [PR 3425](https://github.com/cupy/cupy/pull/3425))
+- variance (see also: [PR 3259](https://github.com/cupy/cupy/pull/3259), [PR 3419](https://github.com/cupy/cupy/pull/3419))
 
 **cupyimg.scipy.ndimage.morphology**:
 
@@ -246,6 +246,10 @@ thus not available in `cupyimg` either.
 - binary_fill_holes- convolve
 - black_tophat
 - generate_binary_structure
+- grey_closing (see also: [PR 3239](https://github.com/cupy/cupy/pull/3239))
+- grey_dilation
+- grey_erosion
+- grey_opening (see also: [PR 3239](https://github.com/cupy/cupy/pull/3239))
 - iterate_structure
 - morphological_gradient
 - morphological_laplace
@@ -253,7 +257,7 @@ thus not available in `cupyimg` either.
 
 **cupyimg.scipy.signal**:
 
-- choose_conv_method
+- choose_conv_method (upstream PR: [3464](https://github.com/cupy/cupy/pull/3464))
 - convolve
 - convolve2d
 - correlate
