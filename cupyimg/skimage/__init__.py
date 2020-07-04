@@ -1,4 +1,4 @@
-"""GPU Image Processing SciKit
+"""GPU Image Processing for Python
 
 This module is a CuPy based implementation of a subset of scikit-image.
 
@@ -10,6 +10,12 @@ subpackages:
 
 Subpackages
 -----------
+color
+    Color space conversion.
+exposure
+    Image intensity adjustment, e.g., histogram equalization, etc.
+feature
+    Feature detection and extraction, e.g., texture analysis corners, etc.
 filters
     Sharpening, edge finding, rank filters, thresholding, etc.
 measure
@@ -20,6 +26,8 @@ morphology
     Morphological operations, e.g., opening or skeletonization.
 restoration
     Restoration algorithms, e.g., deconvolution algorithms, denoising, etc.
+segmentation
+    Partitioning an image into multiple regions.
 transform
     Geometric and other transforms, e.g., rotation or the Radon transform.
 util

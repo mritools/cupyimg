@@ -5,6 +5,7 @@ from warnings import warn
 import cupy as cp
 import numpy as np
 from scipy.ndimage import find_objects as cpu_find_objects
+
 from ._label import label
 
 from cupyimg.scipy import ndimage as ndi
@@ -33,6 +34,7 @@ PROPS = {
     "EulerNumber": "euler_number",
     "Extent": "extent",
     # 'Extrema',
+    "FeretDiameter": "feret_diameter",
     "FilledArea": "filled_area",
     "FilledImage": "filled_image",
     "HuMoments": "moments_hu",
@@ -86,6 +88,7 @@ COL_DTYPES = {
     "equivalent_diameter": float,
     "euler_number": int,
     "extent": float,
+    "feret_diameter": float,
     "filled_area": int,
     "filled_image": object,
     "moments_hu": float,
@@ -243,6 +246,29 @@ class RegionProperties:
     @property
     def extent(self):
         return self.area / self.image.size
+
+    @property
+    def feret_diameter(self):
+        from scipy.spatial.distance import pdist
+        from skimage.measure import find_contours
+        from skimage.measure import marching_cubes
+
+        # TODO (grlee77): implement marching cubes, etc.
+        warn("feret diameter currently not implemented on GPU.")
+        identity_convex_hull = cp.pad(
+            self.convex_image, 2, mode="constant", constant_values=0
+        )
+        identity_convex_hull = cp.asnumpy(identity_convex_hull)
+        if self._ndim == 2:
+            coordinates = np.vstack(
+                find_contours(identity_convex_hull, 0.5, fully_connected="high")
+            )
+        elif self._ndim == 3:
+            coordinates, _, _, _ = marching_cubes(
+                identity_convex_hull, level=0.5
+            )
+        distances = pdist(coordinates, "sqeuclidean")
+        return sqrt(np.max(distances))
 
     @property
     def filled_area(self):
@@ -750,6 +776,10 @@ def regionprops(
     **extent** : float
         Ratio of pixels in the region to pixels in the total bounding box.
         Computed as ``area / (rows * cols)``
+    **feret_diameter** : float
+        Maximum Feret's diameter computed as the longest distance between
+        points around a region's convex hull contour as determined by
+        ``find_contours``. [5]_
     **filled_area** : int
         Number of pixels of the region will all the holes filled in. Describes
         the area of the filled_image.
@@ -864,6 +894,9 @@ def regionprops(
            Features, from Lecture notes in computer science, p. 676. Springer,
            Berlin, 1993.
     .. [4] https://en.wikipedia.org/wiki/Image_moment
+    .. [5] W. Pabst, E. Gregorová. Characterization of particles and particle
+           systems, pp. 27-28. ICT Prague, 2007.
+           https://old.vscht.cz/sil/keramika/Characterization_of_particles/CPPS%20_English%20version_.pdf
 
     Examples
     --------
