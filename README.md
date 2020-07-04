@@ -168,7 +168,7 @@ thus not available in `cupyimg` either.
 
 - apply_along_axis
 - convolve  (upstream PR: [3371](https://github.com/cupy/cupy/pull/3371))
-- correlate
+- correlate  (upstream PR: [3525](https://github.com/cupy/cupy/pull/3525))
 - gradient
 - histogram  (upstream PR: [3124](https://github.com/cupy/cupy/pull/3124))
 - histogram2d

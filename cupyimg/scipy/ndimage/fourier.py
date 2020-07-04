@@ -2,6 +2,7 @@ import cupy
 import numpy as np
 
 
+# TODO (grlee77): improve the efficiency by creating an ElementwiseKernel
 def fourier_shift(input, shift, n=-1, axis=-1, output=None):
     """
     Multidimensional Fourier shift filter.
@@ -51,6 +52,7 @@ def fourier_shift(input, shift, n=-1, axis=-1, output=None):
     >>> plt.show()
     """
 
+    # avoid circular import
     from cupyimg._misc import _reshape_nd
 
     iarr = input
@@ -72,8 +74,6 @@ def fourier_shift(input, shift, n=-1, axis=-1, output=None):
         if kk == axis and n > 0:
             s = -2j * np.pi * shiftk / n
             arr = cupy.arange(ax_size, dtype=complex)
-            arr *= s
-            arr = _reshape_nd(arr, ndim=ndim, axis=kk)
         else:
             s = -2j * np.pi * shiftk / ax_size
             arr = cupy.concatenate(
@@ -82,9 +82,8 @@ def fourier_shift(input, shift, n=-1, axis=-1, output=None):
                     cupy.arange(-(ax_size // 2), 0, dtype=complex),
                 )
             )
-            arr *= s
-            arr = _reshape_nd(arr, ndim=ndim, axis=kk)
+        arr *= s
+        arr = _reshape_nd(arr, ndim=ndim, axis=kk)
         cupy.exp(arr, out=arr)
         iarr = iarr * arr
-    # TODO: could improve the efficiency by creating an ElementwiseKernel
     return iarr
