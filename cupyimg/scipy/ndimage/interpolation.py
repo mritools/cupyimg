@@ -240,32 +240,16 @@ def spline_filter1d(
     # For the kernel, the input and output must have matching dtype
     x = x.astype(y.dtype, copy=False)
 
-    if True:
-        module = cupy.RawModule(
-            code=get_raw_spline1d_code(
-                mode,
-                order=order,
-                dtype_index="int",
-                dtype_data=dtype_data,
-                dtype_pole=dtype_pole,
-            )
+    module = cupy.RawModule(
+        code=get_raw_spline1d_code(
+            mode,
+            order=order,
+            dtype_index="int",
+            dtype_data=dtype_data,
+            dtype_pole=dtype_pole,
         )
-        kern = module.get_function("batch_spline_prefilter")
-    else:
-        # name = "cupy_spline_prefilt_order{}_{}".format(order, dtype_pole[0])
-        # if complex_data:
-        #     name += "_cplx"
-        name = "batch_spline_prefilter"
-        kern = cupy.RawKernel(
-            get_raw_spline1d_code(
-                mode,
-                order=order,
-                dtype_index="int",
-                dtype_data=dtype_data,
-                dtype_pole=dtype_pole,
-            ),
-            name=name,
-        )
+    )
+    kern = module.get_function("batch_spline_prefilter")
 
     # Due to recursive nature, a given line of data must be processed by a
     # single thread. n_batch lines will be processed in total.
