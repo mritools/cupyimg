@@ -1271,9 +1271,57 @@ class TestNdimage:
             output = ndimage.correlate(array, weights, mode=mode, cval=0)
             assert_array_equal(output, expected_value)
 
+    def test_fourier_gaussian_real01(self):
+        for shape in [(32, 16), (31, 15)]:
+            for type_, dec in zip([cupy.float32, cupy.float64], [6, 14]):
+                a = cupy.zeros(shape, type_)
+                a[0, 0] = 1.0
+                a = fft.rfft(a, shape[0], 0)
+                a = fft.fft(a, shape[1], 1)
+                a = ndimage.fourier_gaussian(a, [5.0, 2.5], shape[0], 0)
+                a = fft.ifft(a, shape[1], 1)
+                a = fft.irfft(a, shape[0], 0)
+                assert_array_almost_equal(ndimage.sum(a), 1, decimal=dec)
+
+    def test_fourier_gaussian_complex01(self):
+        for shape in [(32, 16), (31, 15)]:
+            for type_, dec in zip([cupy.complex64, cupy.complex128], [6, 14]):
+                a = cupy.zeros(shape, type_)
+                a[0, 0] = 1.0
+                a = fft.fft(a, shape[0], 0)
+                a = fft.fft(a, shape[1], 1)
+                a = ndimage.fourier_gaussian(a, [5.0, 2.5], -1, 0)
+                a = fft.ifft(a, shape[1], 1)
+                a = fft.ifft(a, shape[0], 0)
+                assert_array_almost_equal(ndimage.sum(a.real), 1.0, decimal=dec)
+
+    def test_fourier_uniform_real01(self):
+        for shape in [(32, 16), (31, 15)]:
+            for type_, dec in zip([cupy.float32, cupy.float64], [6, 14]):
+                a = cupy.zeros(shape, type_)
+                a[0, 0] = 1.0
+                a = fft.rfft(a, shape[0], 0)
+                a = fft.fft(a, shape[1], 1)
+                a = ndimage.fourier_uniform(a, [5.0, 2.5], shape[0], 0)
+                a = fft.ifft(a, shape[1], 1)
+                a = fft.irfft(a, shape[0], 0)
+                assert_array_almost_equal(ndimage.sum(a), 1.0, decimal=dec)
+
+    def test_fourier_uniform_complex01(self):
+        for shape in [(32, 16), (31, 15)]:
+            for type_, dec in zip([cupy.complex64, cupy.complex128], [6, 14]):
+                a = cupy.zeros(shape, type_)
+                a[0, 0] = 1.0
+                a = fft.fft(a, shape[0], 0)
+                a = fft.fft(a, shape[1], 1)
+                a = ndimage.fourier_uniform(a, [5.0, 2.5], -1, 0)
+                a = fft.ifft(a, shape[1], 1)
+                a = fft.ifft(a, shape[0], 0)
+                assert_array_almost_equal(ndimage.sum(a.real), 1.0, decimal=dec)
+
     def test_fourier_shift_real01(self):
         for shape in [(32, 16), (31, 15)]:
-            for type_, dec in zip([numpy.float32, numpy.float64], [4, 11]):
+            for type_, dec in zip([cupy.float32, cupy.float64], [4, 11]):
                 expected = cupy.arange(shape[0] * shape[1], dtype=type_)
                 expected.shape = shape
                 a = fft.rfft(expected, shape[0], 0)
@@ -1290,7 +1338,7 @@ class TestNdimage:
 
     def test_fourier_shift_complex01(self):
         for shape in [(32, 16), (31, 15)]:
-            for type_, dec in zip([numpy.complex64, numpy.complex128], [4, 11]):
+            for type_, dec in zip([cupy.complex64, cupy.complex128], [4, 11]):
                 expected = cupy.arange(shape[0] * shape[1], dtype=type_)
                 expected.shape = shape
                 a = fft.fft(expected, shape[0], 0)
