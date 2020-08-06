@@ -353,7 +353,9 @@ def unsupervised_wiener(
     return (x_postmean, {"noise": gn_chain, "prior": gx_chain})
 
 
-def richardson_lucy(image, psf, iterations=50, clip=True):
+def richardson_lucy(
+    image, psf, iterations=50, clip=True, *, force_float64=False
+):
     """Richardson-Lucy deconvolution.
 
     Parameters
@@ -389,10 +391,14 @@ def richardson_lucy(image, psf, iterations=50, clip=True):
     ----------
     .. [1] https://en.wikipedia.org/wiki/Richardson%E2%80%93Lucy_deconvolution
     """
-    image = image.astype(np.float)
-    psf = psf.astype(np.float)
-    im_deconv = cp.full(image.shape, 0.5)
-    psf_mirror = psf[::-1, ::-1]
+    if force_float64:
+        float_type = np.float64
+    else:
+        float_type = np.promote_types(image.dtype, np.float32)
+    image = image.astype(float_type, copy=False)
+    psf = psf.astype(float_type, copy=False)
+    im_deconv = cp.full(image.shape, 0.5, dtype=float_type)
+    psf_mirror = cp.ascontiguousarray(psf[::-1, ::-1])
 
     for _ in range(iterations):
         relative_blur = image / convolve(im_deconv, psf, mode="same")
