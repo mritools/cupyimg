@@ -208,7 +208,10 @@ thus not available in `cupyimg` either.
 
 **cupyimg.scipy.ndimage.fourier**:
 
-- fourier_shift
+- fourier_ellipsoid
+- fourier_gaussian (see also: [PR 3654](https://github.com/cupy/cupy/pull/3654))
+- fourier_shift (see also: [PR 3654](https://github.com/cupy/cupy/pull/3654))
+- fourier_uniform (see also: [PR 3654](https://github.com/cupy/cupy/pull/3654))
 
 **cupyimg.scipy.ndimage.interpolation**:
 
