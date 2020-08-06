@@ -158,7 +158,12 @@ def histogram(image, nbins=256, source_range="image", normalize=False):
             hist_range = dtype_limits(image, clip_negative=False)
         else:
             ValueError("Wrong value for the `source_range` argument")
-        hist, bin_edges = cnp.histogram(image, bins=nbins, range=hist_range)
+        try:
+            # use upstream version if range argument is available
+            hist, bin_edges = cp.histogram(image, bins=nbins, range=hist_range)
+        except TypeError:
+            # fall back to the version in this library
+            hist, bin_edges = cnp.histogram(image, bins=nbins, range=hist_range)
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
 
     if normalize:
