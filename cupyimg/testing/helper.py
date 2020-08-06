@@ -56,25 +56,14 @@ def _get_numpy_errors():
 _numpy_errors = _get_numpy_errors()
 
 
-def _check_numpy_cupyimg_error_compatible(cupy_error, numpy_error):
+def _check_numpy_cupy_error_compatible(cupy_error, numpy_error):
     """Checks if try/except blocks are equivalent up to public error classes
     """
-
-    errors = _numpy_errors
-
-    # Prior to NumPy version 1.13.0, NumPy raises either `ValueError` or
-    # `IndexError` instead of `numpy.AxisError`.
-    numpy_axis_error = getattr(numpy, "AxisError", None)
-    cupy_axis_error = cupy.core._errors._AxisError
-    if isinstance(cupy_error, cupy_axis_error) and numpy_axis_error is None:
-        if not isinstance(numpy_error, (ValueError, IndexError)):
-            return False
-        errors = list(set(errors) - set([IndexError, ValueError]))
 
     return all(
         [
             isinstance(cupy_error, err) == isinstance(numpy_error, err)
-            for err in errors
+            for err in _numpy_errors
         ]
     )
 
@@ -105,7 +94,7 @@ def _check_cupy_numpy_error(
     elif numpy_error is None:
         self.fail("Only cupy raises error\n\n" + cupy_tb)
 
-    elif not _check_numpy_cupyimg_error_compatible(cupy_error, numpy_error):
+    elif not _check_numpy_cupy_error_compatible(cupy_error, numpy_error):
         msg = """Different types of errors occurred
 
 cupy
