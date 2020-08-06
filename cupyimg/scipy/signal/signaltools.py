@@ -479,12 +479,16 @@ def _freq_domain_conv(in1, in2, axes, shape, calc_fast_len=False):
 
     if not complex_result:
         fft, ifft = sp_fft.rfftn, sp_fft.irfftn
+        plan_fft = sp_fft.get_fft_plan(in1, fshape, axes, value_type="R2C")
+        plan_ifft = None  # don't store as it is only used once
     else:
         fft, ifft = sp_fft.fftn, sp_fft.ifftn
+        plan_fft = sp_fft.get_fft_plan(in1, fshape, axes, value_type="C2C")
+        plan_ifft = plan_fft
 
-    sp1 = fft(in1, fshape, axes=axes)
-    sp1 *= fft(in2, fshape, axes=axes)
-    ret = ifft(sp1, fshape, axes=axes)
+    sp1 = fft(in1, fshape, axes=axes, plan=plan_fft)
+    sp1 *= fft(in2, fshape, axes=axes, plan=plan_fft)
+    ret = ifft(sp1, fshape, axes=axes, plan=plan_ifft)
 
     if calc_fast_len:
         fslice = tuple([slice(sz) for sz in shape])
