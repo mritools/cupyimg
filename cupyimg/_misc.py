@@ -14,8 +14,14 @@ __all__ = ["convolve_separable"]
 
 def _reshape_nd(arr, ndim, axis):
     """Promote a 1d array to ndim with size > 1 at the specified axis."""
-    nd_shape = [1] * ndim
-    nd_shape[axis] = arr.size
+    if arr.ndim != 1:
+        raise ValueError("expected a 1d array")
+    if axis < -ndim or axis > ndim - 1:
+        raise ValueError("invalid axis")
+    if ndim < 1:
+        raise ValueError("ndim must be >= 1")
+    axis = axis % ndim
+    nd_shape = (1,) * axis + (arr.size,) + (1,) * (ndim - axis - 1)
     return arr.reshape(nd_shape)
 
 
