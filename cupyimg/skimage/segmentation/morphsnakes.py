@@ -149,7 +149,7 @@ def circle_level_set(image_shape, center=None, radius=None):
     out : array with shape `image_shape`
         Binary level set of the circle with the given `radius` and `center`.
 
-    See also
+    See Also
     --------
     checkerboard_level_set
     """
@@ -183,7 +183,7 @@ def disk_level_set(image_shape, center=None, radius=None):
     out : array with shape `image_shape`
         Binary level set of the circle with the given `radius` and `center`.
 
-    See also
+    See Also
     --------
     checkerboard_level_set
     """
@@ -216,7 +216,7 @@ def checkerboard_level_set(image_shape, square_size=5):
     out : array with shape `image_shape`
         Binary level set of the checkerboard.
 
-    See also
+    See Also
     --------
     circle_level_set
     """
@@ -318,7 +318,7 @@ def morphological_chan_vese(
     out : (M, N) or (L, M, N) array
         Final segmentation (i.e., the final level set)
 
-    See also
+    See Also
     --------
     circle_level_set, checkerboard_level_set
 
@@ -439,7 +439,7 @@ def morphological_geodesic_active_contour(
     out : (M, N) or (L, M, N) array
         Final segmentation (i.e., the final level set)
 
-    See also
+    See Also
     --------
     inverse_gaussian_gradient, circle_level_set, checkerboard_level_set
 

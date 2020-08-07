@@ -19,9 +19,9 @@ feature
 filters
     Sharpening, edge finding, rank filters, thresholding, etc.
 measure
-    Measurement of image properties, e.g., similarity and contours.
+    Measurement of image properties, e.g., region properties and contours.
 metrics
-    Metrics corresponding to image properties, e.g. similarity
+    Metrics corresponding to images, e.g. distance metrics, similarity, etc.
 morphology
     Morphological operations, e.g., opening or skeletonization.
 restoration

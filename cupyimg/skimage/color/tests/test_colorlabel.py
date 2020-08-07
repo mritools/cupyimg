@@ -4,6 +4,7 @@ import cupy as cp
 import numpy as np
 import pytest
 from cupyimg.skimage.color.colorlabel import label2rgb
+from skimage._shared.testing import assert_no_warnings
 
 from cupy.testing import assert_array_almost_equal, assert_array_equal
 
@@ -160,6 +161,7 @@ def test_leave_labels_alone():
     assert_array_equal(labels, labels_saved)
 
 
+# TODO: diagnose test error that occurs only with CUB enabled: CuPy bug?
 def test_avg():
     # label image
     # ftm: off
@@ -218,3 +220,24 @@ def test_negative_intensity():
     image = cp.full((10, 10), -1, dtype="float64")
     with pytest.warns(UserWarning):
         label2rgb(labels, image, bg_label=-1)
+
+
+def test_bg_color_rgb_string():
+    img = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+    labels = np.zeros((10, 10), dtype=np.int64)
+    labels[1:3, 1:3] = 1
+    labels[6:9, 6:9] = 2
+    img = cp.asarray(img)
+    labels = cp.asarray(labels)
+    output = label2rgb(labels, image=img, alpha=0.9, bg_label=0, bg_color="red")
+    assert output[0, 0, 0] > 0.9  # red channel
+
+
+def test_avg_with_2d_image():
+    img = np.random.randint(0, 255, (10, 10), dtype=np.uint8)
+    labels = np.zeros((10, 10), dtype=np.int64)
+    labels[1:3, 1:3] = 1
+    labels[6:9, 6:9] = 2
+    img = cp.asarray(img)
+    labels = cp.asarray(labels)
+    assert_no_warnings(label2rgb, labels, image=img, bg_label=0, kind="avg")

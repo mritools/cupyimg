@@ -7,12 +7,13 @@ from scipy.ndimage import find_objects as cpu_find_objects
 from cupyimg.skimage import measure
 
 import cupyimg.scipy.ndimage as ndi
+from cupyx.scipy import ndimage as cupyx_ndi
 
 # from .. import measure
 from ..filters import rank_order
+from .._shared.utils import remove_arg
 
 # TODO: update if GPU implementations of the following are completed/improved
-# scipy.ndimage.find_objects
 # skimage.measure.regionprops
 
 
@@ -67,6 +68,7 @@ def _exclude_border(mask, exclude_border):
     return mask
 
 
+@remove_arg("indices", changed_version="0.20")
 def peak_local_max(
     image,
     min_distance=1,
@@ -120,7 +122,10 @@ def peak_local_max(
         coordinates. The coordinates are sorted according to peaks
         values (Larger first). If False, the output will be a boolean
         array shaped as `image.shape` with peaks present at True
-        elements.
+        elements. ``indices`` is deprecated and will be removed in
+        version 0.20. Default behavior will be to always return peak
+        coordinates. You can obtain a mask as shown in the example
+        below.
     num_peaks : int, optional
         Maximum number of peaks. When the number of peaks exceeds `num_peaks`,
         return `num_peaks` peaks based on highest peak intensity.
@@ -178,8 +183,12 @@ def peak_local_max(
 
     >>> img2 = cp.zeros((20, 20, 20))
     >>> img2[10, 10, 10] = 1
-    >>> peak_local_max(img2, exclude_border=0)
+    >>> peak_idx = peak_local_max(img2, exclude_border=0)
+    >>> peak_idx
     array([[10, 10, 10]])
+
+    >>> peak_mask = cp.zeros_like(img2, dtype=bool)
+    >>> peak_mask[peak_idx] = True
 
     """
     out = cp.zeros_like(image, dtype=cp.bool)
@@ -239,10 +248,12 @@ def peak_local_max(
         # For each label, extract a smaller image enclosing the object of
         # interest, identify num_peaks_per_label peaks and mark them in
         # variable out.
-        warnings.warn(
-            "host/device transfers necessary: ndimage.find_objects unimplemented on the GPU"
-        )
-        objects = cpu_find_objects(cp.asnumpy(labels))
+        # TODO: use GPU version of find_objects
+        try:
+            objects = cupyx_ndi.find_objects(labels)
+        except AttributeError:
+            objects = cpu_find_objects(cp.asnumpy(labels))
+
         for label_idx, obj in enumerate(objects):
             img_object = image[obj] * (labels[obj] == label_idx + 1)
             mask = _get_peak_mask(

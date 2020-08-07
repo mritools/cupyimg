@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from cupy.testing import assert_array_almost_equal, assert_array_equal
 from scipy import ndimage as ndimage_cpu
+from skimage._shared._warnings import expected_warnings
 
 from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage.feature import peak
@@ -17,12 +18,11 @@ np.random.seed(21)
 class TestPeakLocalMax:
     def test_trivial_case(self):
         trivial = cp.zeros((25, 25))
-        peak_indices = peak.peak_local_max(
-            trivial, min_distance=1, indices=True
-        )
+        peak_indices = peak.peak_local_max(trivial, min_distance=1)
         assert type(peak_indices) is cp.ndarray
         assert peak_indices.size == 0
-        peaks = peak.peak_local_max(trivial, min_distance=1, indices=False)
+        with expected_warnings(["indices argument is deprecated"]):
+            peaks = peak.peak_local_max(trivial, min_distance=1, indices=False)
         assert (peaks.astype(cp.bool) == trivial).all()
 
     def test_noisy_peaks(self):
@@ -142,7 +142,6 @@ class TestPeakLocalMax:
             labels=labels,
             min_distance=1,
             threshold_rel=0,
-            indices=True,
             num_peaks=cp.inf,
             num_peaks_per_label=2,
         )
@@ -152,7 +151,6 @@ class TestPeakLocalMax:
             labels=labels,
             min_distance=1,
             threshold_rel=0,
-            indices=True,
             num_peaks=cp.inf,
             num_peaks_per_label=1,
         )
@@ -162,7 +160,6 @@ class TestPeakLocalMax:
             labels=labels,
             min_distance=1,
             threshold_rel=0,
-            indices=True,
             num_peaks=2,
             num_peaks_per_label=2,
         )
@@ -190,15 +187,16 @@ class TestPeakLocalMax:
                     image[imin:imax, jmin:jmax], footprint=footprint
                 )
         expected = expected == image
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            min_distance=1,
-            threshold_rel=0,
-            footprint=footprint,
-            indices=False,
-            exclude_border=False,
-        )
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                min_distance=1,
+                threshold_rel=0,
+                footprint=footprint,
+                indices=False,
+                exclude_border=False,
+            )
         assert (result == expected).all()
 
     def test_indices_with_labels(self):
@@ -221,7 +219,6 @@ class TestPeakLocalMax:
             min_distance=1,
             threshold_rel=0,
             footprint=footprint,
-            indices=True,
             exclude_border=False,
         )
         result = result[cp.argsort(image[tuple(result.T)])[::-1]]
@@ -230,7 +227,8 @@ class TestPeakLocalMax:
     def test_ndarray_indices_false(self):
         nd_image = cp.zeros((5, 5, 5))
         nd_image[2, 2, 2] = 1
-        peaks = peak.peak_local_max(nd_image, min_distance=1, indices=False)
+        with expected_warnings(["indices argument is deprecated"]):
+            peaks = peak.peak_local_max(nd_image, min_distance=1, indices=False)
         assert (peaks == nd_image.astype(cp.bool)).all()
 
     def test_ndarray_exclude_border(self):
@@ -241,51 +239,58 @@ class TestPeakLocalMax:
         expected = cp.zeros_like(nd_image, dtype=cp.bool)
         expected[2, 2, 2] = True
         expectedNoBorder = nd_image > 0
-        result = peak.peak_local_max(
-            nd_image, min_distance=2, exclude_border=2, indices=False
-        )
-        assert_array_equal(result, expected)
-        # Check that bools work as expected
-        assert_array_equal(
-            peak.peak_local_max(
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
                 nd_image, min_distance=2, exclude_border=2, indices=False
-            ),
-            peak.peak_local_max(
-                nd_image, min_distance=2, exclude_border=True, indices=False
-            ),
-        )
-        assert_array_equal(
-            peak.peak_local_max(
-                nd_image, min_distance=2, exclude_border=0, indices=False
-            ),
-            peak.peak_local_max(
-                nd_image, min_distance=2, exclude_border=False, indices=False
-            ),
-        )
-        # Check both versions with  no border
-        assert_array_equal(
-            peak.peak_local_max(
-                nd_image, min_distance=2, exclude_border=0, indices=False
-            ),
-            expectedNoBorder,
-        )
-        assert_array_equal(
-            peak.peak_local_max(nd_image, exclude_border=False, indices=False),
-            expectedNoBorder,
-        )
+            )
+            assert_array_equal(result, expected)
+            # Check that bools work as expected
+            assert_array_equal(
+                peak.peak_local_max(
+                    nd_image, min_distance=2, exclude_border=2, indices=False
+                ),
+                peak.peak_local_max(
+                    nd_image, min_distance=2, exclude_border=True, indices=False
+                ),
+            )
+            assert_array_equal(
+                peak.peak_local_max(
+                    nd_image, min_distance=2, exclude_border=0, indices=False
+                ),
+                peak.peak_local_max(
+                    nd_image,
+                    min_distance=2,
+                    exclude_border=False,
+                    indices=False,
+                ),
+            )
+            # Check both versions with  no border
+            assert_array_equal(
+                peak.peak_local_max(
+                    nd_image, min_distance=2, exclude_border=0, indices=False
+                ),
+                expectedNoBorder,
+            )
+            assert_array_equal(
+                peak.peak_local_max(
+                    nd_image, exclude_border=False, indices=False
+                ),
+                expectedNoBorder,
+            )
 
     def test_empty(self):
         image = cp.zeros((10, 20))
         labels = cp.zeros((10, 20), int)
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            footprint=cp.ones((3, 3), bool),
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                footprint=cp.ones((3, 3), bool),
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
         assert cp.all(~result)
 
     def test_empty_non2d_indices(self):
@@ -295,7 +300,6 @@ class TestPeakLocalMax:
             footprint=cp.ones((3, 3), bool),
             min_distance=1,
             threshold_rel=0,
-            indices=True,
             exclude_border=False,
         )
         assert result.shape == (0, image.ndim)
@@ -305,15 +309,16 @@ class TestPeakLocalMax:
         labels = cp.zeros((10, 20), int)
         image[5, 5] = 1
         labels[5, 5] = 1
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            footprint=cp.ones((3, 3), bool),
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                footprint=cp.ones((3, 3), bool),
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
         assert cp.all(result == (labels == 1))
 
     def test_adjacent_and_same(self):
@@ -321,15 +326,16 @@ class TestPeakLocalMax:
         labels = cp.zeros((10, 20), int)
         image[5, 5:6] = 1
         labels[5, 5:6] = 1
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            footprint=cp.ones((3, 3), bool),
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                footprint=cp.ones((3, 3), bool),
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
         assert cp.all(result == (labels == 1))
 
     def test_adjacent_and_different(self):
@@ -339,25 +345,26 @@ class TestPeakLocalMax:
         image[5, 6] = 0.5
         labels[5, 5:6] = 1
         expected = image == 1
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            footprint=cp.ones((3, 3), bool),
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
-        assert cp.all(result == expected)
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
-        assert cp.all(result == expected)
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                footprint=cp.ones((3, 3), bool),
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
+            assert cp.all(result == expected)
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
+            assert cp.all(result == expected)
 
     def test_not_adjacent_and_different(self):
         image = cp.zeros((10, 20))
@@ -366,15 +373,16 @@ class TestPeakLocalMax:
         image[5, 8] = 0.5
         labels[image > 0] = 1
         expected = labels == 1
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            footprint=cp.ones((3, 3), bool),
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                footprint=cp.ones((3, 3), bool),
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
         assert cp.all(result == expected)
 
     def test_two_objects(self):
@@ -385,15 +393,16 @@ class TestPeakLocalMax:
         labels[5, 5] = 1
         labels[5, 15] = 2
         expected = labels > 0
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            footprint=cp.ones((3, 3), bool),
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                footprint=cp.ones((3, 3), bool),
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
         assert cp.all(result == expected)
 
     def test_adjacent_different_objects(self):
@@ -404,15 +413,16 @@ class TestPeakLocalMax:
         labels[5, 5] = 1
         labels[5, 6] = 2
         expected = labels > 0
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            footprint=cp.ones((3, 3), bool),
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                footprint=cp.ones((3, 3), bool),
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
         assert cp.all(result == expected)
 
     def test_four_quadrants(self):
@@ -428,15 +438,16 @@ class TestPeakLocalMax:
                     image[imin:imax, jmin:jmax], footprint=footprint
                 )
         expected = expected == image
-        result = peak.peak_local_max(
-            image,
-            labels=labels,
-            footprint=footprint,
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=labels,
+                footprint=footprint,
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
         assert cp.all(result == expected)
 
     def test_disk(self):
@@ -445,25 +456,26 @@ class TestPeakLocalMax:
         """
         image = cp.asarray(np.random.uniform(size=(10, 20)))
         footprint = cp.asarray([[1]])
-        result = peak.peak_local_max(
-            image,
-            labels=cp.ones((10, 20)),
-            footprint=footprint,
-            min_distance=1,
-            threshold_rel=0,
-            threshold_abs=-1,
-            indices=False,
-            exclude_border=False,
-        )
-        assert cp.all(result)
-        result = peak.peak_local_max(
-            image,
-            footprint=footprint,
-            threshold_abs=-1,
-            indices=False,
-            exclude_border=False,
-        )
-        assert cp.all(result)
+        with expected_warnings(["indices argument is deprecated"]):
+            result = peak.peak_local_max(
+                image,
+                labels=cp.ones((10, 20)),
+                footprint=footprint,
+                min_distance=1,
+                threshold_rel=0,
+                threshold_abs=-1,
+                indices=False,
+                exclude_border=False,
+            )
+            assert cp.all(result)
+            result = peak.peak_local_max(
+                image,
+                footprint=footprint,
+                threshold_abs=-1,
+                indices=False,
+                exclude_border=False,
+            )
+            assert cp.all(result)
 
     def test_3D(self):
         image = cp.zeros((30, 30, 30))
@@ -647,15 +659,16 @@ class TestProminentPeaks(unittest.TestCase):
         image[5, 5] = 1
         labels[5, 5] = 1
         labelsin = labels.copy()
-        peak.peak_local_max(
-            image,
-            labels=labels,
-            footprint=cp.ones((3, 3), bool),
-            min_distance=1,
-            threshold_rel=0,
-            indices=False,
-            exclude_border=False,
-        )
+        with expected_warnings(["indices argument is deprecated"]):
+            peak.peak_local_max(
+                image,
+                labels=labels,
+                footprint=cp.ones((3, 3), bool),
+                min_distance=1,
+                threshold_rel=0,
+                indices=False,
+                exclude_border=False,
+            )
         assert cp.all(labels == labelsin)
 
     def test_many_objects(self):
@@ -670,10 +683,6 @@ class TestProminentPeaks(unittest.TestCase):
         dist = cp.asarray(dist)
         labels = cp.asarray(labels)
         local_max = peak.peak_local_max(
-            dist,
-            min_distance=20,
-            indices=True,
-            exclude_border=False,
-            labels=labels,
+            dist, min_distance=20, exclude_border=False, labels=labels,
         )
         assert len(local_max) == 625

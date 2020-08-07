@@ -354,7 +354,13 @@ def unsupervised_wiener(
 
 
 def richardson_lucy(
-    image, psf, iterations=50, clip=True, *, force_float64=False
+    image,
+    psf,
+    iterations=50,
+    clip=True,
+    filter_epsilon=None,
+    *,
+    force_float64=False,
 ):
     """Richardson-Lucy deconvolution.
 
@@ -370,6 +376,9 @@ def richardson_lucy(
     clip : boolean, optional
        True by default. If true, pixel value of the result above 1 or
        under -1 are thresholded for skimage pipeline compatibility.
+    filter_epsilon: float, optional
+       Value below which intermediate results become 0 to avoid division
+       by small numbers.
 
     Returns
     -------
@@ -401,7 +410,11 @@ def richardson_lucy(
     psf_mirror = cp.ascontiguousarray(psf[::-1, ::-1])
 
     for _ in range(iterations):
-        relative_blur = image / convolve(im_deconv, psf, mode="same")
+        conv = convolve(im_deconv, psf, mode="same")
+        if filter_epsilon:
+            relative_blur = cp.where(conv < filter_epsilon, 0, image / conv)
+        else:
+            relative_blur = image / conv
         im_deconv *= convolve(relative_blur, psf_mirror, mode="same")
 
     if clip:
