@@ -553,8 +553,16 @@ def _cross_entropy(image, threshold, bins=_DEFAULT_ENTROPY_BINS):
            :DOI:`10.1016/S0167-8655(98)00057-9`
     """
     bins = cp.asarray(bins)  # required for _DEFAULT_ENTROPY_BINS tuple
-    histogram, bin_edges = cnp.histogram(image, bins=bins, density=True)
-    bin_centers = cnp.convolve(bin_edges, [0.5, 0.5], mode="valid")
+    try:
+        # use CuPy's implementation when available
+        histogram, bin_edges = cp.histogram(image, bins=bins, density=True)
+    except TypeError:
+        histogram, bin_edges = cnp.histogram(image, bins=bins, density=True)
+    try:
+        # use CuPy's implementation when available
+        bin_centers = cp.convolve(bin_edges, [0.5, 0.5], mode="valid")
+    except AttributeError:
+        bin_centers = cnp.convolve(bin_edges, [0.5, 0.5], mode="valid")
     t = cp.flatnonzero(bin_centers > threshold)[0]
     m0a = cp.sum(histogram[:t])  # 0th moment, background
     m0b = cp.sum(histogram[t:])
