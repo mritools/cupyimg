@@ -7,7 +7,7 @@ from cupyimg.skimage.filters._gaussian import (
     _guess_spatial_dimensions,
     difference_of_gaussians,
 )
-from skimage._shared._warnings import expected_warnings
+from cupyimg.skimage._shared._warnings import expected_warnings
 
 
 def test_negative_sigma():

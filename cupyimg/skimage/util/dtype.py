@@ -252,7 +252,6 @@ def _convert(image, dtype, force_copy=False, uniform=False):
         dtypeobj_out = cp.dtype("float64")
     else:
         dtypeobj_out = cp.dtype(dtype)
-    dtypeobj_out = cp.dtype(dtype)
     dtype_in = dtypeobj_in.type
     dtype_out = dtypeobj_out.type
     kind_in = dtypeobj_in.kind
