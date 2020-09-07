@@ -3,6 +3,7 @@ import cupy.core.internal
 
 from .support import _generate_boundary_condition_ops, _raw_ptr_ops
 from .spline import spline_weights_inline
+from cupyimg import memoize
 
 const_legacy_mode = False
 
@@ -502,7 +503,7 @@ def _generate_interp_custom(
     return operation, name
 
 
-@cupy.util.memoize(for_each_device=True)
+@memoize(for_each_device=True)
 def _get_map_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):
@@ -523,7 +524,7 @@ def _get_map_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize(for_each_device=True)
+@memoize(for_each_device=True)
 def _get_shift_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):
@@ -544,7 +545,7 @@ def _get_shift_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize(for_each_device=True)
+@memoize(for_each_device=True)
 def _get_zoom_shift_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):
@@ -565,7 +566,7 @@ def _get_zoom_shift_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize(for_each_device=True)
+@memoize(for_each_device=True)
 def _get_zoom_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):
@@ -586,7 +587,7 @@ def _get_zoom_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize(for_each_device=True)
+@memoize(for_each_device=True)
 def _get_affine_kernel(
     ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
 ):

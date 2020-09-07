@@ -10,6 +10,7 @@ from .support import (
     _pixelmask_to_buffer,
     _raw_ptr_ops,
 )
+from cupyimg import memoize
 from cupyimg.scipy.ndimage._kernels.optimal_median_preambles import (
     opt_med_preambles,
 )
@@ -420,7 +421,7 @@ __device__ void sort(X *array, int size) {
 }"""
 
 
-@cupy.util.memoize()
+@memoize()
 def _get_shell_gap(filter_size):
     gap = 1
     while gap < filter_size:
@@ -528,7 +529,7 @@ def _generate_rank_kernel_masked(mode, cval, xshape, fshape, nnz, origin, rank):
     return in_params, out_params, operation, name, preamble
 
 
-@cupy.util.memoize()
+@memoize()
 def _get_correlate_kernel(
     ndim, mode, cval, xshape, fshape, origin, unsigned_output
 ):
@@ -538,7 +539,7 @@ def _get_correlate_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-# @cupy.util.memoize()
+# @memoize()
 def _get_correlate_kernel_masked(
     mode, cval, xshape, fshape, nnz, origin, unsigned_output
 ):
@@ -548,7 +549,7 @@ def _get_correlate_kernel_masked(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-# @cupy.util.memoize()
+# @memoize()
 def _get_min_or_max_kernel(
     mode, cval, xshape, fshape, origin, minimum, unsigned_output
 ):
@@ -558,7 +559,7 @@ def _get_min_or_max_kernel(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-# @cupy.util.memoize()
+# @memoize()
 def _get_min_or_max_kernel_masked(
     mode, cval, xshape, fshape, nnz, origin, minimum, unsigned_output
 ):
@@ -584,7 +585,7 @@ def _get_min_or_max_kernel_masked_v2(
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
-@cupy.util.memoize()
+@memoize()
 def _get_rank_kernel(mode, cval, xshape, fshape, origin, rank):
     in_params, out_params, operation, name, preamble = _generate_rank_kernel(
         mode, cval, xshape, fshape, origin, rank

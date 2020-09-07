@@ -8,7 +8,6 @@ import cupy
 
 from cupyimg.scipy.ndimage import convolve1d
 
-
 __all__ = ["convolve_separable"]
 
 

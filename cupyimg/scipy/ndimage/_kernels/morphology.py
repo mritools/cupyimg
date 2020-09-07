@@ -224,7 +224,7 @@ def _generate_erode_kernel_masked(
     return in_params, out_params, operation, name
 
 
-# @cupy.util.memoize()
+# @cupy.memoize()
 def _get_erode_kernel(
     xshape, fshape, origin, center_is_true, border_value, invert, masked
 ):

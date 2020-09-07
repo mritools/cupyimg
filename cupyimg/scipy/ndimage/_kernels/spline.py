@@ -1,4 +1,4 @@
-import cupy
+from cupyimg import memoize
 
 
 def get_poles(order):
@@ -196,7 +196,7 @@ batch_spline1d_template = """
 """
 
 
-@cupy.util.memoize()
+@memoize()
 def get_raw_spline1d_code(
     mode, order=3, dtype_index="int", dtype_data="double", dtype_pole="double"
 ):

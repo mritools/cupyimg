@@ -4,6 +4,7 @@ import cupy
 from .support import _generate_boundary_condition_ops
 from .filters import _get_correlate_kernel_masked
 from cupyimg.scipy.ndimage import _ni_support
+from cupyimg import memoize
 
 # ######## Convolutions and Correlations ##########
 
@@ -107,7 +108,7 @@ def _correlate_or_convolve(
         return _call_kernel(kernel, input, weights, output, weight_dtype)
 
 
-@cupy.util.memoize()
+@memoize()
 def _get_correlate_kernel(
     mode, wshape, int_type, origins, cval, unsigned_output
 ):
