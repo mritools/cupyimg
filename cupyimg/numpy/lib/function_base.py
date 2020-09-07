@@ -5,7 +5,7 @@ import numpy.core.numeric as _nx
 from cupyimg import numpy as cnp
 
 
-def gradient(f, *varargs, edge_order=1, axis=None):
+def gradient(f, *varargs, axis=None, edge_order=1):
     """
     Return the gradient of an N-dimensional array.
 
@@ -183,8 +183,7 @@ def gradient(f, *varargs, edge_order=1, axis=None):
     f = cupy.asanyarray(f)
     N = f.ndim  # number of dimensions
 
-    axes = axis
-    if axes is None:
+    if axis is None:
         axes = tuple(range(N))
     else:
         axes = _nx.normalize_axis_tuple(axes, N)
