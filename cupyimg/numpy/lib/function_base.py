@@ -5,7 +5,7 @@ import numpy.core.numeric as _nx
 from cupyimg import numpy as cnp
 
 
-def gradient(f, *varargs, **kwargs):
+def gradient(f, *varargs, edge_order=1, axis=None):
     """
     Return the gradient of an N-dimensional array.
 
@@ -183,7 +183,7 @@ def gradient(f, *varargs, **kwargs):
     f = cupy.asanyarray(f)
     N = f.ndim  # number of dimensions
 
-    axes = kwargs.pop("axis", None)
+    axes = axis
     if axes is None:
         axes = tuple(range(N))
     else:
@@ -219,13 +219,6 @@ def gradient(f, *varargs, **kwargs):
     else:
         raise TypeError("invalid number of arguments")
 
-    edge_order = kwargs.pop("edge_order", 1)
-    if kwargs:
-        raise TypeError(
-            '"{}" are not valid keyword arguments.'.format(
-                '", "'.join(kwargs.keys())
-            )
-        )
     if edge_order > 2:
         raise ValueError("'edge_order' greater than 2 not supported")
 
