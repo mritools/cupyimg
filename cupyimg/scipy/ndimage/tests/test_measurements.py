@@ -9,7 +9,7 @@ from numpy.testing import (
     assert_raises,
 )
 from cupy.testing import assert_array_equal, assert_array_almost_equal
-from scipy._lib._numpy_compat import suppress_warnings
+from numpy.testing import suppress_warnings
 
 import cupyimg.scipy.ndimage as ndimage
 
