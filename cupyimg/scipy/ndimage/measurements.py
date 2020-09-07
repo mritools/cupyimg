@@ -1201,7 +1201,7 @@ def center_of_mass(input, labels=None, index=None):
     if cupy.isscalar(results[0]) or is_0dim_array:
         return tuple(cupy.asnumpy(results))
 
-    results = cupy.asnumpy(results)
+    results = [cupy.asnumpy(r) for r in results]
     return [tuple(v) for v in numpy.array(results).T]
     # return [tuple(v) for v in cupy.asnumpy(cupy.stack(results, axis=-1))]
 
