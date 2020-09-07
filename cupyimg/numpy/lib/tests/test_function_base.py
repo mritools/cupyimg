@@ -15,8 +15,10 @@ class TestGradient(object):
             cp.asarray([[2.0, 3.0], [2.0, 3.0]]),
             cp.asarray([[0.0, 0.0], [1.0, 1.0]]),
         ]
-        assert_array_equal(gradient(x), dx)
-        assert_array_equal(gradient(v), dx)
+        for g, d in zip(gradient(x), dx):
+            assert_array_equal(g, d)
+        for g, d in zip(gradient(v), dx):
+            assert_array_equal(g, d)
 
     def test_args(self):
         dx = cp.cumsum(cp.ones(5))
@@ -137,8 +139,10 @@ class TestGradient(object):
                 f, x_even, x_even, axis=(0, 1), edge_order=edge_order
             )
             res3 = gradient(f, x_even, x_even, axis=None, edge_order=edge_order)
-            assert_array_equal(res1, res2)
-            assert_array_equal(res2, res3)
+            for g1, g2 in zip(res1, res2):
+                assert_array_equal(g1, g2)
+            for g1, g2 in zip(res2, res3):
+                assert_array_equal(g1, g2)
             assert_array_almost_equal(res1[0], exp_res.T)
             assert_array_almost_equal(res1[1], exp_res)
 
@@ -160,7 +164,8 @@ class TestGradient(object):
             res2 = gradient(
                 f, x_uneven, x_uneven, axis=None, edge_order=edge_order
             )
-            assert_array_equal(res1, res2)
+            for g1, g2 in zip(res1, res2):
+                assert_array_equal(g1, g2)
             assert_array_almost_equal(res1[0], exp_res.T)
             assert_array_almost_equal(res1[1], exp_res)
 
@@ -196,17 +201,20 @@ class TestGradient(object):
         assert_array_equal(gradient(x, axis=0), dx[0])
         assert_array_equal(gradient(x, axis=1), dx[1])
         assert_array_equal(gradient(x, axis=-1), dx[1])
-        assert_array_equal(gradient(x, axis=(1, 0)), [dx[1], dx[0]])
+        for g, d in zip(gradient(x, axis=(1, 0)), [dx[1], dx[0]]):
+            assert_array_equal(g, d)
+        for g, d in zip(gradient(x, axis=None), [dx[0], dx[1]]):
+            assert_array_equal(g, d)
 
-        # test axis=None which means all axes
-        assert_array_almost_equal(gradient(x, axis=None), [dx[0], dx[1]])
-        # and is the same as no axis keyword given
-        assert_array_almost_equal(gradient(x, axis=None), gradient(x))
+        for g1, g2 in zip(gradient(x, axis=None), gradient(x)):
+            # and is the same as no axis keyword given
+            assert_array_almost_equal(g1, g2)
 
         # test vararg order
-        assert_array_equal(
+        for g, d in zip(
             gradient(x, 2, 3, axis=(1, 0)), [dx[1] / 2.0, dx[0] / 3.0]
-        )
+        ):
+            assert_array_equal(g, d)
         # test maximal number of varargs
         assert_raises(TypeError, gradient, x, 1, 2, axis=1)
 
