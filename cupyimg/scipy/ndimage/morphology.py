@@ -2020,13 +2020,6 @@ def white_tophat(
         tmp, size, footprint, structure, output, mode, cval, origin
     )
 
-    if output is not None and tmp is not output:
-        # TODO: should not need this if statement case
-        output[...] = tmp
-        tmp = output
-    # if tmp is None:
-    #    tmp = output
-
     if tmp is None:
         tmp = output
 
@@ -2097,13 +2090,6 @@ def black_tophat(
     tmp = grey_erosion(
         tmp, size, footprint, structure, output, mode, cval, origin
     )
-
-    if output is not None and tmp is not output:
-        # TODO: should not need this if statement case
-        output[...] = tmp
-        tmp = output
-    # if tmp is None:
-    #     tmp = output
 
     if input.dtype == numpy.bool_ and tmp.dtype == numpy.bool_:
         cupy.bitwise_xor(tmp, input, out=tmp)
