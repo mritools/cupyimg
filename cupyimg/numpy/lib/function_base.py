@@ -1,6 +1,7 @@
 import cupy
 import numpy as np
-import numpy.core.numeric as _nx
+
+from cupyimg._misc import _normalize_axis_indices
 
 from cupyimg import numpy as cnp
 
@@ -181,12 +182,12 @@ def gradient(f, *varargs, axis=None, edge_order=1):
             S0025-5718-1988-0935077-0/S0025-5718-1988-0935077-0.pdf>`_.
     """
     f = cupy.asanyarray(f)
-    N = f.ndim  # number of dimensions
+    ndim = f.ndim  # number of dimensions
 
     if axis is None:
-        axes = tuple(range(N))
+        axes = tuple(range(ndim))
     else:
-        axes = _nx.normalize_axis_tuple(axes, N)
+        axes = _normalize_axis_indices(axis, ndim)
 
     len_axes = len(axes)
     n = len(varargs)
@@ -227,10 +228,10 @@ def gradient(f, *varargs, axis=None, edge_order=1):
     outvals = []
 
     # create slice objects --- initially all are [:, :, ..., :]
-    slice1 = [slice(None)] * N
-    slice2 = [slice(None)] * N
-    slice3 = [slice(None)] * N
-    slice4 = [slice(None)] * N
+    slice1 = [slice(None)] * ndim
+    slice2 = [slice(None)] * ndim
+    slice3 = [slice(None)] * ndim
+    slice4 = [slice(None)] * ndim
 
     otype = f.dtype
     if otype.type is np.datetime64:
@@ -275,7 +276,7 @@ def gradient(f, *varargs, axis=None, edge_order=1):
             b = (dx2 - dx1) / (dx1 * dx2)
             c = dx1 / (dx2 * (dx1 + dx2))
             # fix the shape for broadcasting
-            shape = np.ones(N, dtype=int)
+            shape = np.ones(ndim, dtype=int)
             shape[axis] = -1
             a.shape = b.shape = c.shape = shape
             # 1D equivalent -- out[1:-1] = a * f[:-2] + b * f[1:-1] + c * f[2:]
