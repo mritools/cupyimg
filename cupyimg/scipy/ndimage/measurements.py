@@ -590,12 +590,7 @@ def _select(
     idxs[~found] = labels.max() + 1
 
     if find_median:
-        # TODO: grlee77: fix cupy.lexsort for multiple keys
-        order = cupy.asarray(
-            numpy.lexsort(
-                (cupy.asnumpy(input.ravel()), cupy.asnumpy(labels.ravel()))
-            )
-        )
+        order = cupy.lexsort(cupy.stack((input.ravel(), labels.ravel())))
     else:
         order = input.ravel().argsort()
     input = input.ravel()[order]
