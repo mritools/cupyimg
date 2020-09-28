@@ -5,6 +5,7 @@ from .support import _generate_boundary_condition_ops
 from .filters import _get_correlate_kernel_masked
 from cupyimg.scipy.ndimage import _ni_support
 from cupyimg import memoize
+from cupyimg import _misc
 
 # ######## Convolutions and Correlations ##########
 
@@ -154,7 +155,7 @@ def _check_mode(mode):
 def _convert_1d_args(ndim, weights, origin, axis):
     if weights.ndim != 1 or weights.size < 1:
         raise RuntimeError("incorrect filter size")
-    axis = cupy.util._normalize_axis_index(axis, ndim)
+    axis = _misc._normalize_axis_index(axis, ndim)
     wshape = [1] * ndim
     wshape[axis] = weights.size
     weights = weights.reshape(wshape)

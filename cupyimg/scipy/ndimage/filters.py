@@ -30,6 +30,7 @@ from ._kernels.filters import (
 )
 from . import _ni_support
 from ._kernels.filters_v2 import _correlate_or_convolve
+from cupyimg import _misc
 
 _partial = functools.partial
 
@@ -133,7 +134,7 @@ def convolve1d(
     """
     from cupyimg._misc import _reshape_nd
 
-    axis = cupy.util._normalize_axis_index(axis, input.ndim)
+    axis = _misc._normalize_axis_index(axis, input.ndim)
     if backend == "fast_upfirdn":
         origin = _ni_support._check_origin(origin, len(weights))
 
@@ -320,7 +321,7 @@ def prewitt(input, axis=-1, output=None, mode="reflect", cval=0.0):
     See ``scipy.ndimage.prewitt``
     """
     dtype_weights = numpy.promote_types(input.real.dtype, numpy.float32)
-    axis = cupy.util._normalize_axis_index(axis, input.ndim)
+    axis = _misc._normalize_axis_index(axis, input.ndim)
     output = _ni_support._get_output(output, input)
     modes = _ni_support._normalize_sequence(mode, input.ndim)
     filt1 = [-1, 0, 1]
@@ -759,7 +760,7 @@ def minimum_filter1d(
     .. seealso:: :func:`scipy.ndimage.minimum_filter1d`
     """
     ndim = input.ndim
-    axis = cupy.util._normalize_axis_index(axis, ndim)
+    axis = _misc._normalize_axis_index(axis, ndim)
     fshape = (1,) * axis + (size,) + (1,) * (ndim - axis - 1)
     footprint = cupy.ones(fshape, dtype=numpy.bool)
     return _min_or_max_filter(
@@ -794,7 +795,7 @@ def maximum_filter1d(
     .. seealso:: :func:`scipy.ndimage.maximum_filter1d`
     """
     ndim = input.ndim
-    axis = cupy.util._normalize_axis_index(axis, ndim)
+    axis = _misc._normalize_axis_index(axis, ndim)
     fshape = (1,) * axis + (size,) + (1,) * (ndim - axis - 1)
     footprint = cupy.ones(fshape, dtype=numpy.bool)
     return _min_or_max_filter(

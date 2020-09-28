@@ -1,7 +1,6 @@
 """Misc utility functions that are not from SciPy, NumPy or scikit-image.
 
 """
-import operator
 import os
 import tempfile
 
@@ -125,70 +124,68 @@ class cache_source(object):
 
 
 try:
-    from cupy._util import _normalize_axis_indices
+    from cupy._util import (
+        _normalize_axis_index,
+        _normalize_axis_indices,
+    )  # NOQA
+
 except ImportError:
-    from numpy.core.multiarray import normalize_axis_index
+    try:
+        from cupy.util import (
+            _normalize_axis_index,
+            _normalize_axis_indices,
+        )  # NOQA
+    except ImportError:
+        import numpy
 
-    # copy of numpy.core.numeric._nx.normalize_axis_tuple
+        def _normalize_axis_index(axis, ndim):  # NOQA
+            """
+            Normalizes an axis index, ``axis``, such that is a valid positive
+            index into the shape of array with ``ndim`` dimensions. Raises a
+            ValueError with an appropriate message if this is not possible.
 
-    def _normalize_axis_indices(
-        axis, ndim, argname=None, allow_duplicate=False
-    ):
-        """
-        Normalizes an axis argument into a tuple of non-negative integer axes.
+            Args:
+                axis (int):
+                    The un-normalized index of the axis. Can be negative
+                ndim (int):
+                    The number of dimensions of the array that ``axis`` should
+                    be normalized against
 
-        This handles shorthands such as ``1`` and converts them to ``(1,)``,
-        as well as performing the handling of negative indices covered by
-        `normalize_axis_index`.
+            Returns:
+                int:
+                    The normalized axis index, such that
+                    `0 <= normalized_axis < ndim`
+            """
+            if axis < 0:
+                axis += ndim
+            if not (0 <= axis < ndim):
+                raise numpy.AxisError("axis out of bounds")
+            return axis
 
-        By default, this forbids axes from being specified multiple times.
+        def _normalize_axis_indices(axes, ndim):  # NOQA
+            """Normalize axis indices.
 
-        Used internally by multi-axis-checking logic.
+            Args:
+                axis (int, tuple of int or None):
+                    The un-normalized indices of the axis. Can be negative.
+                ndim (int):
+                    The number of dimensions of the array that ``axis`` should
+                    be normalized against
 
-        .. versionadded:: 1.13.0
+            Returns:
+                tuple of int:
+                    The tuple of normalized axis indices.
+            """
+            if axes is None:
+                axes = tuple(range(ndim))
+            elif not isinstance(axes, tuple):
+                axes = (axes,)
 
-        Parameters
-        ----------
-        axis : int, iterable of int
-            The un-normalized index or indices of the axis.
-        ndim : int
-            The number of dimensions of the array that `axis` should be normalized
-            against.
-        argname : str, optional
-            A prefix to put before the error message, typically the name of the
-            argument.
-        allow_duplicate : bool, optional
-            If False, the default, disallow an axis from being specified twice.
+            res = []
+            for axis in axes:
+                axis = _normalize_axis_index(axis, ndim)
+                if axis in res:
+                    raise ValueError("Duplicate value in 'axis'")
+                res.append(axis)
 
-        Returns
-        -------
-        normalized_axes : tuple of int
-            The normalized axis index, such that `0 <= normalized_axis < ndim`
-
-        Raises
-        ------
-        AxisError
-            If any axis provided is out of range
-        ValueError
-            If an axis is repeated
-
-        See also
-        --------
-        normalize_axis_index : normalizing a single scalar axis
-        """
-        # Optimization to speed-up the most common cases.
-        if type(axis) not in (tuple, list):
-            try:
-                axis = [operator.index(axis)]
-            except TypeError:
-                pass
-        # Going via an iterator directly is slower than via list comprehension.
-        axis = tuple([normalize_axis_index(ax, ndim, argname) for ax in axis])
-        if not allow_duplicate and len(set(axis)) != len(axis):
-            if argname:
-                raise ValueError(
-                    "repeated axis in `{}` argument".format(argname)
-                )
-            else:
-                raise ValueError("repeated axis")
-        return axis
+            return tuple(sorted(res))
