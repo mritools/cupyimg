@@ -90,6 +90,7 @@ def label(
     See Also
     --------
     regionprops
+    regionprops_table
 
     References
     ----------

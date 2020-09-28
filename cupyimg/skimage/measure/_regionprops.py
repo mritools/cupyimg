@@ -1096,6 +1096,7 @@ def regionprops(
     (22.72987986048314, 81.91228523446583)
 
     Add custom measurements by passing functions as ``extra_properties``
+
     >>> from skimage import data, util
     >>> from cupyimg.skimage.measure import label, regionprops
     >>> import numpy as np

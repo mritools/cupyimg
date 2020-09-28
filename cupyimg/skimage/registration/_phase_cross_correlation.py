@@ -259,7 +259,6 @@ def phase_cross_correlation(
         # Center of output array at dftshift + 1
         dftshift = np.fix(upsampled_region_size / 2.0)
         upsample_factor = float(upsample_factor)
-        normalization = src_freq.size * (upsample_factor * upsample_factor)
         # Matrix multiply DFT around the current shift estimate
         sample_region_offset = dftshift - shifts * upsample_factor
         cross_correlation = _upsampled_dft(
@@ -268,7 +267,6 @@ def phase_cross_correlation(
             upsample_factor,
             sample_region_offset,
         ).conj()
-        cross_correlation /= normalization
         # Locate maximum and map back to original pixel grid
         maxima = cp.unravel_index(
             cp.argmax(cp.abs(cross_correlation)), cross_correlation.shape
@@ -283,14 +281,12 @@ def phase_cross_correlation(
         shifts = shifts + maxima / upsample_factor
 
         if return_error:
-            src_amp = _upsampled_dft(
-                src_freq * src_freq.conj(), 1, upsample_factor
-            )[0, 0]
-            src_amp /= normalization
-            target_amp = _upsampled_dft(
-                target_freq * target_freq.conj(), 1, upsample_factor
-            )[0, 0]
-            target_amp /= normalization
+            src_amp = cp.abs(src_freq)
+            src_amp *= src_amp
+            src_amp = cp.sum(src_amp)
+            target_amp = cp.abs(target_freq)
+            target_amp *= target_amp
+            target_amp = cp.sum(target_amp)
 
     # If its only one row or column the shift along that dimension has no
     # effect. We set to zero.
@@ -299,6 +295,17 @@ def phase_cross_correlation(
             shifts[dim] = 0
 
     if return_error:
+        # Redirect user to masked_phase_cross_correlation if NaNs are observed
+        if cp.isnan(CCmax) or cp.isnan(src_amp) or cp.isnan(target_amp):
+            raise ValueError(
+                "NaN values found, please remove NaNs from your "
+                "input data or use the `reference_mask`/`moving_mask` "
+                "keywords, eg: "
+                "phase_cross_correlation(reference_image, moving_image, "
+                "reference_mask=~np.isnan(reference_image), "
+                "moving_mask=~np.isnan(moving_image))"
+            )
+
         return (
             shifts,
             _compute_error(CCmax, src_amp, target_amp),
