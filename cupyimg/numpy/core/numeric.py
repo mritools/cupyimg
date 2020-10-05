@@ -2,7 +2,6 @@
 
 """
 
-from fast_upfirdn.cupy import convolve1d
 
 import cupy
 
@@ -102,6 +101,8 @@ def convolve(a, v, mode="full", *, xp=None):
     >>> convolve(cupy.array([1, 2, 3]),cupy.array([0, 1, 0.5]), 'valid')
     array([2.5])
     """
+    from fast_upfirdn.cupy import convolve1d
+
     a = cupy.array(a, copy=False, ndmin=1)
     v = cupy.array(v, copy=False, ndmin=1)
 

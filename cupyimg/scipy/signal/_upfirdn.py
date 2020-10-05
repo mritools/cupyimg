@@ -1,6 +1,3 @@
-from fast_upfirdn.cupy import upfirdn as upfirdn_cupy
-
-
 __all__ = ["upfirdn"]
 
 _upfirdn_modes = [
@@ -145,6 +142,8 @@ def upfirdn(
            [ 6.,  7.]])
 
     """
+    from fast_upfirdn.cupy import upfirdn as upfirdn_cupy
+
     upfirdn_kwargs = dict(
         up=up,
         down=down,

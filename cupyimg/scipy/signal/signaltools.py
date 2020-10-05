@@ -3,7 +3,6 @@ import timeit
 
 import cupy
 import numpy as np
-from fast_upfirdn import upfirdn_out_len, upfirdn_modes
 from cupyx.scipy import fft as sp_fft
 from cupyimg.scipy import ndimage as ndi
 from cupyimg._misc import _prod
@@ -2148,6 +2147,8 @@ def resample_poly(
     >>> plt.show()
 
     """
+    from fast_upfirdn import upfirdn_out_len, upfirdn_modes
+
     if up != int(up):
         raise ValueError("up must be an integer")
     if down != int(down):
