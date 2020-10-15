@@ -46,7 +46,7 @@ def test_spline_filter_1d_real_ndimage(dtype, order, axis, mode):
     xd = cp.asarray(x)
     y = ndi.spline_filter1d(x, order=order, axis=axis, output=dtype)
     yd = spline_filter1d(
-        xd, order=order, axis=axis, output=dtype, dtype_mode="ndimage"
+        xd, order=order, axis=axis, output=dtype, allow_float32=False,
     )
     cp.testing.assert_allclose(y, yd, atol=atol, rtol=rtol)
 
