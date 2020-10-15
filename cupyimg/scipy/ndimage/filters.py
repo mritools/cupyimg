@@ -28,7 +28,7 @@ from ._kernels.filters import (
     _get_rank_kernel,
     _get_rank_kernel_masked,
 )
-from . import _ni_support
+from . import _util
 from ._kernels.filters_v2 import _correlate_or_convolve
 from cupyimg import _misc
 
@@ -85,7 +85,7 @@ def correlate1d(
     ``numpy.complex64`` and ``numpy.complex128`` dtypes.
     """
 
-    origin = _ni_support._check_origin(origin, len(weights))
+    origin = _util._check_origin(origin, len(weights))
 
     weights = weights[::-1]
     origin = -origin
@@ -136,7 +136,7 @@ def convolve1d(
 
     axis = _misc._normalize_axis_index(axis, input.ndim)
     if backend == "fast_upfirdn":
-        origin = _ni_support._check_origin(origin, len(weights))
+        origin = _util._check_origin(origin, len(weights))
 
         try:
             from fast_upfirdn.cupy import convolve1d as _convolve1d_gpu
@@ -155,7 +155,7 @@ def convolve1d(
                 raise ValueError("uncropped case requires origin == 0")
             offset = 0
 
-        mode_kwargs = _ni_support._get_ndimage_mode_kwargs(mode, cval)
+        mode_kwargs = _util._get_ndimage_mode_kwargs(mode, cval)
 
         if dtype_mode == "float":
             dtype = functools.reduce(
@@ -177,11 +177,11 @@ def convolve1d(
             warnings.warn("input of dtype {input.dtype} promoted to {dtype}")
         input = input.astype(dtype, copy=False)
         if output is not None:
-            output = _ni_support._get_output(output, input)
+            output = _util._get_output(output, input)
             needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
             if needs_temp:
                 output, temp = (
-                    _ni_support._get_output(output.dtype, input),
+                    _util._get_output(output.dtype, input),
                     output,
                 )
 
@@ -294,10 +294,10 @@ def gaussian_filter(
 
     See ``scipy.ndimage.gaussian_filter``
     """
-    output = _ni_support._get_output(output, input)
-    orders = _ni_support._normalize_sequence(order, input.ndim)
-    sigmas = _ni_support._normalize_sequence(sigma, input.ndim)
-    modes = _ni_support._normalize_sequence(mode, input.ndim)
+    output = _util._get_output(output, input)
+    orders = _util._normalize_sequence(order, input.ndim)
+    sigmas = _util._normalize_sequence(sigma, input.ndim)
+    modes = _util._normalize_sequence(mode, input.ndim)
     axes = list(range(input.ndim))
     axes = [
         (axes[ii], sigmas[ii], orders[ii], modes[ii])
@@ -322,8 +322,8 @@ def prewitt(input, axis=-1, output=None, mode="reflect", cval=0.0):
     """
     dtype_weights = numpy.promote_types(input.real.dtype, numpy.float32)
     axis = _misc._normalize_axis_index(axis, input.ndim)
-    output = _ni_support._get_output(output, input)
-    modes = _ni_support._normalize_sequence(mode, input.ndim)
+    output = _util._get_output(output, input)
+    modes = _util._normalize_sequence(mode, input.ndim)
     filt1 = [-1, 0, 1]
     filt2 = [1, 1, 1]
 
@@ -348,8 +348,8 @@ def sobel(input, axis=-1, output=None, mode="reflect", cval=0.0):
     See ``scipy.ndimage.sobel``
     """
     dtype_weights = numpy.promote_types(input.real.dtype, numpy.float32)
-    output = _ni_support._get_output(output, input)
-    modes = _ni_support._normalize_sequence(mode, input.ndim)
+    output = _util._get_output(output, input)
+    modes = _util._normalize_sequence(mode, input.ndim)
     filt1 = [-1, 0, 1]
     filt2 = [1, 2, 1]
     filt1, filt2 = map(
@@ -382,10 +382,10 @@ def generic_laplace(
     """
     if extra_keywords is None:
         extra_keywords = {}
-    output = _ni_support._get_output(output, input)
+    output = _util._get_output(output, input)
     axes = list(range(input.ndim))
     if len(axes) > 0:
-        modes = _ni_support._normalize_sequence(mode, len(axes))
+        modes = _util._normalize_sequence(mode, len(axes))
         derivative2(
             input,
             axes[0],
@@ -469,10 +469,10 @@ def generic_gradient_magnitude(
     """
     if extra_keywords is None:
         extra_keywords = {}
-    output = _ni_support._get_output(output, input)
+    output = _util._get_output(output, input)
     axes = list(range(input.ndim))
     if len(axes) > 0:
-        modes = _ni_support._normalize_sequence(mode, len(axes))
+        modes = _util._normalize_sequence(mode, len(axes))
         derivative(
             input,
             axes[0],
@@ -542,7 +542,7 @@ def _prep_size_footprint(
     if footprint is None:
         if size is None:
             raise RuntimeError("no footprint provided")
-        fshape = tuple(_ni_support._normalize_sequence(size, ndim))
+        fshape = tuple(_util._normalize_sequence(size, ndim))
         if not allow_separable:
             footprint = cupy.ones(fshape, dtype=bool)
         filter_size = functools.reduce(operator.mul, fshape)
@@ -698,7 +698,7 @@ def uniform_filter1d(
     dtype_weights = numpy.promote_types(input.real.dtype, numpy.float32)
     if size < 1:
         raise RuntimeError("incorrect filter size")
-    output = _ni_support._get_output(output, input)
+    output = _util._get_output(output, input)
     if (size // 2 + origin < 0) or (size // 2 + origin >= size):
         raise ValueError("invalid origin")
     weights = cupy.full((size,), 1 / size, dtype=dtype_weights)
@@ -714,10 +714,10 @@ def uniform_filter(
 
     See ``scipy.ndimage.uniform_filter``
     """
-    output = _ni_support._get_output(output, input)
-    sizes = _ni_support._normalize_sequence(size, input.ndim)
-    origins = _ni_support._normalize_sequence(origin, input.ndim)
-    modes = _ni_support._normalize_sequence(mode, input.ndim)
+    output = _util._get_output(output, input)
+    sizes = _util._normalize_sequence(size, input.ndim)
+    origins = _util._normalize_sequence(origin, input.ndim)
+    modes = _util._normalize_sequence(mode, input.ndim)
     axes = list(range(input.ndim))
     axes = [
         (axes[ii], sizes[ii], origins[ii], modes[ii])
@@ -856,7 +856,7 @@ def _min_or_max_filter(
             raise ValueError("invalid origin")
 
     if separable:
-        modes = _ni_support._normalize_sequence(mode, ndim)
+        modes = _util._normalize_sequence(mode, ndim)
         # all elements true -> can use separable application of 1d filters
         fshape_1d = [1] * ndim
         for ax, sz in zip(range(ndim), fshape):
@@ -893,11 +893,11 @@ def _min_or_max_filter_inner(
         raise ValueError("footprint must not be None")
     fshape = footprint.shape
 
-    output = _ni_support._get_output(output, input)
+    output = _util._get_output(output, input)
     needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
     if needs_temp:
         output, temp = (
-            _ni_support._get_output(output.dtype, input),
+            _util._get_output(output.dtype, input),
             output,
         )
     input = cupy.ascontiguousarray(input)
@@ -1093,11 +1093,11 @@ def _rank_filter(
     # if footprint.dtype.char != '?':
     #     raise ValueError("filter footprint must be boolean")
 
-    output = _ni_support._get_output(output, input)
+    output = _util._get_output(output, input)
     needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
     if needs_temp:
         output, temp = (
-            _ni_support._get_output(output.dtype, input),
+            _util._get_output(output.dtype, input),
             output,
         )
     input = cupy.ascontiguousarray(input)

@@ -185,8 +185,8 @@ def spline_filter1d(
     temp, data_dtype, output_dtype = _get_spline_output(
         x, output, allow_float32
     )
-    data_type = cupy.core._scalar.get_typename(temp.dtype)
-    pole_type = cupy.core._scalar.get_typename(temp.real.dtype)
+    data_type = _misc.get_typename(temp.dtype)
+    pole_type = _misc.get_typename(temp.real.dtype)
     index_type = _util._get_inttype(input)
 
     kern = _spline_prefilter_core.get_raw_spline1d_kernel(

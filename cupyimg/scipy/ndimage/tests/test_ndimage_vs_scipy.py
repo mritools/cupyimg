@@ -7,7 +7,7 @@ from scipy import ndimage as ndi
 
 from cupyimg.scipy.ndimage import convolve1d, correlate1d
 from cupyimg.scipy.signal import upfirdn
-from cupyimg.scipy.ndimage._ni_support import _get_ndimage_mode_kwargs
+from cupyimg.scipy.ndimage._util import _get_ndimage_mode_kwargs
 
 import pytest
 

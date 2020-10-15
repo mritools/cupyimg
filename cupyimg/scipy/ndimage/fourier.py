@@ -2,7 +2,7 @@ import numpy
 
 import cupy
 import cupyx.scipy.special
-from cupyimg.scipy.ndimage._ni_support import _normalize_sequence
+from cupyimg.scipy.ndimage import _util
 from cupyimg import _misc
 
 
@@ -58,7 +58,7 @@ def fourier_gaussian(input, sigma, n=-1, axis=-1, output=None):
     ndim = input.ndim
     output = _get_output_fourier(output, input)
     axis = _misc._normalize_axis_index(axis, ndim)
-    sigmas = _normalize_sequence(sigma, ndim)
+    sigmas = _util._normalize_sequence(sigma, ndim)
 
     output[...] = input
     for ax, (sigmak, ax_size) in enumerate(zip(sigmas, output.shape)):
@@ -110,7 +110,7 @@ def fourier_uniform(input, size, n=-1, axis=-1, output=None):
     ndim = input.ndim
     output = _get_output_fourier(output, input)
     axis = _misc._normalize_axis_index(axis, ndim)
-    sizes = _normalize_sequence(size, ndim)
+    sizes = _util._normalize_sequence(size, ndim)
 
     output[...] = input
     for ax, (size, ax_size) in enumerate(zip(sizes, output.shape)):
@@ -161,7 +161,7 @@ def fourier_shift(input, shift, n=-1, axis=-1, output=None):
     ndim = input.ndim
     output = _get_output_fourier(output, input, complex_only=True)
     axis = _misc._normalize_axis_index(axis, ndim)
-    shifts = _normalize_sequence(shift, ndim)
+    shifts = _util._normalize_sequence(shift, ndim)
 
     output[...] = input
     for ax, (shiftk, ax_size) in enumerate(zip(shifts, output.shape)):
@@ -218,7 +218,7 @@ def fourier_ellipsoid(input, size, n=-1, axis=-1, output=None):
         raise NotImplementedError("only 1d-3d inputs are supported")
     output = _get_output_fourier(output, input)
     axis = _misc._normalize_axis_index(axis, ndim)
-    sizes = _normalize_sequence(size, ndim)
+    sizes = _util._normalize_sequence(size, ndim)
 
     output[...] = input
 

@@ -5,6 +5,7 @@ import os
 import tempfile
 
 import cupy
+import numpy
 
 from cupyimg.scipy.ndimage import convolve1d
 
@@ -136,7 +137,6 @@ except ImportError:
             _normalize_axis_indices,
         )  # NOQA
     except ImportError:
-        import numpy
 
         def _normalize_axis_index(axis, ndim):  # NOQA
             """
@@ -189,3 +189,39 @@ except ImportError:
                 res.append(axis)
 
             return tuple(sorted(res))
+
+
+try:
+    from cupy.cuda._core import get_typename
+except ImportError:
+    # local copy of private code from CuPy
+    _typenames_base = {
+        numpy.dtype("float64"): "double",
+        numpy.dtype("float32"): "float",
+        numpy.dtype("float16"): "float16",
+        numpy.dtype("complex128"): "complex<double>",
+        numpy.dtype("complex64"): "complex<float>",
+        numpy.dtype("int64"): "long long",
+        numpy.dtype("int32"): "int",
+        numpy.dtype("int16"): "short",
+        numpy.dtype("int8"): "signed char",
+        numpy.dtype("uint64"): "unsigned long long",
+        numpy.dtype("uint32"): "unsigned int",
+        numpy.dtype("uint16"): "unsigned short",
+        numpy.dtype("uint8"): "unsigned char",
+        numpy.dtype("bool"): "bool",
+    }
+
+    all_type_chars = "?bhilqBHILQefdFD"
+    _typenames = {}
+    for i in all_type_chars:
+        d = numpy.dtype(i)
+        t = d.type
+        _typenames[t] = _typenames_base[d]
+
+    def get_typename(dtype):
+        if dtype is None:
+            raise ValueError("dtype is None")
+        if dtype not in _typenames:
+            dtype = numpy.dtype(dtype).type
+        return _typenames[dtype]
