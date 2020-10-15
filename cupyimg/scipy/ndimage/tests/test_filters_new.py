@@ -45,10 +45,10 @@ def test_convolve_precision(dtype, func):
 
     # Note: single_precision flag only affects what dtype w is cast to
     #       internally. The output precision should match the input precision.
-    y1 = func(x, w, allow_float32=False)
+    y1 = func(x, w, dtype_mode="ndimage")
     assert y1.dtype == x.dtype
 
-    y2 = func(x, w, allow_float32=True)
+    y2 = func(x, w, dtype_mode="float")
     assert y2.dtype == x.dtype
 
     # not identical due to differing internal precision used above
