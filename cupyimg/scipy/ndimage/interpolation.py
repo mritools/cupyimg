@@ -6,7 +6,7 @@ import numpy
 
 from cupyimg import _misc
 from cupyimg.scipy.ndimage import _spline_prefilter_core
-from cupyx.scipy.ndimage import _util
+from cupyimg.scipy.ndimage import _util
 
 from ._kernels.interp import (
     _get_map_kernel,
@@ -189,6 +189,7 @@ def spline_filter1d(
     pole_type = _misc.get_typename(temp.real.dtype)
     index_type = _util._get_inttype(input)
 
+    block_size = 128
     kern = _spline_prefilter_core.get_raw_spline1d_kernel(
         axis,
         ndim,
@@ -197,6 +198,7 @@ def spline_filter1d(
         index_type=index_type,
         data_type=data_type,
         pole_type=pole_type,
+        block_size=block_size,
     )
 
     n_samples = x.shape[axis]
@@ -206,7 +208,7 @@ def spline_filter1d(
 
     # Due to recursive nature, a given line of data must be processed by a
     # single thread. n_signals lines will be processed in total.
-    block = (128,)
+    block = (block_size,)
     grid = ((n_signals + block[0] - 1) // block[0],)
 
     # apply prefilter gain
