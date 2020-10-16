@@ -177,8 +177,14 @@ def spline_filter1d(
     data_type = _misc.get_typename(temp.dtype)
     pole_type = _misc.get_typename(temp.real.dtype)
     index_type = _util._get_inttype(input)
+    index_dtype = cupy.int32 if index_type == "int" else cupy.int64
 
-    block_size = 32
+    n_samples = x.shape[axis]
+    n_signals = x.size // n_samples
+    info = cupy.array((n_signals, n_samples) + x.shape, dtype=index_dtype)
+
+    # empirical choice of block size that seemed to work well
+    block_size = max(2 ** math.ceil(numpy.log2(n_samples / 32)), 8)
     kern = _spline_prefilter_core.get_raw_spline1d_kernel(
         axis,
         ndim,
@@ -189,11 +195,6 @@ def spline_filter1d(
         pole_type=pole_type,
         block_size=block_size,
     )
-
-    n_samples = x.shape[axis]
-    n_signals = x.size // n_samples
-    index_dtype = cupy.int32 if index_type == "int" else cupy.int64
-    info = cupy.array((n_signals, n_samples) + x.shape, dtype=index_dtype)
 
     # Due to recursive nature, a given line of data must be processed by a
     # single thread. n_signals lines will be processed in total.
