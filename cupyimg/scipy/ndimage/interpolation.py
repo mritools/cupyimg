@@ -28,17 +28,6 @@ __all__ = [
 ]
 
 
-def highest_power_of_2(n):
-    """Find highest power of 2 divisor of n.
-
-    Notes
-    -----
-    Efficient bitwise implementation from
-    https://www.geeksforgeeks.org/highest-power-of-two-that-divides-a-given-number/
-    """
-    return n & (~(n - 1))
-
-
 def _get_output(output, input, shape=None):
     if shape is None:
         shape = input.shape
@@ -189,7 +178,7 @@ def spline_filter1d(
     pole_type = _misc.get_typename(temp.real.dtype)
     index_type = _util._get_inttype(input)
 
-    block_size = 128
+    block_size = 32
     kern = _spline_prefilter_core.get_raw_spline1d_kernel(
         axis,
         ndim,

@@ -258,5 +258,7 @@ def get_raw_spline1d_kernel(
     code += _get_spline1d_code(mode, poles, pole_type)
 
     # generate code handling batch operation of the 1d filter
-    code += _batch_spline1d_strided_template.format(ndim=ndim, axis=axis)
+    code += _batch_spline1d_strided_template.format(
+        ndim=ndim, axis=axis, block_size=block_size
+    )
     return cupy.RawKernel(code, "cupyx_spline_filter")
