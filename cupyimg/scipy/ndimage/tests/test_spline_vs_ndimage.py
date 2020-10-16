@@ -36,7 +36,7 @@ def test_spline_filter_1d_real(dtype, order, axis, mode):
         [np.float32, np.float64],
         [2, 3, 4, 5],
         [0, -1],
-        ["mirror"],  # "constant", "nearest", "reflect", "wrap"],
+        ["mirror", "constant", "nearest", "reflect", "wrap"],
     ),
 )
 def test_spline_filter_1d_real_ndimage(dtype, order, axis, mode):
@@ -57,7 +57,7 @@ def test_spline_filter_1d_real_ndimage(dtype, order, axis, mode):
         [np.complex64, np.complex128],
         [2, 3, 4, 5],
         [0, -1],
-        ["mirror"],  # "constant", "nearest", "reflect", "wrap"],
+        ["mirror", "constant", "nearest", "reflect", "wrap"],
     ),
 )
 def test_spline_filter_1d_complex(dtype, order, axis, mode):
