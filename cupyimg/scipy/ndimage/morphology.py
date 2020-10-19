@@ -4,7 +4,7 @@ import warnings
 import cupy
 import numpy
 
-from . import _ni_support
+from . import _util
 from . import filters
 from ._kernels.morphology import _get_erode_kernel
 
@@ -116,7 +116,7 @@ def iterate_structure(structure, iterations, origin=None):
     if origin is None:
         return out
     else:
-        origin = _ni_support._normalize_sequence(origin, structure.ndim)
+        origin = _util._normalize_sequence(origin, structure.ndim)
         origin = [iterations * o for o in origin]
         return out, origin
 
@@ -267,14 +267,14 @@ def _binary_erosion(
         masked = True
     else:
         masked = False
-    origin = _ni_support._normalize_sequence(origin, input.ndim)
+    origin = _util._normalize_sequence(origin, input.ndim)
     center_is_true = _center_is_true(structure, origin)
     if isinstance(output, cupy.ndarray):
         if cupy.iscomplexobj(output):
             raise TypeError("Complex output type not supported")
     else:
         output = bool
-    output = _ni_support._get_output(output, input)
+    output = _util._get_output(output, input)
 
     if structure.ndim == 0:
         # kernel doesn't handle ndim=0, so special case it here
@@ -297,7 +297,7 @@ def _binary_erosion(
         needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
         if needs_temp:
             output, temp = (
-                _ni_support._get_output(output.dtype, input),
+                _util._get_output(output.dtype, input),
                 output,
             )
         if masked:
@@ -583,7 +583,7 @@ def binary_dilation(
     input = cupy.asarray(input)
     if structure is None:
         structure = generate_binary_structure(input.ndim, 1)
-    origin = _ni_support._normalize_sequence(origin, input.ndim)
+    origin = _util._normalize_sequence(origin, input.ndim)
     structure = cupy.asarray(structure)
     structure = structure[tuple([slice(None, None, -1)] * structure.ndim)]
     for ii in range(len(origin)):
@@ -1020,11 +1020,11 @@ def binary_hit_or_miss(
         structure1 = generate_binary_structure(input.ndim, 1)
     if structure2 is None:
         structure2 = cupy.logical_not(structure1)
-    origin1 = _ni_support._normalize_sequence(origin1, input.ndim)
+    origin1 = _util._normalize_sequence(origin1, input.ndim)
     if origin2 is None:
         origin2 = origin1
     else:
-        origin2 = _ni_support._normalize_sequence(origin2, input.ndim)
+        origin2 = _util._normalize_sequence(origin2, input.ndim)
 
     tmp1 = _binary_erosion(
         input, structure1, 1, None, None, 0, origin1, 0, False
@@ -1551,7 +1551,7 @@ def grey_dilation(
         footprint = footprint[tuple([slice(None, None, -1)] * footprint.ndim)]
 
     input = cupy.asarray(input)
-    origin = _ni_support._normalize_sequence(origin, input.ndim)
+    origin = _util._normalize_sequence(origin, input.ndim)
     for ii in range(len(origin)):
         origin[ii] = -origin[ii]
         if footprint is not None:

@@ -3,7 +3,7 @@ import warnings
 import cupy
 from .support import _generate_boundary_condition_ops
 from .filters import _get_correlate_kernel_masked
-from cupyimg.scipy.ndimage import _ni_support
+from cupyimg.scipy.ndimage import _util
 from cupyimg import memoize
 from cupyimg import _misc
 
@@ -73,7 +73,7 @@ def _correlate_or_convolve(
                     input.real.dtype, cupy.float32
                 )
         weight_dtype = cupy.dtype(weight_dtype)
-        output = _ni_support._get_output(output, input, None, weight_dtype)
+        output = _util._get_output(output, input, None, weight_dtype)
     unsigned_output = output.dtype.kind in ["u", "b"]
 
     if use_weights_mask:
@@ -160,7 +160,7 @@ def _convert_1d_args(ndim, weights, origin, axis):
     wshape[axis] = weights.size
     weights = weights.reshape(wshape)
     origins = [0] * ndim
-    origins[axis] = _ni_support._check_origin(origin, weights.size)
+    origins[axis] = _util._check_origin(origin, weights.size)
     return weights, tuple(origins)
 
 
@@ -174,7 +174,7 @@ def _check_nd_args(input, weights, mode, origins, wghts_name="filter weights"):
         raise RuntimeError("{} array has incorrect shape".format(wghts_name))
     origins = _fix_sequence_arg(origins, len(weight_dims), "origin", int)
     for origin, width in zip(origins, weight_dims):
-        _ni_support._check_origin(origin, width)
+        _util._check_origin(origin, width)
     return tuple(origins), int_type
 
 
@@ -202,7 +202,7 @@ def _call_kernel(kernel, input, weights, output, weight_dtype=cupy.float64):
     needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
     if needs_temp:
         output, temp = (
-            _ni_support._get_output(output.dtype, input, None, weight_dtype),
+            _util._get_output(output.dtype, input, None, weight_dtype),
             output,
         )
     if weights is None:
