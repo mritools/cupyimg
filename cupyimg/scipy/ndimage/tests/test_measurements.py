@@ -10,6 +10,7 @@ from numpy.testing import (
 )
 from cupy.testing import assert_array_equal, assert_array_almost_equal
 from numpy.testing import suppress_warnings
+import pytest
 
 import cupyimg.scipy.ndimage as ndimage
 
@@ -26,83 +27,6 @@ types = [
     cp.float32,
     cp.float64,
 ]
-
-
-np.mod(1.0, 1)  # Silence fmod bug on win-amd64. See #1408 and #1238.
-
-
-class Test_measurements_stats(object):
-    """ndimage.measurements._stats() is a utility function used by other functions."""
-
-    def test_a(self):
-        x = [0, 1, 2, 6]
-        labels = [0, 0, 1, 1]
-        index = [0, 1]
-        for shp in [(4,), (2, 2)]:
-            x = cp.asarray(x).reshape(shp)
-            labels = cp.asarray(labels).reshape(shp)
-            counts, sums = ndimage.measurements._stats(
-                x, labels=labels, index=index
-            )
-            assert_array_equal(counts, [2, 2])
-            assert_array_equal(sums, [1.0, 8.0])
-
-    def test_b(self):
-        # Same data as test_a, but different labels.  The label 9 exceeds the
-        # length of 'labels', so this test will follow a different code path.
-        x = [0, 1, 2, 6]
-        labels = [0, 0, 9, 9]
-        index = [0, 9]
-        for shp in [(4,), (2, 2)]:
-            x = cp.asarray(x).reshape(shp)
-            labels = cp.asarray(labels).reshape(shp)
-            counts, sums = ndimage.measurements._stats(
-                x, labels=labels, index=index
-            )
-            assert_array_equal(counts, [2, 2])
-            assert_array_equal(sums, [1.0, 8.0])
-
-    def test_a_centered(self):
-        x = [0, 1, 2, 6]
-        labels = [0, 0, 1, 1]
-        index = [0, 1]
-        for shp in [(4,), (2, 2)]:
-            x = cp.asarray(x).reshape(shp)
-            labels = cp.asarray(labels).reshape(shp)
-            counts, sums, centers = ndimage.measurements._stats(
-                x, labels=labels, index=index, centered=True
-            )
-            assert_array_equal(counts, [2, 2])
-            assert_array_equal(sums, [1.0, 8.0])
-            assert_array_equal(centers, [0.5, 8.0])
-
-    def test_b_centered(self):
-        x = [0, 1, 2, 6]
-        labels = [0, 0, 9, 9]
-        index = [0, 9]
-        for shp in [(4,), (2, 2)]:
-            x = cp.asarray(x).reshape(shp)
-            labels = cp.asarray(labels).reshape(shp)
-            counts, sums, centers = ndimage.measurements._stats(
-                x, labels=labels, index=index, centered=True
-            )
-            assert_array_equal(counts, [2, 2])
-            assert_array_equal(sums, [1.0, 8.0])
-            assert_array_equal(centers, [0.5, 8.0])
-
-    def test_nonint_labels(self):
-        x = [0, 1, 2, 6]
-        labels = [0.0, 0.0, 9.0, 9.0]
-        index = [0.0, 9.0]
-        for shp in [(4,), (2, 2)]:
-            x = cp.asarray(x).reshape(shp)
-            labels = cp.asarray(labels).reshape(shp)
-            counts, sums, centers = ndimage.measurements._stats(
-                x, labels=labels, index=index, centered=True
-            )
-            assert_array_equal(counts, [2, 2])
-            assert_array_equal(sums, [1.0, 8.0])
-            assert_array_equal(centers, [0.5, 8.0])
 
 
 class Test_measurements_select(object):
@@ -622,16 +546,16 @@ def test_sum12():
     labels = cp.asarray([[1, 2], [2, 4]], cp.int8)
     for type in types:
         input = cp.asarray([[1, 2], [3, 4]], type)
-        output = ndimage.sum(input, labels=labels, index=[4, 8, 2])
+        output = ndimage.sum(input, labels=labels, index=cp.asarray([4, 8, 2]))
         assert_array_almost_equal(output, [4.0, 0.0, 5.0])
 
 
-def test_mean01():
+@pytest.mark.parametrize("dtype", types)
+def test_mean01(dtype):
     labels = cp.asarray([1, 0], bool)
-    for type in types:
-        input = cp.asarray([[1, 2], [3, 4]], type)
-        output = ndimage.mean(input, labels=labels)
-        assert_almost_equal(output, 2.0)
+    input = cp.asarray([[1, 2], [3, 4]], dtype)
+    output = ndimage.mean(input, labels=labels)
+    assert_almost_equal(output, 2.0)
 
 
 def test_mean02():
@@ -641,23 +565,23 @@ def test_mean02():
     assert_almost_equal(output, 1.0)
 
 
-def test_mean03():
+@pytest.mark.parametrize("dtype", types)
+def test_mean03(dtype):
     labels = cp.asarray([1, 2])
-    for type in types:
-        input = cp.asarray([[1, 2], [3, 4]], type)
-        output = ndimage.mean(input, labels=labels, index=2)
-        assert_almost_equal(output, 3.0)
+    input = cp.asarray([[1, 2], [3, 4]], dtype)
+    output = ndimage.mean(input, labels=labels, index=2)
+    assert_almost_equal(output, 3.0)
 
 
-def test_mean04():
+@pytest.mark.parametrize("dtype", types)
+def test_mean04(dtype):
     labels = cp.asarray([[1, 2], [2, 4]], cp.int8)
     olderr = np.seterr(all="ignore")
     try:
-        for type in types:
-            input = cp.asarray([[1, 2], [3, 4]], type)
-            output = ndimage.mean(input, labels=labels, index=[4, 8, 2])
-            assert_array_almost_equal(output[[0, 2]], [4.0, 2.5])
-            assert_(cp.isnan(output[1]))
+        input = cp.asarray([[1, 2], [3, 4]], dtype)
+        output = ndimage.mean(input, labels=labels, index=cp.asarray([4, 8, 2]))
+        assert_array_almost_equal(output[[0, 2]], [4.0, 2.5])
+        assert_(cp.isnan(output[1]))
     finally:
         np.seterr(**olderr)
 
@@ -801,7 +725,7 @@ def test_variance06():
     try:
         for type in types:
             input = cp.asarray([1, 3, 8, 10, 8], type)
-            output = ndimage.variance(input, labels, [2, 3, 4])
+            output = ndimage.variance(input, labels, cp.asarray([2, 3, 4]))
             assert_array_almost_equal(output, [1.0, 1.0, 0.0])
     finally:
         np.seterr(**olderr)
@@ -854,7 +778,9 @@ def test_standard_deviation06():
     try:
         for type in types:
             input = cp.asarray([1, 3, 8, 10, 8], type)
-            output = ndimage.standard_deviation(input, labels, [2, 3, 4])
+            output = ndimage.standard_deviation(
+                input, labels, cp.asarray([2, 3, 4])
+            )
             assert_array_almost_equal(output, [1.0, 1.0, 0.0])
     finally:
         np.seterr(**olderr)
@@ -866,7 +792,7 @@ def test_standard_deviation07():
     try:
         for type in types:
             input = cp.asarray([-0.00619519], type)
-            output = ndimage.standard_deviation(input, labels, [1])
+            output = ndimage.standard_deviation(input, labels, cp.asarray([1]))
             assert_array_almost_equal(output, [0])
     finally:
         np.seterr(**olderr)
@@ -986,8 +912,8 @@ def test_extrema01():
         input = cp.asarray([[1, 2], [3, 4]], type)
         # TODO: grlee77: avoid use of item()?
         output1 = ndimage.extrema(input, labels=labels)
-        output2 = ndimage.minimum(input, labels=labels).item()
-        output3 = ndimage.maximum(input, labels=labels).item()
+        output2 = ndimage.minimum(input, labels=labels)
+        output3 = ndimage.maximum(input, labels=labels)
         output4 = ndimage.minimum_position(input, labels=labels)
         output5 = ndimage.maximum_position(input, labels=labels)
         assert_equal(output1, (output2, output3, output4, output5))
@@ -999,8 +925,8 @@ def test_extrema02():
         input = cp.asarray([[1, 2], [3, 4]], type)
         # TODO: grlee77: avoid use of item()?
         output1 = ndimage.extrema(input, labels=labels, index=2)
-        output2 = ndimage.minimum(input, labels=labels, index=2).item()
-        output3 = ndimage.maximum(input, labels=labels, index=2).item()
+        output2 = ndimage.minimum(input, labels=labels, index=2)
+        output3 = ndimage.maximum(input, labels=labels, index=2)
         output4 = ndimage.minimum_position(input, labels=labels, index=2)
         output5 = ndimage.maximum_position(input, labels=labels, index=2)
         assert_equal(output1, (output2, output3, output4, output5))
@@ -1107,7 +1033,7 @@ def test_center_of_mass09():
     labels = cp.asarray([1, 2])
     expected = [(0.5, 0.0), (0.5, 1.0)]
     input = cp.asarray([[1, 2], [1, 1]], bool)
-    output = ndimage.center_of_mass(input, labels, [1, 2])
+    output = ndimage.center_of_mass(input, labels, cp.asarray([1, 2]))
     assert_array_almost_equal(output, expected)
 
 
@@ -1141,20 +1067,21 @@ def test_stat_funcs_2d():
     a = cp.asarray([[5, 6, 0, 0, 0], [8, 9, 0, 0, 0], [0, 0, 0, 3, 5]])
     lbl = cp.asarray([[1, 1, 0, 0, 0], [1, 1, 0, 0, 0], [0, 0, 0, 2, 2]])
 
-    mean = ndimage.mean(a, labels=lbl, index=[1, 2])
+    index = cp.asarray([1, 2])
+    mean = ndimage.mean(a, labels=lbl, index=index)
     assert_array_equal(mean, [7.0, 4.0])
 
-    var = ndimage.variance(a, labels=lbl, index=[1, 2])
+    var = ndimage.variance(a, labels=lbl, index=index)
     assert_array_equal(var, [2.5, 1.0])
 
-    std = ndimage.standard_deviation(a, labels=lbl, index=[1, 2])
+    std = ndimage.standard_deviation(a, labels=lbl, index=index)
     assert_array_almost_equal(std, cp.sqrt(cp.asarray([2.5, 1.0])))
 
-    med = ndimage.median(a, labels=lbl, index=[1, 2])
+    med = ndimage.median(a, labels=lbl, index=index)
     assert_array_equal(med, [7.0, 4.0])
 
-    min = ndimage.minimum(a, labels=lbl, index=[1, 2])
+    min = ndimage.minimum(a, labels=lbl, index=index)
     assert_array_equal(min, [5, 3])
 
-    max = ndimage.maximum(a, labels=lbl, index=[1, 2])
+    max = ndimage.maximum(a, labels=lbl, index=index)
     assert_array_equal(max, [9, 5])
