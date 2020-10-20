@@ -219,6 +219,8 @@ def _binary_erosion(
 
     if input.dtype.kind == "c":
         raise TypeError("Complex type not supported")
+    if any(s < 0 for s in input.strides):
+        input = cupy.ascontiguousarray(input)
     if structure is None:
         structure = generate_binary_structure(input.ndim, 1)
         all_weights_nonzero = input.ndim == 1
@@ -246,8 +248,9 @@ def _binary_erosion(
         masked = False
     origin = _util._fix_sequence_arg(origin, input.ndim, "origin", int)
 
-    if isinstance(output, cupy.ndarray) and output.dtype.kind == "c":
-        raise TypeError("Complex output type not supported")
+    if isinstance(output, cupy.ndarray):
+        if output.dtype.kind == "c":
+            raise TypeError("Complex output type not supported")
     else:
         output = bool
     output = _util._get_output(output, input)

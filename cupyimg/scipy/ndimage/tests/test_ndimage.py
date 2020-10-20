@@ -1647,12 +1647,17 @@ class TestNdimage:
             out = ndimage.binary_erosion(data, border_value=1)
             assert_array_almost_equal(out, expected)
 
-            # grlee77 add non-contiguous test case
+            # grlee77 add negative stride test case
             out2 = ndimage.binary_erosion(data[::-1], border_value=1)
             expected2 = ndimage.binary_erosion(
                 cupy.ascontiguousarray(data[::-1]), border_value=1
             )
             assert_array_almost_equal(out2, expected2)
+
+            # grlee77 add non-contiguous test case
+            data = cupy.asfortranarray(data)
+            out3 = ndimage.binary_erosion(data, border_value=1)
+            assert_array_almost_equal(out3, expected)
 
     def test_binary_erosion23(self):
         struct = ndimage.generate_binary_structure(2, 2)

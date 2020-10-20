@@ -11,9 +11,7 @@ from .support import (
     _raw_ptr_ops,
 )
 from cupyimg import memoize
-from cupyimg.scipy.ndimage._kernels.optimal_median_preambles import (
-    opt_med_preambles,
-)
+from cupyimg.scipy.ndimage._filters_optimal_medians import _opt_med_preambles
 
 
 def _generate_correlate_kernel(
@@ -445,9 +443,9 @@ def _generate_rank_kernel(mode, cval, xshape, fshape, origin, rank):
     # footprint. Now we have to sort these and return the value of the
     # requested rank.
     is_median = rank == nnz // 2
-    if is_median and nnz in opt_med_preambles:
+    if is_median and nnz in _opt_med_preambles:
         # special fast sorting cases for some common kernel sizes
-        preamble = opt_med_preambles[nnz]
+        preamble = _opt_med_preambles[nnz]
         ops.append(
             """
             y = (Y)sort(selected);
@@ -494,9 +492,9 @@ def _generate_rank_kernel_masked(mode, cval, xshape, fshape, nnz, origin, rank):
     # footprint. Now we have to sort these and return the value of the
     # requested rank.
     is_median = rank == nnz // 2
-    if is_median and nnz in opt_med_preambles:
+    if is_median and nnz in _opt_med_preambles:
         # special fast sorting cases for some common kernel sizes
-        preamble = opt_med_preambles[nnz]
+        preamble = _opt_med_preambles[nnz]
         ops.append(
             """
             y = (Y)sort(selected);

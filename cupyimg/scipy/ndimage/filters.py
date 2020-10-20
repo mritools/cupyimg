@@ -21,19 +21,20 @@ import warnings
 import cupy
 import numpy
 
-from ._kernels.filters import (
-    #    _get_min_or_max_kernel,
-    #    _get_min_or_max_kernel_masked,
-    #    _get_min_or_max_kernel_masked_v2,
-    _get_rank_kernel,
-    _get_rank_kernel_masked,
-)
+# from ._kernels.filters import (
+#     #    _get_min_or_max_kernel,
+#     #    _get_min_or_max_kernel_masked,
+#     #    _get_min_or_max_kernel_masked_v2,
+# #    _get_rank_kernel,
+# #    _get_rank_kernel_masked,
+# )
 from . import _util
 from ._kernels.filters_v2 import _correlate_or_convolve
 from cupyimg import _misc
 from cupyimg.scipy.ndimage import _filters_core
+from cupyimg.scipy.ndimage import _filters_optimal_medians
 
-
+median_preambles = _filters_optimal_medians._opt_med_preambles
 _partial = functools.partial
 
 
@@ -1070,89 +1071,6 @@ def _get_min_or_max_kernel(
     )
 
 
-def _rank_filter(
-    input, rank, size, footprint, output, mode, cval, origin, operation="rank"
-):
-    if cupy.iscomplexobj(input):
-        raise TypeError("Complex type not supported")
-    if not hasattr(origin, "__getitem__"):
-        origin = [origin] * input.ndim
-    else:
-        origin = list(origin)
-    fshape, footprint, filter_size = _prep_size_footprint(
-        input.ndim, size, footprint, allow_separable=False
-    )
-    for _origin, lenw in zip(origin, fshape):
-        if (lenw // 2 + _origin < 0) or (lenw // 2 + _origin >= lenw):
-            raise ValueError("invalid origin")
-    if mode not in ("reflect", "constant", "nearest", "mirror", "wrap"):
-        msg = "boundary mode not supported (actual: {}).".format(mode)
-        raise RuntimeError(msg)
-    if operation == "median":
-        rank = filter_size // 2
-    elif operation == "percentile":
-        percentile = rank
-        if percentile < 0.0:
-            percentile += 100.0
-        if percentile < 0 or percentile > 100:
-            raise RuntimeError("invalid percentile")
-        if percentile == 100.0:
-            rank = filter_size - 1
-        else:
-            rank = int(float(filter_size) * percentile / 100.0)
-    if rank < 0:
-        rank += filter_size
-    if rank < 0 or rank >= filter_size:
-        raise RuntimeError("rank not within filter footprint size")
-
-    if rank == 0:
-        return minimum_filter(
-            input, None, footprint, output, mode, cval, origin
-        )
-    if rank == filter_size - 1:
-        return maximum_filter(
-            input, None, footprint, output, mode, cval, origin
-        )
-    # if footprint.dtype.char != '?':
-    #     raise ValueError("filter footprint must be boolean")
-
-    output = _util._get_output(output, input)
-    needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
-    if needs_temp:
-        output, temp = (
-            _util._get_output(output.dtype, input),
-            output,
-        )
-    input = cupy.ascontiguousarray(input)
-
-    # unsigned_output =  output.dtype.kind in ['u', 'b']
-
-    if filter_size != functools.reduce(operator.mul, fshape):
-        # The kernel needs only the non-zero footprint coordinates
-        wlocs = cupy.stack(cupy.nonzero(footprint))  # (ndim, nnz)
-
-        # TODO: refactor to remove input.shape as done for convolution cases
-        output = _get_rank_kernel_masked(
-            mode,
-            cval,
-            input.shape,
-            footprint.shape,
-            wlocs.shape[1],
-            tuple(origin),
-            rank,
-        )(input, wlocs, output)
-    else:
-        footprint = cupy.ascontiguousarray(footprint)
-        # TODO: refactor to remove input.shape as done for convolution cases
-        output = _get_rank_kernel(
-            mode, cval, input.shape, footprint.shape, tuple(origin), rank
-        )(input, footprint, output)
-    if needs_temp:
-        temp[...] = output[...]
-        output = temp
-    return output
-
-
 def rank_filter(
     input,
     rank,
@@ -1167,39 +1085,41 @@ def rank_filter(
 
     Args:
         input (cupy.ndarray): The input array.
-        rank (int): The rank parameter may be less then zero, i.e., ``rank=-1``
-            indicates the largest element.
-        size (int or None): see footprint. Ignored if footprint is given.
-        footprint (cupy.ndarray or None): Either size or footprint must be
-            defined. size gives the shape that is taken from the input array,
-            at every element position, to define the input to the filter
-            function. footprint is a boolean array that specifies (implicitly)
-            a shape, but also which of the elements within this shape will get
-            passed to the filter function. Thus ``size=(n, m)`` is equivalent to
-            ``footprint=cupy.ones((n, m))``. We adjust size to the number of
-            dimensions of the input array, so that, if the input array is shape
-            (10,10,10), and size is 2, then the actual size used is (2,2,2).
-            When footprint is given, size is ignored.
+        rank (int): The rank of the element to get. Can be negative to count
+            from the largest value, e.g. ``-1`` indicates the largest value.
+        size (int or sequence of int): One of ``size`` or ``footprint`` must be
+            provided. If ``footprint`` is given, ``size`` is ignored. Otherwise
+            ``footprint = cupy.ones(size)`` with ``size`` automatically made to
+            match the number of dimensions in ``input``.
+        footprint (cupy.ndarray): a boolean array which specifies which of the
+            elements within this shape will get passed to the filter function.
         output (cupy.ndarray, dtype or None): The array in which to place the
-            output.
+            output. Default is is same dtype as the input.
         mode (str): The array borders are handled according to the given mode
             (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
             ``'wrap'``). Default is ``'reflect'``.
         cval (scalar): Value to fill past edges of input if mode is
-            ``constant``. Default is ``0.0``.
-        origin (scalar or tuple of scalar): The origin parameter controls the
+            ``'constant'``. Default is ``0.0``.
+        origin (int or sequence of int): The origin parameter controls the
             placement of the filter, relative to the center of the current
             element of the input. Default of 0 is equivalent to
             ``(0,)*input.ndim``.
 
     Returns:
-        cupy.ndarray: The result of convolution.
+        cupy.ndarray: The result of the filtering.
 
     .. seealso:: :func:`scipy.ndimage.rank_filter`
     """
     rank = operator.index(rank)
     return _rank_filter(
-        input, rank, size, footprint, output, mode, cval, origin
+        input,
+        lambda fs: rank + fs if rank < 0 else rank,
+        size,
+        footprint,
+        output,
+        mode,
+        cval,
+        origin,
     )
 
 
@@ -1216,36 +1136,31 @@ def median_filter(
 
     Args:
         input (cupy.ndarray): The input array.
-        size (int or None): see footprint. Ignored if footprint is given.
-        footprint (cupy.ndarray or None): Either size or footprint must be
-            defined. size gives the shape that is taken from the input array,
-            at every element position, to define the input to the filter
-            function. footprint is a boolean array that specifies (implicitly)
-            a shape, but also which of the elements within this shape will get
-            passed to the filter function. Thus ``size=(n, m)`` is equivalent to
-            ``footprint=cupy.ones((n, m))``. We adjust size to the number of
-            dimensions of the input array, so that, if the input array is shape
-            (10,10,10), and size is 2, then the actual size used is (2,2,2).
-            When footprint is given, size is ignored.
+        size (int or sequence of int): One of ``size`` or ``footprint`` must be
+            provided. If ``footprint`` is given, ``size`` is ignored. Otherwise
+            ``footprint = cupy.ones(size)`` with ``size`` automatically made to
+            match the number of dimensions in ``input``.
+        footprint (cupy.ndarray): a boolean array which specifies which of the
+            elements within this shape will get passed to the filter function.
         output (cupy.ndarray, dtype or None): The array in which to place the
-            output.
+            output. Default is is same dtype as the input.
         mode (str): The array borders are handled according to the given mode
             (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
             ``'wrap'``). Default is ``'reflect'``.
         cval (scalar): Value to fill past edges of input if mode is
-            ``constant``. Default is ``0.0``.
-        origin (scalar or tuple of scalar): The origin parameter controls the
+            ``'constant'``. Default is ``0.0``.
+        origin (int or sequence of int): The origin parameter controls the
             placement of the filter, relative to the center of the current
             element of the input. Default of 0 is equivalent to
             ``(0,)*input.ndim``.
 
     Returns:
-        cupy.ndarray: The result of convolution.
+        cupy.ndarray: The result of the filtering.
 
     .. seealso:: :func:`scipy.ndimage.median_filter`
     """
     return _rank_filter(
-        input, None, size, footprint, output, mode, cval, origin, "median"
+        input, lambda fs: fs // 2, size, footprint, output, mode, cval, origin
     )
 
 
@@ -1263,44 +1178,185 @@ def percentile_filter(
 
     Args:
         input (cupy.ndarray): The input array.
-        percentile (float): The percentile parameter may be less then zero,
-            i.e., percentile = -20 equals percentile = 80
-        size (int or None): see footprint. Ignored if footprint is given.
-        footprint (cupy.ndarray or None): Either size or footprint must be
-            defined. size gives the shape that is taken from the input array,
-            at every element position, to define the input to the filter
-            function. footprint is a boolean array that specifies (implicitly)
-            a shape, but also which of the elements within this shape will get
-            passed to the filter function. Thus ``size=(n, m)`` is equivalent to
-            ``footprint=cupy.ones((n, m))``. We adjust size to the number of
-            dimensions of the input array, so that, if the input array is shape
-            (10,10,10), and size is 2, then the actual size used is (2,2,2).
-            When footprint is given, size is ignored.
+        percentile (scalar): The percentile of the element to get (from ``0``
+            to ``100``). Can be negative, thus ``-20`` equals ``80``.
+        size (int or sequence of int): One of ``size`` or ``footprint`` must be
+            provided. If ``footprint`` is given, ``size`` is ignored. Otherwise
+            ``footprint = cupy.ones(size)`` with ``size`` automatically made to
+            match the number of dimensions in ``input``.
+        footprint (cupy.ndarray): a boolean array which specifies which of the
+            elements within this shape will get passed to the filter function.
         output (cupy.ndarray, dtype or None): The array in which to place the
-            output.
+            output. Default is is same dtype as the input.
         mode (str): The array borders are handled according to the given mode
             (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
             ``'wrap'``). Default is ``'reflect'``.
         cval (scalar): Value to fill past edges of input if mode is
-            ``constant``. Default is ``0.0``.
-        origin (scalar or tuple of scalar): The origin parameter controls the
+            ``'constant'``. Default is ``0.0``.
+        origin (int or sequence of int): The origin parameter controls the
             placement of the filter, relative to the center of the current
             element of the input. Default of 0 is equivalent to
             ``(0,)*input.ndim``.
 
     Returns:
-        cupy.ndarray: The result of convolution.
+        cupy.ndarray: The result of the filtering.
 
     .. seealso:: :func:`scipy.ndimage.percentile_filter`
     """
+    percentile = float(percentile)
+    if percentile < 0.0:
+        percentile += 100.0
+    if percentile < 0.0 or percentile > 100.0:
+        raise RuntimeError("invalid percentile")
+    if percentile == 100.0:
+
+        def get_rank(fs):
+            return fs - 1
+
+    else:
+
+        def get_rank(fs):
+            return int(float(fs) * percentile / 100.0)
+
     return _rank_filter(
-        input,
-        percentile,
-        size,
-        footprint,
-        output,
+        input, get_rank, size, footprint, output, mode, cval, origin
+    )
+
+
+def _rank_filter(
+    input,
+    get_rank,
+    size=None,
+    footprint=None,
+    output=None,
+    mode="reflect",
+    cval=0.0,
+    origin=0,
+):
+    _, footprint, _ = _filters_core._check_size_footprint_structure(
+        input.ndim, size, footprint, None, force_footprint=True
+    )
+    if cval is cupy.nan:
+        raise NotImplementedError("NaN cval is unsupported")
+    origins, int_type = _filters_core._check_nd_args(
+        input, footprint, mode, origin, "footprint"
+    )
+    if footprint.size == 0:
+        return cupy.zeros_like(input)
+    filter_size = int(cupy.count_nonzero(footprint))
+    rank = get_rank(filter_size)
+    if rank < 0 or rank >= filter_size:
+        raise RuntimeError("rank not within filter footprint size")
+    if rank == 0:
+        return _min_or_max_filter(
+            input, None, footprint, None, output, mode, cval, origins, "min"
+        )
+    if rank == filter_size - 1:
+        return _min_or_max_filter(
+            input, None, footprint, None, output, mode, cval, origins, "max"
+        )
+    offsets = _filters_core._origins_to_offsets(origins, footprint.shape)
+    kernel = _get_rank_kernel(
+        filter_size, rank, mode, footprint.shape, offsets, float(cval), int_type
+    )
+    return _filters_core._call_kernel(
+        kernel, input, footprint, output, weights_dtype=bool
+    )
+
+
+__SHELL_SORT = """
+__device__ void sort(X *array, int size) {{
+    int gap = {gap};
+    while (gap > 1) {{
+        gap /= 3;
+        for (int i = gap; i < size; ++i) {{
+            X value = array[i];
+            int j = i - gap;
+            while (j >= 0 && value < array[j]) {{
+                array[j + gap] = array[j];
+                j -= gap;
+            }}
+            array[j + gap] = value;
+        }}
+    }}
+}}"""
+
+
+@cupy._util.memoize()
+def _get_shell_gap(filter_size):
+    gap = 1
+    while gap < filter_size:
+        gap = 3 * gap + 1
+    return gap
+
+
+@cupy._util.memoize(for_each_device=True)
+def _get_rank_kernel(filter_size, rank, mode, w_shape, offsets, cval, int_type):
+    is_median = rank == filter_size // 2
+    if is_median:
+        s_rank = rank
+        sorter = median_preambles.get(filter_size, None)
+    else:
+        s_rank = min(rank, filter_size - rank - 1)
+    if is_median and sorter is not None:
+        # The sort() function defined in sorter returns only the median
+        array_size = filter_size
+        found_post = ""
+        post = "y=cast<Y>(sort(values));"
+    elif s_rank <= 80:
+        # When s_rank is small and register usage is low, this partial
+        # selection sort approach is faster than general sorting approach
+        # using shell sort.
+        if s_rank == rank:
+            comp_op = "<"
+        else:
+            comp_op = ">"
+        array_size = s_rank + 1
+        found_post = """
+            if (iv > {rank} + 1) {{{{
+                int target_iv = 0;
+                X target_val = values[0];
+                for (int jv = 1; jv <= {rank} + 1; jv++) {{{{
+                    if (target_val {comp_op} values[jv]) {{{{
+                        target_val = values[jv];
+                        target_iv = jv;
+                    }}}}
+                }}}}
+                if (target_iv <= {rank}) {{{{
+                    values[target_iv] = values[{rank} + 1];
+                }}}}
+                iv = {rank} + 1;
+            }}}}""".format(
+            rank=s_rank, comp_op=comp_op
+        )
+        post = """
+            X target_val = values[0];
+            for (int jv = 1; jv <= {rank}; jv++) {{
+                if (target_val {comp_op} values[jv]) {{
+                    target_val = values[jv];
+                }}
+            }}
+            y=cast<Y>(target_val);""".format(
+            rank=s_rank, comp_op=comp_op
+        )
+        sorter = ""
+    else:
+        array_size = filter_size
+        found_post = ""
+        post = "sort(values,{});\ny=cast<Y>(values[{}]);".format(
+            filter_size, rank
+        )
+        sorter = __SHELL_SORT.format(gap=_get_shell_gap(filter_size))
+
+    return _filters_core._generate_nd_kernel(
+        "rank_{}_{}".format(filter_size, rank),
+        "int iv = 0;\nX values[{}];".format(array_size),
+        "values[iv++] = {value};" + found_post,
+        post,
         mode,
+        w_shape,
+        int_type,
+        offsets,
         cval,
-        origin,
-        "percentile",
+        preamble=sorter,
     )
