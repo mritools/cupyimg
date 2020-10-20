@@ -225,3 +225,11 @@ except ImportError:
         if dtype not in _typenames:
             dtype = numpy.dtype(dtype).type
         return _typenames[dtype]
+
+
+try:
+    from cupy._util import PerformanceWarning
+except ImportError:
+
+    class PerformanceWarning(RuntimeWarning):
+        """Warning that indicates possible performance issues."""
