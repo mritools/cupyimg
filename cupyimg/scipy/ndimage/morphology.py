@@ -4,9 +4,9 @@ import warnings
 import cupy
 import numpy
 
-from . import _util
-from . import filters
-from ._kernels.morphology import _get_erode_kernel
+from cupyimg.scipy.ndimage import _filters_core
+from cupyimg.scipy.ndimage import _util
+from cupyimg.scipy.ndimage import filters
 
 
 __all__ = [
@@ -38,69 +38,119 @@ __all__ = [
 # There is also a Jump-Flooding Centroidal Voronoi Code (BSD 3-clause) here:
 
 
-_brute_force_implemented = (
-    False  # TODO: set to True if/when faster approach has been implemented
-)
+@cupy.memoize(for_each_device=True)
+def _get_binary_erosion_kernel(
+    w_shape,
+    int_type,
+    offsets,
+    center_is_true,
+    border_value,
+    invert,
+    masked,
+    all_weights_nonzero,
+):
+    if invert:
+        border_value = int(not border_value)
+        true_val = 0
+        false_val = 1
+    else:
+        true_val = 1
+        false_val = 0
+
+    if masked:
+        pre = """
+            bool mv = (bool)mask[i];
+            bool _in = (bool)x[i];
+            if (!mv) {{
+                y = cast<Y>(_in);
+                return;
+            }} else if ({center_is_true} && _in == {false_val}) {{
+                y = cast<Y>(_in);
+                return;
+            }}""".format(
+            center_is_true=int(center_is_true), false_val=false_val
+        )
+    else:
+        pre = """
+            bool _in = (bool)x[i];
+            if ({center_is_true} && _in == {false_val}) {{
+                y = cast<Y>(_in);
+                return;
+            }}""".format(
+            center_is_true=int(center_is_true), false_val=false_val
+        )
+    pre = (
+        pre
+        + """
+            y = cast<Y>({true_val});""".format(
+            true_val=true_val
+        )
+    )
+
+    # {{{{ required because format is called again within _generate_nd_kernel
+    found = """
+        if ({{cond}}) {{{{
+            if (!{border_value}) {{{{
+                y = cast<Y>({false_val});
+                return;
+            }}}}
+        }}}} else {{{{
+            bool nn = {{value}} ? {true_val} : {false_val};
+            if (!nn) {{{{
+                y = cast<Y>({false_val});
+                return;
+            }}}}
+        }}}}""".format(
+        true_val=int(true_val),
+        false_val=int(false_val),
+        border_value=int(border_value),
+    )
+
+    name = "binary_erosion"
+    if false_val:
+        name += "_invert"
+    return _filters_core._generate_nd_kernel(
+        name,
+        pre,
+        found,
+        "",
+        "constant",
+        w_shape,
+        int_type,
+        offsets,
+        0,
+        ctype="Y",
+        has_weights=True,
+        has_structure=False,
+        has_mask=masked,
+        binary_morphology=True,
+        all_weights_nonzero=all_weights_nonzero,
+    )
 
 
 def _center_is_true(structure, origin):
-    structure = cupy.asarray(structure)
     coor = tuple([oo + ss // 2 for ss, oo in zip(structure.shape, origin)])
-    return bool(structure[coor])
+    return bool(structure[coor])  # device synchronization
 
 
 def iterate_structure(structure, iterations, origin=None):
+    """Iterate a structure by dilating it with itself.
+
+    Args:
+        structure(array_like): Structuring element (an array of bools,
+            for example), to be dilated with itself.
+        iterations(int): The number of dilations performed on the structure
+            with itself.
+        origin(int or tuple of int, optional): If origin is None, only the
+            iterated structure is returned. If not, a tuple of the iterated
+            structure and the modified origin is returned.
+
+    Returns:
+        cupy.ndarray: A new structuring element obtained by dilating
+             ``structure`` (``iterations`` - 1) times with itself.
+
+    .. seealso:: :func:`scipy.ndimage.iterate_structure`
     """
-    Iterate a structure by dilating it with itself.
-
-    Parameters
-    ----------
-    structure : array_like
-       Structuring element (an array of bools, for example), to be dilated with
-       itself.
-    iterations : int
-       number of dilations performed on the structure with itself
-    origin : optional
-        If origin is None, only the iterated structure is returned. If
-        not, a tuple of the iterated structure and the modified origin is
-        returned.
-
-    Returns
-    -------
-    iterate_structure : ndarray of bools
-        A new structuring element obtained by dilating `structure`
-        (`iterations` - 1) times with itself.
-
-    See also
-    --------
-    generate_binary_structure
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> struct = ndimage.generate_binary_structure(2, 1)
-    >>> struct.astype(int)
-    array([[0, 1, 0],
-           [1, 1, 1],
-           [0, 1, 0]])
-    >>> ndimage.iterate_structure(struct, 2).astype(int)
-    array([[0, 0, 1, 0, 0],
-           [0, 1, 1, 1, 0],
-           [1, 1, 1, 1, 1],
-           [0, 1, 1, 1, 0],
-           [0, 0, 1, 0, 0]])
-    >>> ndimage.iterate_structure(struct, 3).astype(int)
-    array([[0, 0, 0, 1, 0, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 1, 1, 1, 1, 1, 0],
-           [1, 1, 1, 1, 1, 1, 1],
-           [0, 1, 1, 1, 1, 1, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 0, 1, 0, 0, 0]])
-
-    """
-    structure = cupy.asarray(structure)
     if iterations < 2:
         return structure.copy()
     ni = iterations - 1
@@ -116,109 +166,38 @@ def iterate_structure(structure, iterations, origin=None):
     if origin is None:
         return out
     else:
-        origin = _util._normalize_sequence(origin, structure.ndim)
+        origin = _util._fix_sequence_arg(origin, structure.ndim, "origin", int)
         origin = [iterations * o for o in origin]
         return out, origin
 
 
-def generate_binary_structure(rank, connectivity, *, on_cpu=False):
-    """
-    Generate a binary structure for binary morphological operations.
+def generate_binary_structure(rank, connectivity):
+    """Generate a binary structure for binary morphological operations.
 
-    Parameters
-    ----------
-    rank : int
-         Number of dimensions of the array to which the structuring element
-         will be applied, as returned by `np.ndim`.
-    connectivity : int
-         `connectivity` determines which elements of the output array belong
-         to the structure, i.e., are considered as neighbors of the central
-         element. Elements up to a squared distance of `connectivity` from
-         the center are considered neighbors. `connectivity` may range from 1
-         (no diagonal elements are neighbors) to `rank` (all elements are
-         neighbors).
-    on_cpu : bool
-        If True, return a NumPy array rather than transferring the structure
-        to the GPU.
+    Args:
+        rank(int): Number of dimensions of the array to which the structuring
+            element will be applied, as returned by ``np.ndim``.
+        connectivity(int): ``connectivity`` determines which elements of the
+            output array belong to the structure, i.e., are considered as
+            neighbors of the central element. Elements up to a squared distance
+            of ``connectivity`` from the center are considered neighbors.
+            ``connectivity`` may range from 1 (no diagonal elements are
+            neighbors) to ``rank`` (all elements are neighbors).
 
-    Returns
-    -------
-    output : ndarray of bools
-         Structuring element which may be used for binary morphological
-         operations, with `rank` dimensions and all dimensions equal to 3.
+    Returns:
+        cupy.ndarray: Structuring element which may be used for binary
+            morphological operations, with ``rank`` dimensions and all
+            dimensions equal to 3.
 
-    See also
-    --------
-    iterate_structure, binary_dilation, binary_erosion
-
-    Notes
-    -----
-    `generate_binary_structure` can only create structuring elements with
-    dimensions equal to 3, i.e., minimal dimensions. For larger structuring
-    elements, that are useful e.g., for eroding large objects, one may either
-    use `iterate_structure`, or create directly custom arrays with
-    numpy functions such as `cupy.ones`.
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> struct = ndimage.generate_binary_structure(2, 1)
-    >>> struct
-    array([[False,  True, False],
-           [ True,  True,  True],
-           [False,  True, False]], dtype=bool)
-    >>> a = cp.zeros((5,5))
-    >>> a[2, 2] = 1
-    >>> a
-    array([[ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.]])
-    >>> b = ndimage.binary_dilation(a, structure=struct).astype(a.dtype)
-    >>> b
-    array([[ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.]])
-    >>> ndimage.binary_dilation(b, structure=struct).astype(a.dtype)
-    array([[ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 1.,  1.,  1.,  1.,  1.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.]])
-    >>> struct = ndimage.generate_binary_structure(2, 2)
-    >>> struct
-    array([[ True,  True,  True],
-           [ True,  True,  True],
-           [ True,  True,  True]], dtype=bool)
-    >>> struct = ndimage.generate_binary_structure(3, 1)
-    >>> struct # no diagonal elements
-    array([[[False, False, False],
-            [False,  True, False],
-            [False, False, False]],
-           [[False,  True, False],
-            [ True,  True,  True],
-            [False,  True, False]],
-           [[False, False, False],
-            [False,  True, False],
-            [False, False, False]]], dtype=bool)
-
+    .. seealso:: :func:`scipy.ndimage.generate_binary_structure`
     """
     if connectivity < 1:
         connectivity = 1
     if rank < 1:
-        if on_cpu:
-            return numpy.asarray(True, dtype=bool)
-        else:
-            return cupy.asarray(True, dtype=bool)
+        return cupy.asarray(True, dtype=bool)
     output = numpy.fabs(numpy.indices([3] * rank) - 1)
     output = numpy.add.reduce(output, 0)
     output = output <= connectivity
-    if on_cpu:
-        return output
     return cupy.asarray(output)
 
 
@@ -238,44 +217,48 @@ def _binary_erosion(
     except TypeError:
         raise TypeError("iterations parameter should be an integer")
 
-    input = cupy.asarray(input)
-    if not input.flags.c_contiguous:
-        # TODO: grlee77: current indexing requires C contiguous arrays.
-        input = cupy.ascontiguousarray(input)
-    if cupy.iscomplexobj(input):
+    if input.dtype.kind == "c":
         raise TypeError("Complex type not supported")
+    if any(s < 0 for s in input.strides):
+        input = cupy.ascontiguousarray(input)
     if structure is None:
         structure = generate_binary_structure(input.ndim, 1)
+        all_weights_nonzero = input.ndim == 1
+        center_is_true = True
+        default_structure = True
     else:
-        structure = cupy.asarray(structure, dtype=bool)
+        structure = structure.astype(dtype=bool, copy=False)
+        # transfer to CPU for use in determining if it is fully dense
+        # structure_cpu = cupy.asnumpy(structure)
+        default_structure = False
     if structure.ndim != input.ndim:
         raise RuntimeError("structure and input must have same dimensionality")
     if not structure.flags.c_contiguous:
-        # TODO: grlee77: current indexing requires C contiguous arrays.
         structure = cupy.ascontiguousarray(structure)
-    # if functools.reduce(operator.mul, structure.shape) < 1:
     if structure.size < 1:
         raise RuntimeError("structure must not be empty")
 
     if mask is not None:
-        mask = cupy.asarray(mask)
         if mask.shape != input.shape:
             raise RuntimeError("mask and input must have equal sizes")
         if not mask.flags.c_contiguous:
-            # TODO: grlee77: current indexing requires C contiguous arrays.
-            mask = cupy.asacontiguousarray(mask)
+            mask = cupy.ascontiguousarray(mask)
         masked = True
     else:
         masked = False
-    origin = _util._normalize_sequence(origin, input.ndim)
-    center_is_true = _center_is_true(structure, origin)
+    origin = _util._fix_sequence_arg(origin, input.ndim, "origin", int)
+
     if isinstance(output, cupy.ndarray):
-        if cupy.iscomplexobj(output):
+        if output.dtype.kind == "c":
             raise TypeError("Complex output type not supported")
     else:
         output = bool
     output = _util._get_output(output, input)
-
+    temp_needed = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
+    if temp_needed:
+        # input and output arrays cannot share memory
+        temp = output
+        output = _util._get_output(output.dtype, input)
     if structure.ndim == 0:
         # kernel doesn't handle ndim=0, so special case it here
         if float(structure):
@@ -284,30 +267,33 @@ def _binary_erosion(
             output[...] = ~cupy.asarray(input, dtype=bool)
         return output
     origin = tuple(origin)
-    erode_kernel = _get_erode_kernel(
-        input.shape,
+    int_type = _util._get_inttype(input)
+    offsets = _filters_core._origins_to_offsets(origin, structure.shape)
+    if not default_structure:
+        # synchronize required to determine if all weights are non-zero
+        nnz = int(cupy.count_nonzero(structure))
+        all_weights_nonzero = nnz == structure.size
+        if all_weights_nonzero:
+            center_is_true = True
+        else:
+            center_is_true = _center_is_true(structure, origin)
+
+    erode_kernel = _get_binary_erosion_kernel(
         structure.shape,
-        origin,
+        int_type,
+        offsets,
         center_is_true,
         border_value,
         invert,
         masked,
+        all_weights_nonzero,
     )
+
     if iterations == 1:
-        needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
-        if needs_temp:
-            output, temp = (
-                _util._get_output(output.dtype, input),
-                output,
-            )
         if masked:
             output = erode_kernel(input, structure, mask, output)
         else:
             output = erode_kernel(input, structure, output)
-        if needs_temp:
-            temp[...] = output
-            output = temp
-        return output
     elif center_is_true and not brute_force:
         raise NotImplementedError(
             "only brute_force iteration has been implemented"
@@ -315,7 +301,7 @@ def _binary_erosion(
     else:
         if cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS"):
             raise ValueError("output and input may not overlap in memory")
-        tmp_in = cupy.empty_like(input, dtype=bool)
+        tmp_in = cupy.empty_like(input, dtype=output.dtype)
         tmp_out = output
         if iterations >= 1 and not iterations & 1:
             tmp_in, tmp_out = tmp_out, tmp_in
@@ -324,7 +310,7 @@ def _binary_erosion(
         else:
             tmp_out = erode_kernel(input, structure, tmp_out)
         # TODO: kernel doesn't return the changed status, so determine it here
-        changed = not (tmp_in == tmp_out).all()  # synchronize!
+        changed = not (input == tmp_out).all()  # synchronize!
         ii = 1
         while ii < iterations or ((iterations < 1) and changed):
             tmp_in, tmp_out = tmp_out, tmp_in
@@ -338,7 +324,11 @@ def _binary_erosion(
                 # can exit early if nothing changed
                 # (only do this after even number of tmp_in/out swaps)
                 break
-        return tmp_out
+        output = tmp_out
+    if temp_needed:
+        temp[...] = output
+        output = temp
+    return output
 
 
 def binary_erosion(
@@ -351,97 +341,44 @@ def binary_erosion(
     origin=0,
     brute_force=False,
 ):
-    """
-    Multidimensional binary erosion with a given structuring element.
+    """Multidimensional binary erosion with a given structuring element.
 
     Binary erosion is a mathematical morphology operation used for image
     processing.
+    Args:
+        input(cupy.ndarray): The input binary array_like to be eroded.
+            Non-zero (True) elements form the subset to be eroded.
+        structure(cupy.ndarray, optional): The structuring element used for the
+            erosion. Non-zero elements are considered True. If no structuring
+            element is provided an element is generated with a square
+            connectivity equal to one. (Default value = None).
+        iterations(int, optional): The erosion is repeated ``iterations`` times
+            (one, by default). If iterations is less than 1, the erosion is
+            repeated until the result does not change anymore. Only an integer
+            of iterations is accepted.
+        mask(cupy.ndarray or None, optional): If a mask is given, only those
+            elements with a True value at the corresponding mask element are
+            modified at each iteration. (Default value = None)
+        output(cupy.ndarray, optional): Array of the same shape as input, into
+            which the output is placed. By default, a new array is created.
+        border_value(int (cast to 0 or 1), optional): Value at the
+            border in the output array. (Default value = 0)
+        origin(int or tuple of ints, optional): Placement of the filter, by
+            default 0.
+        brute_force(boolean, optional): Memory condition: if False, only the
+            pixels whose value was changed in the last iteration are tracked as
+            candidates to be updated (eroded) in the current iteration; if
+            True all pixels are considered as candidates for erosion,
+            regardless of what happened in the previous iteration.
 
-    Parameters
-    ----------
-    input : array_like
-        Binary image to be eroded. Non-zero (True) elements form
-        the subset to be eroded.
-    structure : array_like, optional
-        Structuring element used for the erosion. Non-zero elements are
-        considered True. If no structuring element is provided, an element
-        is generated with a square connectivity equal to one.
-    iterations : int, optional
-        The erosion is repeated `iterations` times (one, by default).
-        If iterations is less than 1, the erosion is repeated until the
-        result does not change anymore.
-    mask : array_like, optional
-        If a mask is given, only those elements with a True value at
-        the corresponding mask element are modified at each iteration.
-    output : ndarray, optional
-        Array of the same shape as input, into which the output is placed.
-        By default, a new array is created.
-    border_value : int (cast to 0 or 1), optional
-        Value at the border in the output array.
-    origin : int or tuple of ints, optional
-        Placement of the filter, by default 0.
-    brute_force : boolean, optional
-        Memory condition: if False, only the pixels whose value was changed in
-        the last iteration are tracked as candidates to be updated (eroded) in
-        the current iteration; if True all pixels are considered as candidates
-        for erosion, regardless of what happened in the previous iteration.
-        False by default.
+    Returns:
+        cupy.ndarray: The result of binary erosion.
 
-    Returns
-    -------
-    binary_erosion : ndarray of bools
-        Erosion of the input by the structuring element.
+    .. warning::
 
-    See also
-    --------
-    grey_erosion, binary_dilation, binary_closing, binary_opening,
-    generate_binary_structure
+        This function may synchronize the device.
 
-    Notes
-    -----
-    Erosion [1]_ is a mathematical morphology operation [2]_ that uses a
-    structuring element for shrinking the shapes in an image. The binary
-    erosion of an image by a structuring element is the locus of the points
-    where a superimposition of the structuring element centered on the point
-    is entirely contained in the set of non-zero elements of the image.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Erosion_%28morphology%29
-    .. [2] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.zeros((7,7), dtype=int)
-    >>> a[1:6, 2:5] = 1
-    >>> a
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> ndimage.binary_erosion(a).astype(a.dtype)
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 1, 0, 0, 0],
-           [0, 0, 0, 1, 0, 0, 0],
-           [0, 0, 0, 1, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> #Erosion removes objects smaller than the structure
-    >>> ndimage.binary_erosion(a, structure=cp.ones((5,5))).astype(a.dtype)
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-
+    .. seealso:: :func:`scipy.ndimage.binary_erosion`
     """
     return _binary_erosion(
         input,
@@ -466,131 +403,51 @@ def binary_dilation(
     origin=0,
     brute_force=False,
 ):
+    """Multidimensional binary dilation with the given structuring element.
+
+    Args:
+        input(cupy.ndarray): The input binary array_like to be dilated.
+            Non-zero (True) elements form the subset to be dilated.
+        structure(cupy.ndarray, optional): The structuring element used for the
+            dilation. Non-zero elements are considered True. If no structuring
+            element is provided an element is generated with a square
+            connectivity equal to one. (Default value = None).
+        iterations(int, optional): The dilation is repeated ``iterations``
+            times (one, by default). If iterations is less than 1, the dilation
+            is repeated until the result does not change anymore. Only an
+            integer of iterations is accepted.
+        mask(cupy.ndarray or None, optional): If a mask is given, only those
+            elements with a True value at the corresponding mask element are
+            modified at each iteration. (Default value = None)
+        output(cupy.ndarray, optional): Array of the same shape as input, into
+            which the output is placed. By default, a new array is created.
+        border_value(int (cast to 0 or 1), optional): Value at the
+            border in the output array. (Default value = 0)
+        origin(int or tuple of ints, optional): Placement of the filter, by
+            default 0.
+        brute_force(boolean, optional): Memory condition: if False, only the
+            pixels whose value was changed in the last iteration are tracked as
+            candidates to be updated (dilated) in the current iteration; if
+            True all pixels are considered as candidates for dilation,
+            regardless of what happened in the previous iteration.
+
+    Returns:
+        cupy.ndarray: The result of binary dilation.
+
+    .. warning::
+
+        This function may synchronize the device.
+
+    .. seealso:: :func:`scipy.ndimage.binary_dilation`
     """
-    Multidimensional binary dilation with the given structuring element.
-
-    Parameters
-    ----------
-    input : array_like
-        Binary array_like to be dilated. Non-zero (True) elements form
-        the subset to be dilated.
-    structure : array_like, optional
-        Structuring element used for the dilation. Non-zero elements are
-        considered True. If no structuring element is provided an element
-        is generated with a square connectivity equal to one.
-    iterations : int, optional
-        The dilation is repeated `iterations` times (one, by default).
-        If iterations is less than 1, the dilation is repeated until the
-        result does not change anymore. Only an integer of iterations is
-        accepted.
-    mask : array_like, optional
-        If a mask is given, only those elements with a True value at
-        the corresponding mask element are modified at each iteration.
-    output : ndarray, optional
-        Array of the same shape as input, into which the output is placed.
-        By default, a new array is created.
-    border_value : int (cast to 0 or 1), optional
-        Value at the border in the output array.
-    origin : int or tuple of ints, optional
-        Placement of the filter, by default 0.
-    brute_force : boolean, optional
-        Memory condition: if False, only the pixels whose value was changed in
-        the last iteration are tracked as candidates to be updated (dilated)
-        in the current iteration; if True all pixels are considered as
-        candidates for dilation, regardless of what happened in the previous
-        iteration. False by default.
-
-    Returns
-    -------
-    binary_dilation : ndarray of bools
-        Dilation of the input by the structuring element.
-
-    See also
-    --------
-    grey_dilation, binary_erosion, binary_closing, binary_opening,
-    generate_binary_structure
-
-    Notes
-    -----
-    Dilation [1]_ is a mathematical morphology operation [2]_ that uses a
-    structuring element for expanding the shapes in an image. The binary
-    dilation of an image by a structuring element is the locus of the points
-    covered by the structuring element, when its center lies within the
-    non-zero points of the image.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Dilation_%28morphology%29
-    .. [2] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.zeros((5, 5))
-    >>> a[2, 2] = 1
-    >>> a
-    array([[ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.]])
-    >>> ndimage.binary_dilation(a)
-    array([[False, False, False, False, False],
-           [False, False,  True, False, False],
-           [False,  True,  True,  True, False],
-           [False, False,  True, False, False],
-           [False, False, False, False, False]], dtype=bool)
-    >>> ndimage.binary_dilation(a).astype(a.dtype)
-    array([[ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.]])
-    >>> # 3x3 structuring element with connectivity 1, used by default
-    >>> struct1 = ndimage.generate_binary_structure(2, 1)
-    >>> struct1
-    array([[False,  True, False],
-           [ True,  True,  True],
-           [False,  True, False]], dtype=bool)
-    >>> # 3x3 structuring element with connectivity 2
-    >>> struct2 = ndimage.generate_binary_structure(2, 2)
-    >>> struct2
-    array([[ True,  True,  True],
-           [ True,  True,  True],
-           [ True,  True,  True]], dtype=bool)
-    >>> ndimage.binary_dilation(a, structure=struct1).astype(a.dtype)
-    array([[ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.]])
-    >>> ndimage.binary_dilation(a, structure=struct2).astype(a.dtype)
-    array([[ 0.,  0.,  0.,  0.,  0.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 0.,  0.,  0.,  0.,  0.]])
-    >>> ndimage.binary_dilation(a, structure=struct1,\\
-    ... iterations=2).astype(a.dtype)
-    array([[ 0.,  0.,  1.,  0.,  0.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 1.,  1.,  1.,  1.,  1.],
-           [ 0.,  1.,  1.,  1.,  0.],
-           [ 0.,  0.,  1.,  0.,  0.]])
-
-    """
-    input = cupy.asarray(input)
     if structure is None:
         structure = generate_binary_structure(input.ndim, 1)
-    origin = _util._normalize_sequence(origin, input.ndim)
-    structure = cupy.asarray(structure)
+    origin = _util._fix_sequence_arg(origin, input.ndim, "origin", int)
     structure = structure[tuple([slice(None, None, -1)] * structure.ndim)]
     for ii in range(len(origin)):
         origin[ii] = -origin[ii]
         if not structure.shape[ii] & 1:
             origin[ii] -= 1
-
     return _binary_erosion(
         input,
         structure,
@@ -620,116 +477,44 @@ def binary_opening(
     The *opening* of an input image by a structuring element is the
     *dilation* of the *erosion* of the image by the structuring element.
 
-    Parameters
-    ----------
-    input : array_like
-        Binary array_like to be opened. Non-zero (True) elements form
-        the subset to be opened.
-    structure : array_like, optional
-        Structuring element used for the opening. Non-zero elements are
-        considered True. If no structuring element is provided an element
-        is generated with a square connectivity equal to one (i.e., only
-        nearest neighbors are connected to the center, diagonally-connected
-        elements are not considered neighbors).
-    iterations : int, optional
-        The erosion step of the opening, then the dilation step are each
-        repeated `iterations` times (one, by default). If `iterations` is
-        less than 1, each operation is repeated until the result does
-        not change anymore. Only an integer of iterations is accepted.
-    output : ndarray, optional
-        Array of the same shape as input, into which the output is placed.
-        By default, a new array is created.
-    origin : int or tuple of ints, optional
-        Placement of the filter, by default 0.
-    mask : array_like, optional
-        If a mask is given, only those elements with a True value at
-        the corresponding mask element are modified at each iteration.
+    Args:
+        input(cupy.ndarray): The input binary array to be opened.
+            Non-zero (True) elements form the subset to be opened.
+        structure(cupy.ndarray, optional): The structuring element used for the
+            opening. Non-zero elements are considered True. If no structuring
+            element is provided an element is generated with a square
+            connectivity equal to one. (Default value = None).
+        iterations(int, optional): The opening is repeated ``iterations`` times
+            (one, by default). If iterations is less than 1, the opening is
+            repeated until the result does not change anymore. Only an integer
+            of iterations is accepted.
+        output(cupy.ndarray, optional): Array of the same shape as input, into
+            which the output is placed. By default, a new array is created.
+        origin(int or tuple of ints, optional): Placement of the filter, by
+            default 0.
+        mask(cupy.ndarray or None, optional): If a mask is given, only those
+            elements with a True value at the corresponding mask element are
+            modified at each iteration. (Default value = None)
+        border_value(int (cast to 0 or 1), optional): Value at the
+            border in the output array. (Default value = 0)
+        brute_force(boolean, optional): Memory condition: if False, only the
+            pixels whose value was changed in the last iteration are tracked as
+            candidates to be updated (dilated) in the current iteration; if
+            True all pixels are considered as candidates for opening,
+            regardless of what happened in the previous iteration.
 
-        .. versionadded:: 1.1.0
-    border_value : int (cast to 0 or 1), optional
-        Value at the border in the output array.
+    Returns:
+        cupy.ndarray: The result of binary opening.
 
-        .. versionadded:: 1.1.0
-    brute_force : boolean, optional
-        Memory condition: if False, only the pixels whose value was changed in
-        the last iteration are tracked as candidates to be updated in the
-        current iteration; if true all pixels are considered as candidates for
-        update, regardless of what happened in the previous iteration.
-        False by default.
+    .. warning::
 
-        .. versionadded:: 1.1.0
+        This function may synchronize the device.
 
-    Returns
-    -------
-    binary_opening : ndarray of bools
-        Opening of the input by the structuring element.
-
-    See also
-    --------
-    grey_opening, binary_closing, binary_erosion, binary_dilation,
-    generate_binary_structure
-
-    Notes
-    -----
-    *Opening* [1]_ is a mathematical morphology operation [2]_ that
-    consists in the succession of an erosion and a dilation of the
-    input with the same structuring element. Opening, therefore, removes
-    objects smaller than the structuring element.
-
-    Together with *closing* (`binary_closing`), opening can be used for
-    noise removal.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Opening_%28morphology%29
-    .. [2] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.zeros((5,5), dtype=int)
-    >>> a[1:4, 1:4] = 1; a[4, 4] = 1
-    >>> a
-    array([[0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 1]])
-    >>> # Opening removes small objects
-    >>> ndimage.binary_opening(a, structure=cp.ones((3,3))).astype(int)
-    array([[0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0]])
-    >>> # Opening can also smooth corners
-    >>> ndimage.binary_opening(a).astype(int)
-    array([[0, 0, 0, 0, 0],
-           [0, 0, 1, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 1, 0, 0],
-           [0, 0, 0, 0, 0]])
-    >>> # Opening is the dilation of the erosion of the input
-    >>> ndimage.binary_erosion(a).astype(int)
-    array([[0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0],
-           [0, 0, 1, 0, 0],
-           [0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0]])
-    >>> ndimage.binary_dilation(ndimage.binary_erosion(a)).astype(int)
-    array([[0, 0, 0, 0, 0],
-           [0, 0, 1, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 1, 0, 0],
-           [0, 0, 0, 0, 0]])
-
+    .. seealso:: :func:`scipy.ndimage.binary_opening`
     """
-    input = cupy.asarray(input)
     if structure is None:
         rank = input.ndim
         structure = generate_binary_structure(rank, 1)
-
     tmp = binary_erosion(
         input,
         structure,
@@ -768,139 +553,44 @@ def binary_closing(
     The *closing* of an input image by a structuring element is the
     *erosion* of the *dilation* of the image by the structuring element.
 
-    Parameters
-    ----------
-    input : array_like
-        Binary array_like to be closed. Non-zero (True) elements form
-        the subset to be closed.
-    structure : array_like, optional
-        Structuring element used for the closing. Non-zero elements are
-        considered True. If no structuring element is provided an element
-        is generated with a square connectivity equal to one (i.e., only
-        nearest neighbors are connected to the center, diagonally-connected
-        elements are not considered neighbors).
-    iterations : int, optional
-        The dilation step of the closing, then the erosion step are each
-        repeated `iterations` times (one, by default). If iterations is
-        less than 1, each operations is repeated until the result does
-        not change anymore. Only an integer of iterations is accepted.
-    output : ndarray, optional
-        Array of the same shape as input, into which the output is placed.
-        By default, a new array is created.
-    origin : int or tuple of ints, optional
-        Placement of the filter, by default 0.
-    mask : array_like, optional
-        If a mask is given, only those elements with a True value at
-        the corresponding mask element are modified at each iteration.
+    Args:
+        input(cupy.ndarray): The input binary array to be closed.
+            Non-zero (True) elements form the subset to be closed.
+        structure(cupy.ndarray, optional): The structuring element used for the
+            closing. Non-zero elements are considered True. If no structuring
+            element is provided an element is generated with a square
+            connectivity equal to one. (Default value = None).
+        iterations(int, optional): The closing is repeated ``iterations`` times
+            (one, by default). If iterations is less than 1, the closing is
+            repeated until the result does not change anymore. Only an integer
+            of iterations is accepted.
+        output(cupy.ndarray, optional): Array of the same shape as input, into
+            which the output is placed. By default, a new array is created.
+        origin(int or tuple of ints, optional): Placement of the filter, by
+            default 0.
+        mask(cupy.ndarray or None, optional): If a mask is given, only those
+            elements with a True value at the corresponding mask element are
+            modified at each iteration. (Default value = None)
+        border_value(int (cast to 0 or 1), optional): Value at the
+            border in the output array. (Default value = 0)
+        brute_force(boolean, optional): Memory condition: if False, only the
+            pixels whose value was changed in the last iteration are tracked as
+            candidates to be updated (dilated) in the current iteration; if
+            True all pixels are considered as candidates for closing,
+            regardless of what happened in the previous iteration.
 
-        .. versionadded:: 1.1.0
-    border_value : int (cast to 0 or 1), optional
-        Value at the border in the output array.
+    Returns:
+        cupy.ndarray: The result of binary closing.
 
-        .. versionadded:: 1.1.0
-    brute_force : boolean, optional
-        Memory condition: if False, only the pixels whose value was changed in
-        the last iteration are tracked as candidates to be updated in the
-        current iteration; if true al pixels are considered as candidates for
-        update, regardless of what happened in the previous iteration.
-        False by default.
+    .. warning::
 
-        .. versionadded:: 1.1.0
+        This function may synchronize the device.
 
-    Returns
-    -------
-    binary_closing : ndarray of bools
-        Closing of the input by the structuring element.
-
-    See also
-    --------
-    grey_closing, binary_opening, binary_dilation, binary_erosion,
-    generate_binary_structure
-
-    Notes
-    -----
-    *Closing* [1]_ is a mathematical morphology operation [2]_ that
-    consists in the succession of a dilation and an erosion of the
-    input with the same structuring element. Closing therefore fills
-    holes smaller than the structuring element.
-
-    Together with *opening* (`binary_opening`), closing can be used for
-    noise removal.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Closing_%28morphology%29
-    .. [2] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.zeros((5,5), dtype=int)
-    >>> a[1:-1, 1:-1] = 1; a[2,2] = 0
-    >>> a
-    array([[0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 0, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0]])
-    >>> # Closing removes small holes
-    >>> ndimage.binary_closing(a).astype(int)
-    array([[0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0]])
-    >>> # Closing is the erosion of the dilation of the input
-    >>> ndimage.binary_dilation(a).astype(int)
-    array([[0, 1, 1, 1, 0],
-           [1, 1, 1, 1, 1],
-           [1, 1, 1, 1, 1],
-           [1, 1, 1, 1, 1],
-           [0, 1, 1, 1, 0]])
-    >>> ndimage.binary_erosion(ndimage.binary_dilation(a)).astype(int)
-    array([[0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0]])
-
-
-    >>> a = cp.zeros((7,7), dtype=int)
-    >>> a[1:6, 2:5] = 1; a[1:3,3] = 0
-    >>> a
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 0, 1, 0, 0],
-           [0, 0, 1, 0, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> # In addition to removing holes, closing can also
-    >>> # coarsen boundaries with fine hollows.
-    >>> ndimage.binary_closing(a).astype(int)
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 0, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> ndimage.binary_closing(a, structure=cp.ones((2,2))).astype(int)
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-
+    .. seealso:: :func:`scipy.ndimage.binary_closing`
     """
-    input = cupy.asarray(input)
     if structure is None:
         rank = input.ndim
         structure = generate_binary_structure(rank, 1)
-
     tmp = binary_dilation(
         input,
         structure,
@@ -937,94 +627,44 @@ def binary_hit_or_miss(
     The hit-or-miss transform finds the locations of a given pattern
     inside the input image.
 
-    Parameters
-    ----------
-    input : array_like (cast to booleans)
-        Binary image where a pattern is to be detected.
-    structure1 : array_like (cast to booleans), optional
-        Part of the structuring element to be fitted to the foreground
-        (non-zero elements) of `input`. If no value is provided, a
-        structure of square connectivity 1 is chosen.
-    structure2 : array_like (cast to booleans), optional
-        Second part of the structuring element that has to miss completely
-        the foreground. If no value is provided, the complementary of
-        `structure1` is taken.
-    output : ndarray, optional
-        Array of the same shape as input, into which the output is placed.
-        By default, a new array is created.
-    origin1 : int or tuple of ints, optional
-        Placement of the first part of the structuring element `structure1`,
-        by default 0 for a centered structure.
-    origin2 : int or tuple of ints, optional
-        Placement of the second part of the structuring element `structure2`,
-        by default 0 for a centered structure. If a value is provided for
-        `origin1` and not for `origin2`, then `origin2` is set to `origin1`.
+    Args:
+        input (cupy.ndarray): Binary image where a pattern is to be detected.
+        structure1 (cupy.ndarray, optional): Part of the structuring element to
+            be fitted to the foreground (non-zero elements) of ``input``. If no
+            value is provided, a structure of square connectivity 1 is chosen.
+        structure2 (cupy.ndarray, optional): Second part of the structuring
+            element that has to miss completely the foreground. If no value is
+            provided, the complementary of ``structure1`` is taken.
+        output (cupy.ndarray, dtype or None, optional): Array of the same shape
+            as input, into which the output is placed. By default, a new array
+            is created.
+        origin1 (int or tuple of ints, optional): Placement of the first part
+            of the structuring element ``structure1``, by default 0 for a
+            centered structure.
+        origin2 (int or tuple of ints or None, optional): Placement of the
+            second part of the structuring element ``structure2``, by default 0
+            for a centered structure. If a value is provided for ``origin1``
+            and not for ``origin2``, then ``origin2`` is set to ``origin1``.
 
-    Returns
-    -------
-    binary_hit_or_miss : ndarray
-        Hit-or-miss transform of `input` with the given structuring
-        element (`structure1`, `structure2`).
+    Returns:
+        cupy.ndarray: Hit-or-miss transform of ``input`` with the given
+            structuring element (``structure1``, ``structure2``).
 
-    See also
-    --------
-    binary_erosion
+    .. warning::
 
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Hit-or-miss_transform
+        This function may synchronize the device.
 
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.zeros((7,7), dtype=int)
-    >>> a[1, 1] = 1; a[2:4, 2:4] = 1; a[4:6, 4:6] = 1
-    >>> a
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 1, 0, 0, 0, 0, 0],
-           [0, 0, 1, 1, 0, 0, 0],
-           [0, 0, 1, 1, 0, 0, 0],
-           [0, 0, 0, 0, 1, 1, 0],
-           [0, 0, 0, 0, 1, 1, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> structure1 = cp.array([[1, 0, 0], [0, 1, 1], [0, 1, 1]])
-    >>> structure1
-    array([[1, 0, 0],
-           [0, 1, 1],
-           [0, 1, 1]])
-    >>> # Find the matches of structure1 in the array a
-    >>> ndimage.binary_hit_or_miss(a, structure1=structure1).astype(int)
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 1, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> # Change the origin of the filter
-    >>> # origin1=1 is equivalent to origin1=(1,1) here
-    >>> ndimage.binary_hit_or_miss(a, structure1=structure1,\\
-    ... origin1=1).astype(int)
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 1, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 1, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-
+    .. seealso:: :func:`scipy.ndimage.binary_hit_or_miss`
     """
-    input = cupy.asarray(input)
     if structure1 is None:
         structure1 = generate_binary_structure(input.ndim, 1)
     if structure2 is None:
         structure2 = cupy.logical_not(structure1)
-    origin1 = _util._normalize_sequence(origin1, input.ndim)
+    origin1 = _util._fix_sequence_arg(origin1, input.ndim, "origin1", int)
     if origin2 is None:
         origin2 = origin1
     else:
-        origin2 = _util._normalize_sequence(origin2, input.ndim)
+        origin2 = _util._fix_sequence_arg(origin2, input.ndim, "origin2", int)
 
     tmp1 = _binary_erosion(
         input, structure1, 1, None, None, 0, origin1, 0, False
@@ -1047,128 +687,29 @@ def binary_propagation(
     """
     Multidimensional binary propagation with the given structuring element.
 
-    Parameters
-    ----------
-    input : array_like
-        Binary image to be propagated inside `mask`.
-    structure : array_like, optional
-        Structuring element used in the successive dilations. The output
-        may depend on the structuring element, especially if `mask` has
-        several connex components. If no structuring element is
-        provided, an element is generated with a squared connectivity equal
-        to one.
-    mask : array_like, optional
-        Binary mask defining the region into which `input` is allowed to
-        propagate.
-    output : ndarray, optional
-        Array of the same shape as input, into which the output is placed.
-        By default, a new array is created.
-    border_value : int (cast to 0 or 1), optional
-        Value at the border in the output array.
-    origin : int or tuple of ints, optional
-        Placement of the filter, by default 0.
+    Args:
+        input (cupy.ndarray): Binary image to be propagated inside ``mask``.
+        structure (cupy.ndarray, optional): Structuring element used in the
+            successive dilations. The output may depend on the structuring
+            element, especially if ``mask`` has several connex components. If
+            no structuring element is provided, an element is generated with a
+            squared connectivity equal to one.
+        mask (cupy.ndarray, optional): Binary mask defining the region into
+            which ``input`` is allowed to propagate.
+        output (cupy.ndarray, optional): Array of the same shape as input, into
+            which the output is placed. By default, a new array is created.
+        border_value (int, optional): Value at the border in the output array.
+            The value is cast to 0 or 1.
+        origin (int or tuple of ints, optional): Placement of the filter.
 
-    Returns
-    -------
-    binary_propagation : ndarray
-        Binary propagation of `input` inside `mask`.
+    Returns:
+        cupy.ndarray : Binary propagation of ``input`` inside ``mask``.
 
-    Notes
-    -----
-    This function is functionally equivalent to calling binary_dilation
-    with the number of iterations less than one: iterative dilation until
-    the result does not change anymore.
+    .. warning::
 
-    The succession of an erosion and propagation inside the original image
-    can be used instead of an *opening* for deleting small objects while
-    keeping the contours of larger objects untouched.
+        This function may synchronize the device.
 
-    References
-    ----------
-    .. [1] http://cmm.ensmp.fr/~serra/cours/pdf/en/ch6en.pdf, slide 15.
-    .. [2] I.T. Young, J.J. Gerbrands, and L.J. van Vliet, "Fundamentals of
-        image processing", 1998
-        ftp://qiftp.tudelft.nl/DIPimage/docs/FIP2.3.pdf
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> input = cp.zeros((8, 8), dtype=int)
-    >>> input[2, 2] = 1
-    >>> mask = cp.zeros((8, 8), dtype=int)
-    >>> mask[1:4, 1:4] = mask[4, 4]  = mask[6:8, 6:8] = 1
-    >>> input
-    array([[0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0]])
-    >>> mask
-    array([[0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0, 0, 0, 0],
-           [0, 0, 0, 0, 1, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 1, 1],
-           [0, 0, 0, 0, 0, 0, 1, 1]])
-    >>> ndimage.binary_propagation(input, mask=mask).astype(int)
-    array([[0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0]])
-    >>> ndimage.binary_propagation(input, mask=mask,\\
-    ... structure=cp.ones((3,3))).astype(int)
-    array([[0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0, 0, 0, 0],
-           [0, 0, 0, 0, 1, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0, 0]])
-
-    >>> # Comparison between opening and erosion+propagation
-    >>> a = cp.zeros((6,6), dtype=int)
-    >>> a[2:5, 2:5] = 1; a[0, 0] = 1; a[5, 5] = 1
-    >>> a
-    array([[1, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 1, 1, 0],
-           [0, 0, 1, 1, 1, 0],
-           [0, 0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0, 1]])
-    >>> ndimage.binary_opening(a).astype(int)
-    array([[0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0],
-           [0, 0, 0, 1, 0, 0],
-           [0, 0, 0, 0, 0, 0]])
-    >>> b = ndimage.binary_erosion(a)
-    >>> b.astype(int)
-    array([[0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 1, 0, 0],
-           [0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0]])
-    >>> ndimage.binary_propagation(b, mask=a).astype(int)
-    array([[0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 1, 1, 0],
-           [0, 0, 1, 1, 1, 0],
-           [0, 0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0, 0]])
-
+    .. seealso:: :func:`scipy.ndimage.binary_propagation`
     """
     return binary_dilation(
         input,
@@ -1178,107 +719,48 @@ def binary_propagation(
         output,
         border_value,
         origin,
-        brute_force=(not _brute_force_implemented),
+        brute_force=True,
     )
 
 
 def binary_fill_holes(input, structure=None, output=None, origin=0):
-    """
-    Fill the holes in binary objects.
+    """Fill the holes in binary objects.
 
+    Args:
+        input (cupy.ndarray): N-D binary array with holes to be filled.
+        structure (cupy.ndarray, optional):  Structuring element used in the
+            computation; large-size elements make computations faster but may
+            miss holes separated from the background by thin regions. The
+            default element (with a square connectivity equal to one) yields
+            the intuitive result where all holes in the input have been filled.
+        output (cupy.ndarray, dtype or None, optional): Array of the same shape
+            as input, into which the output is placed. By default, a new array
+            is created.
+        origin (int, tuple of ints, optional): Position of the structuring
+            element.
 
-    Parameters
-    ----------
-    input : array_like
-        N-D binary array with holes to be filled
-    structure : array_like, optional
-        Structuring element used in the computation; large-size elements
-        make computations faster but may miss holes separated from the
-        background by thin regions. The default element (with a square
-        connectivity equal to one) yields the intuitive result where all
-        holes in the input have been filled.
-    output : ndarray, optional
-        Array of the same shape as input, into which the output is placed.
-        By default, a new array is created.
-    origin : int, tuple of ints, optional
-        Position of the structuring element.
+    Returns:
+        cupy.ndarray: Transformation of the initial image ``input`` where holes
+            have been filled.
 
-    Returns
-    -------
-    out : ndarray
-        Transformation of the initial image `input` where holes have been
-        filled.
+    .. warning::
 
-    See also
-    --------
-    binary_dilation, binary_propagation, label
+        This function may synchronize the device.
 
-    Notes
-    -----
-    The algorithm used in this function consists in invading the complementary
-    of the shapes in `input` from the outer boundary of the image,
-    using binary dilations. Holes are not connected to the boundary and are
-    therefore not invaded. The result is the complementary subset of the
-    invaded region.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.zeros((5, 5), dtype=int)
-    >>> a[1:4, 1:4] = 1
-    >>> a[2,2] = 0
-    >>> a
-    array([[0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 0, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0]])
-    >>> ndimage.binary_fill_holes(a).astype(int)
-    array([[0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0]])
-    >>> # Too big structuring element
-    >>> ndimage.binary_fill_holes(a, structure=cp.ones((5,5))).astype(int)
-    array([[0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 0],
-           [0, 1, 0, 1, 0],
-           [0, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0]])
-
+    .. seealso:: :func:`scipy.ndimage.binary_fill_holes`
     """
     mask = cupy.logical_not(input)
     tmp = cupy.zeros(mask.shape, bool)
     inplace = isinstance(output, cupy.ndarray)
+    # TODO (grlee77): set brute_force=False below once implemented
     if inplace:
         binary_dilation(
-            tmp,
-            structure,
-            -1,
-            mask,
-            output,
-            1,
-            origin,
-            brute_force=(not _brute_force_implemented),
+            tmp, structure, -1, mask, output, 1, origin, brute_force=True
         )
         cupy.logical_not(output, output)
     else:
         output = binary_dilation(
-            tmp,
-            structure,
-            -1,
-            mask,
-            None,
-            1,
-            origin,
-            brute_force=(not _brute_force_implemented),
+            tmp, structure, -1, mask, None, 1, origin, brute_force=True
         )
         cupy.logical_not(output, output)
         return output
@@ -1294,122 +776,42 @@ def grey_erosion(
     cval=0.0,
     origin=0,
 ):
+    """Calculates a greyscale erosion.
+
+    Args:
+        input (cupy.ndarray): The input array.
+        size (tuple of ints): Shape of a flat and full structuring element used
+            for the greyscale erosion. Optional if ``footprint`` or
+            ``structure`` is provided.
+        footprint (array of ints): Positions of non-infinite elements of a flat
+            structuring element used for greyscale erosion. Non-zero values
+            give the set of neighbors of the center over which minimum is
+            chosen.
+        structure (array of ints): Structuring element used for the greyscale
+            erosion. ``structure`` may be a non-flat structuring element.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``constant``. Default is ``0.0``.
+        origin (scalar or tuple of scalar): The origin parameter controls the
+            placement of the filter, relative to the center of the current
+            element of the input. Default of 0 is equivalent to
+            ``(0,)*input.ndim``.
+
+    Returns:
+        cupy.ndarray: The result of greyscale erosion.
+
+    .. seealso:: :func:`scipy.ndimage.grey_erosion`
     """
-    Calculate a greyscale erosion, using either a structuring element,
-    or a footprint corresponding to a flat structuring element.
 
-    Grayscale erosion is a mathematical morphology operation. For the
-    simple case of a full and flat structuring element, it can be viewed
-    as a minimum filter over a sliding window.
-
-    Parameters
-    ----------
-    input : array_like
-        Array over which the grayscale erosion is to be computed.
-    size : tuple of ints
-        Shape of a flat and full structuring element used for the grayscale
-        erosion. Optional if `footprint` or `structure` is provided.
-    footprint : array of ints, optional
-        Positions of non-infinite elements of a flat structuring element
-        used for the grayscale erosion. Non-zero values give the set of
-        neighbors of the center over which the minimum is chosen.
-    structure : array of ints, optional
-        Structuring element used for the grayscale erosion. `structure`
-        may be a non-flat structuring element.
-    output : array, optional
-        An array used for storing the output of the erosion may be provided.
-    mode : {'reflect','constant','nearest','mirror', 'wrap'}, optional
-        The `mode` parameter determines how the array borders are
-        handled, where `cval` is the value when mode is equal to
-        'constant'. Default is 'reflect'
-    cval : scalar, optional
-        Value to fill past edges of input if `mode` is 'constant'. Default
-        is 0.0.
-    origin : scalar, optional
-        The `origin` parameter controls the placement of the filter.
-        Default 0
-
-    Returns
-    -------
-    output : ndarray
-        Grayscale erosion of `input`.
-
-    See also
-    --------
-    binary_erosion, grey_dilation, grey_opening, grey_closing
-    generate_binary_structure, minimum_filter
-
-    Notes
-    -----
-    The grayscale erosion of an image input by a structuring element s defined
-    over a domain E is given by:
-
-    (input+s)(x) = min {input(y) - s(x-y), for y in E}
-
-    In particular, for structuring elements defined as
-    s(y) = 0 for y in E, the grayscale erosion computes the minimum of the
-    input image inside a sliding window defined by E.
-
-    Grayscale erosion [1]_ is a *mathematical morphology* operation [2]_.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Erosion_%28morphology%29
-    .. [2] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.zeros((7,7), dtype=int)
-    >>> a[1:6, 1:6] = 3
-    >>> a[4,4] = 2; a[2,3] = 1
-    >>> a
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 3, 3, 3, 3, 3, 0],
-           [0, 3, 3, 1, 3, 3, 0],
-           [0, 3, 3, 3, 3, 3, 0],
-           [0, 3, 3, 3, 2, 3, 0],
-           [0, 3, 3, 3, 3, 3, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> ndimage.grey_erosion(a, size=(3,3))
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 3, 2, 2, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> footprint = ndimage.generate_binary_structure(2, 1)
-    >>> footprint
-    array([[False,  True, False],
-           [ True,  True,  True],
-           [False,  True, False]], dtype=bool)
-    >>> # Diagonally-connected elements are not considered neighbors
-    >>> ndimage.grey_erosion(a, size=(3,3), footprint=footprint)
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 3, 1, 2, 0, 0],
-           [0, 0, 3, 2, 2, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-
-    """
     if size is None and footprint is None and structure is None:
-        raise ValueError("size, footprint, or structure must be specified")
+        raise ValueError("size, footprint or structure must be specified")
 
     return filters._min_or_max_filter(
-        input,
-        size,
-        footprint,
-        structure,
-        output,
-        mode,
-        cval,
-        origin,
-        True,
-        morphology_mode=True,
+        input, size, footprint, structure, output, mode, cval, origin, "min"
     )
 
 
@@ -1423,255 +825,62 @@ def grey_dilation(
     cval=0.0,
     origin=0,
 ):
-    """
-    Calculate a greyscale dilation, using either a structuring element,
-    or a footprint corresponding to a flat structuring element.
+    """Calculates a greyscale dilation.
 
-    Grayscale dilation is a mathematical morphology operation. For the
-    simple case of a full and flat structuring element, it can be viewed
-    as a maximum filter over a sliding window.
+    Args:
+        input (cupy.ndarray): The input array.
+        size (tuple of ints): Shape of a flat and full structuring element used
+            for the greyscale dilation. Optional if ``footprint`` or
+            ``structure`` is provided.
+        footprint (array of ints): Positions of non-infinite elements of a flat
+            structuring element used for greyscale dilation. Non-zero values
+            give the set of neighbors of the center over which maximum is
+            chosen.
+        structure (array of ints): Structuring element used for the greyscale
+            dilation. ``structure`` may be a non-flat structuring element.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``constant``. Default is ``0.0``.
+        origin (scalar or tuple of scalar): The origin parameter controls the
+            placement of the filter, relative to the center of the current
+            element of the input. Default of 0 is equivalent to
+            ``(0,)*input.ndim``.
 
-    Parameters
-    ----------
-    input : array_like
-        Array over which the grayscale dilation is to be computed.
-    size : tuple of ints
-        Shape of a flat and full structuring element used for the grayscale
-        dilation. Optional if `footprint` or `structure` is provided.
-    footprint : array of ints, optional
-        Positions of non-infinite elements of a flat structuring element
-        used for the grayscale dilation. Non-zero values give the set of
-        neighbors of the center over which the maximum is chosen.
-    structure : array of ints, optional
-        Structuring element used for the grayscale dilation. `structure`
-        may be a non-flat structuring element.
-    output : array, optional
-        An array used for storing the output of the dilation may be provided.
-    mode : {'reflect','constant','nearest','mirror', 'wrap'}, optional
-        The `mode` parameter determines how the array borders are
-        handled, where `cval` is the value when mode is equal to
-        'constant'. Default is 'reflect'
-    cval : scalar, optional
-        Value to fill past edges of input if `mode` is 'constant'. Default
-        is 0.0.
-    origin : scalar, optional
-        The `origin` parameter controls the placement of the filter.
-        Default 0
+    Returns:
+        cupy.ndarray: The result of greyscale dilation.
 
-    Returns
-    -------
-    grey_dilation : ndarray
-        Grayscale dilation of `input`.
-
-    See also
-    --------
-    binary_dilation, grey_erosion, grey_closing, grey_opening
-    generate_binary_structure, maximum_filter
-
-    Notes
-    -----
-    The grayscale dilation of an image input by a structuring element s defined
-    over a domain E is given by:
-
-    (input+s)(x) = max {input(y) + s(x-y), for y in E}
-
-    In particular, for structuring elements defined as
-    s(y) = 0 for y in E, the grayscale dilation computes the maximum of the
-    input image inside a sliding window defined by E.
-
-    Grayscale dilation [1]_ is a *mathematical morphology* operation [2]_.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Dilation_%28morphology%29
-    .. [2] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-    Examples
-    --------
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.zeros((7,7), dtype=int)
-    >>> a[2:5, 2:5] = 1
-    >>> a[4,4] = 2; a[2,3] = 3
-    >>> a
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 3, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 2, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> ndimage.grey_dilation(a, size=(3,3))
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 1, 3, 3, 3, 1, 0],
-           [0, 1, 3, 3, 3, 1, 0],
-           [0, 1, 3, 3, 3, 2, 0],
-           [0, 1, 1, 2, 2, 2, 0],
-           [0, 1, 1, 2, 2, 2, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> ndimage.grey_dilation(a, footprint=cp.ones((3,3)))
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 1, 3, 3, 3, 1, 0],
-           [0, 1, 3, 3, 3, 1, 0],
-           [0, 1, 3, 3, 3, 2, 0],
-           [0, 1, 1, 2, 2, 2, 0],
-           [0, 1, 1, 2, 2, 2, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> s = ndimage.generate_binary_structure(2,1)
-    >>> s
-    array([[False,  True, False],
-           [ True,  True,  True],
-           [False,  True, False]], dtype=bool)
-    >>> ndimage.grey_dilation(a, footprint=s)
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 3, 1, 0, 0],
-           [0, 1, 3, 3, 3, 1, 0],
-           [0, 1, 1, 3, 2, 1, 0],
-           [0, 1, 1, 2, 2, 2, 0],
-           [0, 0, 1, 1, 2, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> ndimage.grey_dilation(a, size=(3,3), structure=cp.ones((3,3)))
-    array([[1, 1, 1, 1, 1, 1, 1],
-           [1, 2, 4, 4, 4, 2, 1],
-           [1, 2, 4, 4, 4, 2, 1],
-           [1, 2, 4, 4, 4, 3, 1],
-           [1, 2, 2, 3, 3, 3, 1],
-           [1, 2, 2, 3, 3, 3, 1],
-           [1, 1, 1, 1, 1, 1, 1]])
-
+    .. seealso:: :func:`scipy.ndimage.grey_dilation`
     """
 
     if size is None and footprint is None and structure is None:
-        raise ValueError("size, footprint, or structure must be specified")
-
+        raise ValueError("size, footprint or structure must be specified")
     if structure is not None:
-        structure = cupy.asarray(structure)
+        structure = cupy.array(structure)
         structure = structure[tuple([slice(None, None, -1)] * structure.ndim)]
     if footprint is not None:
-        footprint = cupy.asarray(footprint)
+        footprint = cupy.array(footprint)
         footprint = footprint[tuple([slice(None, None, -1)] * footprint.ndim)]
 
-    input = cupy.asarray(input)
-    origin = _util._normalize_sequence(origin, input.ndim)
-    for ii in range(len(origin)):
-        origin[ii] = -origin[ii]
+    origin = _util._fix_sequence_arg(origin, input.ndim, "origin", int)
+    for i in range(len(origin)):
+        origin[i] = -origin[i]
         if footprint is not None:
-            sz = footprint.shape[ii]
+            sz = footprint.shape[i]
         elif structure is not None:
-            sz = structure.shape[ii]
-        elif cupy.isscalar(size):
+            sz = structure.shape[i]
+        elif numpy.isscalar(size):
             sz = size
         else:
-            sz = size[ii]
-        if not sz & 1:
-            origin[ii] -= 1
+            sz = size[i]
+        if sz % 2 == 0:
+            origin[i] -= 1
 
     return filters._min_or_max_filter(
-        input,
-        size,
-        footprint,
-        structure,
-        output,
-        mode,
-        cval,
-        origin,
-        False,
-        morphology_mode=True,
-    )
-
-
-def grey_opening(
-    input,
-    size=None,
-    footprint=None,
-    structure=None,
-    output=None,
-    mode="reflect",
-    cval=0.0,
-    origin=0,
-):
-    """
-    Multidimensional grayscale opening.
-
-    A grayscale opening consists in the succession of a grayscale erosion,
-    and a grayscale dilation.
-
-    Parameters
-    ----------
-    input : array_like
-        Array over which the grayscale opening is to be computed.
-    size : tuple of ints
-        Shape of a flat and full structuring element used for the grayscale
-        opening. Optional if `footprint` or `structure` is provided.
-    footprint : array of ints, optional
-        Positions of non-infinite elements of a flat structuring element
-        used for the grayscale opening.
-    structure : array of ints, optional
-        Structuring element used for the grayscale opening. `structure`
-        may be a non-flat structuring element.
-    output : array, optional
-        An array used for storing the output of the opening may be provided.
-    mode : {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}, optional
-        The `mode` parameter determines how the array borders are
-        handled, where `cval` is the value when mode is equal to
-        'constant'. Default is 'reflect'
-    cval : scalar, optional
-        Value to fill past edges of input if `mode` is 'constant'. Default
-        is 0.0.
-    origin : scalar, optional
-        The `origin` parameter controls the placement of the filter.
-        Default 0
-
-    Returns
-    -------
-    grey_opening : ndarray
-        Result of the grayscale opening of `input` with `structure`.
-
-    See also
-    --------
-    binary_opening, grey_dilation, grey_erosion, grey_closing
-    generate_binary_structure
-
-    Notes
-    -----
-    The action of a grayscale opening with a flat structuring element amounts
-    to smoothen high local maxima, whereas binary opening erases small objects.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-    Examples
-    --------
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.arange(36).reshape((6,6))
-    >>> a[3, 3] = 50
-    >>> a
-    array([[ 0,  1,  2,  3,  4,  5],
-           [ 6,  7,  8,  9, 10, 11],
-           [12, 13, 14, 15, 16, 17],
-           [18, 19, 20, 50, 22, 23],
-           [24, 25, 26, 27, 28, 29],
-           [30, 31, 32, 33, 34, 35]])
-    >>> ndimage.grey_opening(a, size=(3,3))
-    array([[ 0,  1,  2,  3,  4,  4],
-           [ 6,  7,  8,  9, 10, 10],
-           [12, 13, 14, 15, 16, 16],
-           [18, 19, 20, 22, 22, 22],
-           [24, 25, 26, 27, 28, 28],
-           [24, 25, 26, 27, 28, 28]])
-    >>> # Note that the local maximum a[3,3] has disappeared
-
-    """
-    if (size is not None) and (footprint is not None):
-        warnings.warn(
-            "ignoring size because footprint is set", UserWarning, stacklevel=2
-        )
-
-    tmp = grey_erosion(
-        input, size, footprint, structure, None, mode, cval, origin
-    )
-    return grey_dilation(
-        tmp, size, footprint, structure, output, mode, cval, origin
+        input, size, footprint, structure, output, mode, cval, origin, "max"
     )
 
 
@@ -1685,88 +894,96 @@ def grey_closing(
     cval=0.0,
     origin=0,
 ):
-    """
-    Multidimensional grayscale closing.
+    """Calculates a multi-dimensional greyscale closing.
 
-    A grayscale closing consists in the succession of a grayscale dilation,
-    and a grayscale erosion.
+    Args:
+        input (cupy.ndarray): The input array.
+        size (tuple of ints): Shape of a flat and full structuring element used
+            for the greyscale closing. Optional if ``footprint`` or
+            ``structure`` is provided.
+        footprint (array of ints): Positions of non-infinite elements of a flat
+            structuring element used for greyscale closing. Non-zero values
+            give the set of neighbors of the center over which closing is
+            chosen.
+        structure (array of ints): Structuring element used for the greyscale
+            closing. ``structure`` may be a non-flat structuring element.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``constant``. Default is ``0.0``.
+        origin (scalar or tuple of scalar): The origin parameter controls the
+            placement of the filter, relative to the center of the current
+            element of the input. Default of 0 is equivalent to
+            ``(0,)*input.ndim``.
 
-    Parameters
-    ----------
-    input : array_like
-        Array over which the grayscale closing is to be computed.
-    size : tuple of ints
-        Shape of a flat and full structuring element used for the grayscale
-        closing. Optional if `footprint` or `structure` is provided.
-    footprint : array of ints, optional
-        Positions of non-infinite elements of a flat structuring element
-        used for the grayscale closing.
-    structure : array of ints, optional
-        Structuring element used for the grayscale closing. `structure`
-        may be a non-flat structuring element.
-    output : array, optional
-        An array used for storing the output of the closing may be provided.
-    mode : {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}, optional
-        The `mode` parameter determines how the array borders are
-        handled, where `cval` is the value when mode is equal to
-        'constant'. Default is 'reflect'
-    cval : scalar, optional
-        Value to fill past edges of input if `mode` is 'constant'. Default
-        is 0.0.
-    origin : scalar, optional
-        The `origin` parameter controls the placement of the filter.
-        Default 0
+    Returns:
+        cupy.ndarray: The result of greyscale closing.
 
-    Returns
-    -------
-    grey_closing : ndarray
-        Result of the grayscale closing of `input` with `structure`.
-
-    See also
-    --------
-    binary_closing, grey_dilation, grey_erosion, grey_opening,
-    generate_binary_structure
-
-    Notes
-    -----
-    The action of a grayscale closing with a flat structuring element amounts
-    to smoothen deep local minima, whereas binary closing fills small holes.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-    Examples
-    --------
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.arange(36).reshape((6,6))
-    >>> a[3,3] = 0
-    >>> a
-    array([[ 0,  1,  2,  3,  4,  5],
-           [ 6,  7,  8,  9, 10, 11],
-           [12, 13, 14, 15, 16, 17],
-           [18, 19, 20,  0, 22, 23],
-           [24, 25, 26, 27, 28, 29],
-           [30, 31, 32, 33, 34, 35]])
-    >>> ndimage.grey_closing(a, size=(3,3))
-    array([[ 7,  7,  8,  9, 10, 11],
-           [ 7,  7,  8,  9, 10, 11],
-           [13, 13, 14, 15, 16, 17],
-           [19, 19, 20, 20, 22, 23],
-           [25, 25, 26, 27, 28, 29],
-           [31, 31, 32, 33, 34, 35]])
-    >>> # Note that the local minimum a[3,3] has disappeared
-
+    .. seealso:: :func:`scipy.ndimage.grey_closing`
     """
     if (size is not None) and (footprint is not None):
         warnings.warn(
             "ignoring size because footprint is set", UserWarning, stacklevel=2
         )
-
     tmp = grey_dilation(
         input, size, footprint, structure, None, mode, cval, origin
     )
     return grey_erosion(
+        tmp, size, footprint, structure, output, mode, cval, origin
+    )
+
+
+def grey_opening(
+    input,
+    size=None,
+    footprint=None,
+    structure=None,
+    output=None,
+    mode="reflect",
+    cval=0.0,
+    origin=0,
+):
+    """Calculates a multi-dimensional greyscale opening.
+
+    Args:
+        input (cupy.ndarray): The input array.
+        size (tuple of ints): Shape of a flat and full structuring element used
+            for the greyscale opening. Optional if ``footprint`` or
+            ``structure`` is provided.
+        footprint (array of ints): Positions of non-infinite elements of a flat
+            structuring element used for greyscale opening. Non-zero values
+            give the set of neighbors of the center over which opening is
+            chosen.
+        structure (array of ints): Structuring element used for the greyscale
+            opening. ``structure`` may be a non-flat structuring element.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``constant``. Default is ``0.0``.
+        origin (scalar or tuple of scalar): The origin parameter controls the
+            placement of the filter, relative to the center of the current
+            element of the input. Default of 0 is equivalent to
+            ``(0,)*input.ndim``.
+
+    Returns:
+        cupy.ndarray: The result of greyscale opening.
+
+    .. seealso:: :func:`scipy.ndimage.grey_opening`
+    """
+    if (size is not None) and (footprint is not None):
+        warnings.warn(
+            "ignoring size because footprint is set", UserWarning, stacklevel=2
+        )
+    tmp = grey_erosion(
+        input, size, footprint, structure, None, mode, cval, origin
+    )
+    return grey_dilation(
         tmp, size, footprint, structure, output, mode, cval, origin
     )
 
@@ -1787,102 +1004,35 @@ def morphological_gradient(
     The morphological gradient is calculated as the difference between a
     dilation and an erosion of the input with a given structuring element.
 
-    Parameters
-    ----------
-    input : array_like
-        Array over which to compute the morphlogical gradient.
-    size : tuple of ints
-        Shape of a flat and full structuring element used for the mathematical
-        morphology operations. Optional if `footprint` or `structure` is
-        provided. A larger `size` yields a more blurred gradient.
-    footprint : array of ints, optional
-        Positions of non-infinite elements of a flat structuring element
-        used for the morphology operations. Larger footprints
-        give a more blurred morphological gradient.
-    structure : array of ints, optional
-        Structuring element used for the morphology operations.
-        `structure` may be a non-flat structuring element.
-    output : array, optional
-        An array used for storing the output of the morphological gradient
-        may be provided.
-    mode : {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}, optional
-        The `mode` parameter determines how the array borders are
-        handled, where `cval` is the value when mode is equal to
-        'constant'. Default is 'reflect'
-    cval : scalar, optional
-        Value to fill past edges of input if `mode` is 'constant'. Default
-        is 0.0.
-    origin : scalar, optional
-        The `origin` parameter controls the placement of the filter.
-        Default 0
+    Args:
+        input (cupy.ndarray): The input array.
+        size (tuple of ints): Shape of a flat and full structuring element used
+            for the morphological gradient. Optional if ``footprint`` or
+            ``structure`` is provided.
+        footprint (array of ints): Positions of non-infinite elements of a flat
+            structuring element used for morphological gradient. Non-zero
+            values give the set of neighbors of the center over which opening
+            is chosen.
+        structure (array of ints): Structuring element used for the
+            morphological gradient. ``structure`` may be a non-flat
+            structuring element.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``constant``. Default is ``0.0``.
+        origin (scalar or tuple of scalar): The origin parameter controls the
+            placement of the filter, relative to the center of the current
+            element of the input. Default of 0 is equivalent to
+            ``(0,)*input.ndim``.
 
-    Returns
-    -------
-    morphological_gradient : ndarray
-        Morphological gradient of `input`.
+    Returns:
+        cupy.ndarray: The morphological gradient of the input.
 
-    See also
-    --------
-    grey_dilation, grey_erosion, gaussian_gradient_magnitude
-
-    Notes
-    -----
-    For a flat structuring element, the morphological gradient
-    computed at a given point corresponds to the maximal difference
-    between elements of the input among the elements covered by the
-    structuring element centered on the point.
-
-    References
-    ----------
-    .. [1] https://en.wikipedia.org/wiki/Mathematical_morphology
-
-    Examples
-    --------
-    >>> import cupy as cp
-    >>> from cupyimg.scipy import ndimage
-    >>> a = cp.zeros((7,7), dtype=int)
-    >>> a[2:5, 2:5] = 1
-    >>> ndimage.morphological_gradient(a, size=(3,3))
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 1, 1, 0],
-           [0, 1, 1, 1, 1, 1, 0],
-           [0, 1, 1, 0, 1, 1, 0],
-           [0, 1, 1, 1, 1, 1, 0],
-           [0, 1, 1, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> # The morphological gradient is computed as the difference
-    >>> # between a dilation and an erosion
-    >>> ndimage.grey_dilation(a, size=(3,3)) -\\
-    ...  ndimage.grey_erosion(a, size=(3,3))
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 1, 1, 1, 1, 1, 0],
-           [0, 1, 1, 1, 1, 1, 0],
-           [0, 1, 1, 0, 1, 1, 0],
-           [0, 1, 1, 1, 1, 1, 0],
-           [0, 1, 1, 1, 1, 1, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> a = cp.zeros((7,7), dtype=int)
-    >>> a[2:5, 2:5] = 1
-    >>> a[4,4] = 2; a[2,3] = 3
-    >>> a
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 1, 3, 1, 0, 0],
-           [0, 0, 1, 1, 1, 0, 0],
-           [0, 0, 1, 1, 2, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-    >>> ndimage.morphological_gradient(a, size=(3,3))
-    array([[0, 0, 0, 0, 0, 0, 0],
-           [0, 1, 3, 3, 3, 1, 0],
-           [0, 1, 3, 3, 3, 1, 0],
-           [0, 1, 3, 2, 3, 2, 0],
-           [0, 1, 1, 2, 2, 2, 0],
-           [0, 1, 1, 2, 2, 2, 0],
-           [0, 0, 0, 0, 0, 0, 0]])
-
+    .. seealso:: :func:`scipy.ndimage.morphological_gradient`
     """
-
     tmp = grey_dilation(
         input, size, footprint, structure, None, mode, cval, origin
     )
@@ -1910,35 +1060,35 @@ def morphological_laplace(
     """
     Multidimensional morphological laplace.
 
-    Parameters
-    ----------
-    input : array_like
-        Input.
-    size : int or sequence of ints, optional
-        See `structure`.
-    footprint : bool or ndarray, optional
-        See `structure`.
-    structure : structure, optional
-        Either `size`, `footprint`, or the `structure` must be provided.
-    output : ndarray, optional
-        An output array can optionally be provided.
-    mode : {'reflect','constant','nearest','mirror', 'wrap'}, optional
-        The mode parameter determines how the array borders are handled.
-        For 'constant' mode, values beyond borders are set to be `cval`.
-        Default is 'reflect'.
-    cval : scalar, optional
-        Value to fill past edges of input if mode is 'constant'.
-        Default is 0.0
-    origin : origin, optional
-        The origin parameter controls the placement of the filter.
+    Args:
+        input (cupy.ndarray): The input array.
+        size (tuple of ints): Shape of a flat and full structuring element used
+            for the morphological laplace. Optional if ``footprint`` or
+            ``structure`` is provided.
+        footprint (array of ints): Positions of non-infinite elements of a flat
+            structuring element used for morphological laplace. Non-zero
+            values give the set of neighbors of the center over which opening
+            is chosen.
+        structure (array of ints): Structuring element used for the
+            morphological laplace. ``structure`` may be a non-flat
+            structuring element.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``constant``. Default is ``0.0``.
+        origin (scalar or tuple of scalar): The origin parameter controls the
+            placement of the filter, relative to the center of the current
+            element of the input. Default of 0 is equivalent to
+            ``(0,)*input.ndim``.
 
-    Returns
-    -------
-    morphological_laplace : ndarray
-        Output
+    Returns:
+        cupy.ndarray: The morphological laplace of the input.
 
+    .. seealso:: :func:`scipy.ndimage.morphological_laplace`
     """
-
     tmp1 = grey_dilation(
         input, size, footprint, structure, None, mode, cval, origin
     )
@@ -1972,41 +1122,33 @@ def white_tophat(
     """
     Multidimensional white tophat filter.
 
-    Parameters
-    ----------
-    input : array_like
-        Input.
-    size : tuple of ints
-        Shape of a flat and full structuring element used for the filter.
-        Optional if `footprint` or `structure` is provided.
-    footprint : array of ints, optional
-        Positions of elements of a flat structuring element
-        used for the white tophat filter.
-    structure : array of ints, optional
-        Structuring element used for the filter. `structure`
-        may be a non-flat structuring element.
-    output : array, optional
-        An array used for storing the output of the filter may be provided.
-    mode : {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}, optional
-        The `mode` parameter determines how the array borders are
-        handled, where `cval` is the value when mode is equal to
-        'constant'. Default is 'reflect'
-    cval : scalar, optional
-        Value to fill past edges of input if `mode` is 'constant'.
-        Default is 0.0.
-    origin : scalar, optional
-        The `origin` parameter controls the placement of the filter.
-        Default is 0.
+    Args:
+        input (cupy.ndarray): The input array.
+        size (tuple of ints): Shape of a flat and full structuring element used
+            for the white tophat. Optional if ``footprint`` or ``structure`` is
+            provided.
+        footprint (array of ints): Positions of non-infinite elements of a flat
+            structuring element used for the white tophat. Non-zero values
+            give the set of neighbors of the center over which opening is
+            chosen.
+        structure (array of ints): Structuring element used for the white
+            tophat. ``structure`` may be a non-flat structuring element.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``constant``. Default is ``0.0``.
+        origin (scalar or tuple of scalar): The origin parameter controls the
+            placement of the filter, relative to the center of the current
+            element of the input. Default of 0 is equivalent to
+            ``(0,)*input.ndim``.
 
-    Returns
-    -------
-    output : ndarray
-        Result of the filter of `input` with `structure`.
+    Returns:
+        cupy.ndarray: Result of the filter of ``input`` with ``structure``.
 
-    See also
-    --------
-    black_tophat
-
+    .. seealso:: :func:`scipy.ndimage.white_tophat`
     """
     if (size is not None) and (footprint is not None):
         warnings.warn(
@@ -2019,10 +1161,6 @@ def white_tophat(
     tmp = grey_dilation(
         tmp, size, footprint, structure, output, mode, cval, origin
     )
-
-    if tmp is None:
-        tmp = output
-
     if input.dtype == numpy.bool_ and tmp.dtype == numpy.bool_:
         cupy.bitwise_xor(input, tmp, out=tmp)
     else:
@@ -2043,54 +1181,44 @@ def black_tophat(
     """
     Multidimensional black tophat filter.
 
-    Parameters
-    ----------
-    input : array_like
-        Input.
-    size : tuple of ints, optional
-        Shape of a flat and full structuring element used for the filter.
-        Optional if `footprint` or `structure` is provided.
-    footprint : array of ints, optional
-        Positions of non-infinite elements of a flat structuring element
-        used for the black tophat filter.
-    structure : array of ints, optional
-        Structuring element used for the filter. `structure`
-        may be a non-flat structuring element.
-    output : array, optional
-        An array used for storing the output of the filter may be provided.
-    mode : {'reflect', 'constant', 'nearest', 'mirror', 'wrap'}, optional
-        The `mode` parameter determines how the array borders are
-        handled, where `cval` is the value when mode is equal to
-        'constant'. Default is 'reflect'
-    cval : scalar, optional
-        Value to fill past edges of input if `mode` is 'constant'. Default
-        is 0.0.
-    origin : scalar, optional
-        The `origin` parameter controls the placement of the filter.
-        Default 0
+    Args:
+        input (cupy.ndarray): The input array.
+        size (tuple of ints): Shape of a flat and full structuring element used
+            for the black tophat. Optional if ``footprint`` or ``structure`` is
+            provided.
+        footprint (array of ints): Positions of non-infinite elements of a flat
+            structuring element used for the black tophat. Non-zero values
+            give the set of neighbors of the center over which opening is
+            chosen.
+        structure (array of ints): Structuring element used for the black
+            tophat. ``structure`` may be a non-flat structuring element.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``constant``. Default is ``0.0``.
+        origin (scalar or tuple of scalar): The origin parameter controls the
+            placement of the filter, relative to the center of the current
+            element of the input. Default of 0 is equivalent to
+            ``(0,)*input.ndim``.
 
-    Returns
-    -------
-    black_tophat : ndarray
-        Result of the filter of `input` with `structure`.
+    Returns:
+        cupy.ndarry : Result of the filter of ``input`` with ``structure``.
 
-    See also
-    --------
-    white_tophat, grey_opening, grey_closing
-
+    .. seealso:: :func:`scipy.ndimage.black_tophat`
     """
     if (size is not None) and (footprint is not None):
         warnings.warn(
             "ignoring size because footprint is set", UserWarning, stacklevel=2
         )
-
     tmp = grey_dilation(
         input, size, footprint, structure, None, mode, cval, origin
     )
     tmp = grey_erosion(
         tmp, size, footprint, structure, output, mode, cval, origin
     )
-
     if input.dtype == numpy.bool_ and tmp.dtype == numpy.bool_:
         cupy.bitwise_xor(tmp, input, out=tmp)
     else:

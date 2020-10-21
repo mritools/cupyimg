@@ -1,13 +1,84 @@
 import warnings
 
 import cupy
-from .support import _generate_boundary_condition_ops
-from .filters import _get_correlate_kernel_masked
+from .support import (
+    _generate_boundary_condition_ops,
+    _masked_loop_init,
+    _raw_ptr_ops,
+)
+
 from cupyimg.scipy.ndimage import _util
 from cupyimg import memoize
 from cupyimg import _misc
 
 # ######## Convolutions and Correlations ##########
+
+
+def _generate_correlate_kernel_masked(
+    mode, cval, xshape, fshape, nnz, origin, unsigned_output
+):
+    """Generate a correlation kernel for sparse filters.
+
+    Only nonzero positions within a filter of shape fshape are visited. This is
+    done via a single loop indexed by a counter, iw, on the nonzero position
+    within the filter.
+    """
+    in_params = "raw X x, raw I wlocs, raw W wvals"
+    out_params = "Y y"
+
+    ndim = len(fshape)
+
+    # any declarations outside the mask loop go here
+    ops = []
+    ops = ops + _raw_ptr_ops(in_params)
+    ops.append("W sum = (W)0;")
+
+    # declare the loop and intialize image indices, ix_0, etc.
+    ops += _masked_loop_init(mode, xshape, fshape, origin, nnz)
+
+    _cond = " || ".join(["(ix_{0} < 0)".format(j) for j in range(ndim)])
+    _expr = " + ".join(["ix_{0}".format(j) for j in range(ndim)])
+
+    ops.append(
+        """
+        if ({cond}) {{
+            sum += (W){cval} * wvals_data[iw];
+        }} else {{
+            int ix = {expr};
+            sum += (W)x_data[ix] * wvals_data[iw];
+        }}
+        """.format(
+            cond=_cond, expr=_expr, cval=cval
+        )
+    )
+
+    ops.append("}")
+    if unsigned_output:
+        # Avoid undefined behaviour of float -> unsigned conversions
+        ops.append("y = (sum > -1) ? (Y)sum : -(Y)(-sum);")
+    else:
+        ops.append("y = (Y)sum;")
+
+    operation = "\n".join(ops)
+
+    name = "cupy_ndimage_correlate_{}d_{}_x{}_w{}_nnz{}".format(
+        ndim,
+        mode,
+        "_".join(["{}".format(j) for j in xshape]),
+        "_".join(["{}".format(j) for j in fshape]),
+        nnz,
+    )
+    return in_params, out_params, operation, name
+
+
+# @memoize()
+def _get_correlate_kernel_masked(
+    mode, cval, xshape, fshape, nnz, origin, unsigned_output
+):
+    in_params, out_params, operation, name = _generate_correlate_kernel_masked(
+        mode, cval, xshape, fshape, nnz, origin, unsigned_output
+    )
+    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
 def _correlate_or_convolve(

@@ -4,7 +4,7 @@ import itertools
 import cupy as cp
 import pytest
 
-from cupyimg.scipy.ndimage import correlate, convolve
+from cupyimg.scipy.ndimage import correlate, convolve, correlate1d, convolve1d
 
 try:
     import scipy.ndimage  # NOQA
@@ -42,6 +42,30 @@ def test_convolve_precision(dtype, func):
     rstate = cp.random.RandomState(5)
     x = rstate.randn(16, 7).astype(dtype)
     w = rstate.randn(3, 4).astype(dtype)
+
+    # Note: single_precision flag only affects what dtype w is cast to
+    #       internally. The output precision should match the input precision.
+    y1 = func(x, w, dtype_mode="ndimage")
+    assert y1.dtype == x.dtype
+
+    y2 = func(x, w, dtype_mode="float")
+    assert y2.dtype == x.dtype
+
+    # not identical due to differing internal precision used above
+    cp.testing.assert_allclose(y1, y2, rtol=1e-4)
+
+
+@pytest.mark.parametrize(
+    "dtype, func",
+    itertools.product(
+        [cp.float32, cp.float64, cp.complex64, cp.complex128],
+        [correlate1d, convolve1d],
+    ),
+)
+def test_convolve1d_precision(dtype, func):
+    rstate = cp.random.RandomState(5)
+    x = rstate.randn(16, 7).astype(dtype)
+    w = rstate.randn(5).astype(dtype)
 
     # Note: single_precision flag only affects what dtype w is cast to
     #       internally. The output precision should match the input precision.

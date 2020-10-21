@@ -505,8 +505,8 @@ class TestNdimage:
             array = cupy.asarray(
                 [[3, 2, 5, 1, 4], [5, 8, 3, 7, 1], [5, 6, 9, 3, 5]], type_
             )
-            t = ndimage.correlate1d(array, [-1.0, 0.0, 1.0], 0)
-            t = ndimage.correlate1d(t, [1.0, 1.0, 1.0], 1)
+            t = ndimage.correlate1d(array, cupy.asarray([-1.0, 0.0, 1.0]), 0)
+            t = ndimage.correlate1d(t, cupy.asarray([1.0, 1.0, 1.0]), 1)
             output = ndimage.prewitt(array, 0)
             assert_array_almost_equal(t, output)
 
@@ -515,8 +515,8 @@ class TestNdimage:
             array = cupy.asarray(
                 [[3, 2, 5, 1, 4], [5, 8, 3, 7, 1], [5, 6, 9, 3, 5]], type_
             )
-            t = ndimage.correlate1d(array, [-1.0, 0.0, 1.0], 0)
-            t = ndimage.correlate1d(t, [1.0, 1.0, 1.0], 1)
+            t = ndimage.correlate1d(array, cupy.asarray([-1.0, 0.0, 1.0]), 0)
+            t = ndimage.correlate1d(t, cupy.asarray([1.0, 1.0, 1.0]), 1)
             output = cupy.zeros(array.shape, type_)
             ndimage.prewitt(array, 0, output)
             assert_array_almost_equal(t, output)
@@ -526,8 +526,8 @@ class TestNdimage:
             array = cupy.asarray(
                 [[3, 2, 5, 1, 4], [5, 8, 3, 7, 1], [5, 6, 9, 3, 5]], type_
             )
-            t = ndimage.correlate1d(array, [-1.0, 0.0, 1.0], 1)
-            t = ndimage.correlate1d(t, [1.0, 1.0, 1.0], 0)
+            t = ndimage.correlate1d(array, cupy.asarray([-1.0, 0.0, 1.0]), 1)
+            t = ndimage.correlate1d(t, cupy.asarray([1.0, 1.0, 1.0]), 0)
             output = ndimage.prewitt(array, 1)
             assert_array_almost_equal(t, output)
 
@@ -545,8 +545,8 @@ class TestNdimage:
             array = cupy.asarray(
                 [[3, 2, 5, 1, 4], [5, 8, 3, 7, 1], [5, 6, 9, 3, 5]], type_
             )
-            t = ndimage.correlate1d(array, [-1.0, 0.0, 1.0], 0)
-            t = ndimage.correlate1d(t, [1.0, 2.0, 1.0], 1)
+            t = ndimage.correlate1d(array, cupy.asarray([-1.0, 0.0, 1.0]), 0)
+            t = ndimage.correlate1d(t, cupy.asarray([1.0, 2.0, 1.0]), 1)
             output = ndimage.sobel(array, 0)
             assert_array_almost_equal(t, output)
 
@@ -555,8 +555,8 @@ class TestNdimage:
             array = cupy.asarray(
                 [[3, 2, 5, 1, 4], [5, 8, 3, 7, 1], [5, 6, 9, 3, 5]], type_
             )
-            t = ndimage.correlate1d(array, [-1.0, 0.0, 1.0], 0)
-            t = ndimage.correlate1d(t, [1.0, 2.0, 1.0], 1)
+            t = ndimage.correlate1d(array, cupy.asarray([-1.0, 0.0, 1.0]), 0)
+            t = ndimage.correlate1d(t, cupy.asarray([1.0, 2.0, 1.0]), 1)
             output = cupy.zeros(array.shape, type_)
             ndimage.sobel(array, 0, output)
             assert_array_almost_equal(t, output)
@@ -566,8 +566,8 @@ class TestNdimage:
             array = cupy.asarray(
                 [[3, 2, 5, 1, 4], [5, 8, 3, 7, 1], [5, 6, 9, 3, 5]], type_
             )
-            t = ndimage.correlate1d(array, [-1.0, 0.0, 1.0], 1)
-            t = ndimage.correlate1d(t, [1.0, 2.0, 1.0], 0)
+            t = ndimage.correlate1d(array, cupy.asarray([-1.0, 0.0, 1.0]), 1)
+            t = ndimage.correlate1d(t, cupy.asarray([1.0, 2.0, 1.0]), 0)
             output = cupy.zeros(array.shape, type_)
             output = ndimage.sobel(array, 1)
             assert_array_almost_equal(t, output)
@@ -589,8 +589,8 @@ class TestNdimage:
                 )
                 * 100
             )
-            tmp1 = ndimage.correlate1d(array, [1, -2, 1], 0)
-            tmp2 = ndimage.correlate1d(array, [1, -2, 1], 1)
+            tmp1 = ndimage.correlate1d(array, cupy.asarray([1, -2, 1]), 0)
+            tmp2 = ndimage.correlate1d(array, cupy.asarray([1, -2, 1]), 1)
             output = ndimage.laplace(array)
             assert_array_almost_equal(tmp1 + tmp2, output)
 
@@ -602,8 +602,8 @@ class TestNdimage:
                 )
                 * 100
             )
-            tmp1 = ndimage.correlate1d(array, [1, -2, 1], 0)
-            tmp2 = ndimage.correlate1d(array, [1, -2, 1], 1)
+            tmp1 = ndimage.correlate1d(array, cupy.asarray([1, -2, 1]), 0)
+            tmp2 = ndimage.correlate1d(array, cupy.asarray([1, -2, 1]), 1)
             output = cupy.zeros(array.shape, type_)
             ndimage.laplace(array, output=output)
             assert_array_almost_equal(tmp1 + tmp2, output)
@@ -1647,12 +1647,17 @@ class TestNdimage:
             out = ndimage.binary_erosion(data, border_value=1)
             assert_array_almost_equal(out, expected)
 
-            # grlee77 add non-contiguous test case
+            # grlee77 add negative stride test case
             out2 = ndimage.binary_erosion(data[::-1], border_value=1)
             expected2 = ndimage.binary_erosion(
                 cupy.ascontiguousarray(data[::-1]), border_value=1
             )
             assert_array_almost_equal(out2, expected2)
+
+            # grlee77 add non-contiguous test case
+            data = cupy.asfortranarray(data)
+            out3 = ndimage.binary_erosion(data, border_value=1)
+            assert_array_almost_equal(out3, expected)
 
     def test_binary_erosion23(self):
         struct = ndimage.generate_binary_structure(2, 2)
