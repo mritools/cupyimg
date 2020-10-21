@@ -21,15 +21,10 @@ import warnings
 import cupy
 import numpy
 
-# from ._kernels.filters import (
-#     #    _get_min_or_max_kernel,
-#     #    _get_min_or_max_kernel_masked,
-#     #    _get_min_or_max_kernel_masked_v2,
-# #    _get_rank_kernel,
-# #    _get_rank_kernel_masked,
-# )
 from . import _util
-from ._kernels.filters_v2 import _correlate_or_convolve
+from ._kernels.filters_v2 import (
+    _correlate_or_convolve as _correlate_or_convolve_legacy,
+)
 from cupyimg import _misc
 from cupyimg.scipy.ndimage import _filters_core
 from cupyimg.scipy.ndimage import _filters_optimal_medians
@@ -106,7 +101,13 @@ def correlate(
     Returns:
         cupy.ndarray: The result of correlate.
 
+    .. seealso:: :func:`scipy.ndimage.correlate`
+
     .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
+
         This function supports complex-valued inputs, but the implementation in
         scipy does not. It also supports single precision computation if the
         user specifies ``dtype_mode='float'``. Otherwise, the convolution is
@@ -114,19 +115,23 @@ def correlate(
         If ``weights`` is complex-valued, it will be conjugated. This matches
         convention used by ``numpy.correlate`` and ``scipy.signal.correlate``.
 
-    .. seealso:: :func:`scipy.ndimage.correlate`
     """
-    return _correlate_or_convolve(
-        input,
-        weights,
-        output,
-        mode,
-        cval,
-        origin,
-        False,
-        dtype_mode,
-        use_weights_mask,
-    )
+    if use_weights_mask:
+        return _correlate_or_convolve_legacy(
+            input,
+            weights,
+            output,
+            mode,
+            cval,
+            origin,
+            False,
+            dtype_mode,
+            use_weights_mask,
+        )
+    else:
+        return _correlate_or_convolve(
+            input, weights, output, mode, cval, origin, dtype_mode=dtype_mode
+        )
 
 
 def convolve(
@@ -169,6 +174,10 @@ def convolve(
         cupy.ndarray: The result of convolution.
 
     .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
+
         This function supports complex-valued inputs, but the implementation in
         scipy does not. It also supports single precision computation if the
         user specifies ``dtype_mode='float'``. Otherwise, the convolution is
@@ -176,17 +185,29 @@ def convolve(
 
     .. seealso:: :func:`scipy.ndimage.convolve`
     """
-    return _correlate_or_convolve(
-        input,
-        weights,
-        output,
-        mode,
-        cval,
-        origin,
-        True,
-        dtype_mode,
-        use_weights_mask,
-    )
+    if use_weights_mask:
+        return _correlate_or_convolve_legacy(
+            input,
+            weights,
+            output,
+            mode,
+            cval,
+            origin,
+            True,
+            dtype_mode,
+            use_weights_mask,
+        )
+    else:
+        return _correlate_or_convolve(
+            input,
+            weights,
+            output,
+            mode,
+            cval,
+            origin,
+            True,
+            dtype_mode=dtype_mode,
+        )
 
 
 def correlate1d(
@@ -201,36 +222,65 @@ def correlate1d(
     backend="ndimage",
     dtype_mode="float",
 ):
-    """Calculate a one-dimensional correlation along the given axis.
+    """One-dimensional correlate.
 
+    The array is correlated with the given kernel.
 
-    See ``scipy.ndimage.correlate1d``
+    Args:
+        input (cupy.ndarray): The input array.
+        weights (cupy.ndarray): One-dimensional array of weights
+        axis (int): The axis of input along which to calculate. Default is -1.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        origin (int): The origin parameter controls the placement of the
+            filter, relative to the center of the current element of the
+            input. Default is ``0``.
 
-    This version supports only ``numpy.float32``, ``numpy.float64``,
-    ``numpy.complex64`` and ``numpy.complex128`` dtypes.
+    Returns:
+        cupy.ndarray: The result of the 1D correlation.
+
+    .. seealso:: :func:`scipy.ndimage.correlate1d`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results
     """
+    if backend == "ndimage":
+        weights, origins = _filters_core._convert_1d_args(
+            input.ndim, weights, origin, axis
+        )
+        return _correlate_or_convolve(
+            input, weights, output, mode, cval, origins, dtype_mode=dtype_mode
+        )
+    else:
 
-    origin = _util._check_origin(origin, len(weights))
+        origin = _util._check_origin(origin, len(weights))
 
-    weights = weights[::-1]
-    origin = -origin
-    if not len(weights) & 1:
-        origin -= 1
-    if cupy.iscomplexobj(weights):
-        # numpy.correlate conjugates weights rather than input. Do the same here
-        weights = weights.conj()
+        weights = weights[::-1]
+        origin = -origin
+        if not len(weights) & 1:
+            origin -= 1
+        if cupy.iscomplexobj(weights):
+            # numpy.correlate conjugates weights rather than input. Do the same here
+            weights = weights.conj()
 
-    return convolve1d(
-        input,
-        weights,
-        axis=axis,
-        output=output,
-        mode=mode,
-        cval=cval,
-        origin=origin,
-        backend=backend,
-        dtype_mode=dtype_mode,
-    )
+        return convolve1d(
+            input,
+            weights,
+            axis=axis,
+            output=output,
+            mode=mode,
+            cval=cval,
+            origin=origin,
+            backend=backend,
+            dtype_mode=dtype_mode,
+        )
 
 
 def convolve1d(
@@ -246,132 +296,203 @@ def convolve1d(
     backend="ndimage",
     dtype_mode="float",
 ):
-    """Calculate a one-dimensional convolution along the given axis.
+    """One-dimensional convolution.
 
-    see ``scipy.ndimage.convolve1d``
+    The array is convolved with the given kernel.
 
-    Notes
-    -----
-    crop=True gives an output the same size as the input ``input``.
+    Args:
+        input (cupy.ndarray): The input array.
+        weights (cupy.ndarray): One-dimensional array of weights
+        axis (int): The axis of input along which to calculate. Default is -1.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        origin (int): The origin parameter controls the placement of the
+            filter, relative to the center of the current element of the
+            input. Default is ``0``.
+    Returns:
+        cupy.ndarray: The result of the 1D convolution.
 
-    Setting crop=False gives an output that is the full size of the
-    convolution. ``output.shape[axis] = input.shape[axis] + len(weights) - 1``
+    .. seealso:: :func:`scipy.ndimage.convolve1d`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
+
+        crop=True gives an output the same size as the input ``input``.
+
+        Setting crop=False gives an output that is the full size of the
+        convolution. ``output.shape[axis] = input.shape[axis] + len(weights) - 1``
     """
-    from cupyimg._misc import _reshape_nd
-
-    axis = _misc._normalize_axis_index(axis, input.ndim)
-    if backend == "fast_upfirdn":
-        origin = _util._check_origin(origin, len(weights))
-
-        try:
-            from fast_upfirdn.cupy import convolve1d as _convolve1d_gpu
-        except ImportError as err:
-            msg = (
-                "Use of fast_upfirdn backend requires installation of "
-                "fast_upfirdn."
-            )
-            raise ImportError(msg) from err
-
-        w_len_half = len(weights) // 2
-        if crop:
-            offset = w_len_half + origin
-        else:
-            if origin != 0:
-                raise ValueError("uncropped case requires origin == 0")
-            offset = 0
-
-        mode_kwargs = _util._get_ndimage_mode_kwargs(mode, cval)
-
-        if dtype_mode == "float":
-            dtype = functools.reduce(
-                numpy.promote_types,
-                [input.dtype, numpy.float32, weights.real.dtype],
-            )
-        elif dtype_mode == "ndimage":
-            dtype = functools.reduce(
-                numpy.promote_types,
-                [input.dtype, numpy.float64, weights.real.dtype],
-            )
-        else:
-            raise ValueError(
-                "dtype_mode={} not supported by backend fast_upfirdn".format(
-                    dtype_mode
-                )
-            )
-        if input.dtype != dtype:
-            warnings.warn("input of dtype {input.dtype} promoted to {dtype}")
-        input = input.astype(dtype, copy=False)
-        if output is not None:
-            output = _util._get_output(output, input)
-            needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
-            if needs_temp:
-                output, temp = (
-                    _util._get_output(output.dtype, input),
-                    output,
-                )
-
-        output = _convolve1d_gpu(
-            weights,
-            input,
-            axis=axis,
-            offset=offset,
-            crop=crop,
-            out=output,
-            **mode_kwargs,
+    if backend == "ndimage" and not crop:
+        weights = weights[::-1]
+        origin = -origin
+        if not len(weights) & 1:
+            origin -= 1
+        weights, origins = _filters_core._convert_1d_args(
+            input.ndim, weights, origin, axis
         )
-        if needs_temp:
-            temp[...] = output[...]
-            output = temp
-        return output
+        return _correlate_or_convolve(
+            input, weights, output, mode, cval, origins, dtype_mode=dtype_mode
+        )
     else:
-        if not crop:
-            raise ValueError("crop=False requires backend='fast_upfirdn'")
-        if output is input:
-            # warnings.warn(
-            #     "in-place convolution is not supported. A copy of input "
-            #     "will be made."
-            # )
-            input = input.copy()
-        weights = cupy.asarray(weights)
-        if weights.ndim != 1:
-            raise ValueError("expected a 1d weights array")
-        if input.ndim > 1:
-            weights = _reshape_nd(weights, ndim=input.ndim, axis=axis)
-            _origin = origin
-            origin = [0] * input.ndim
-            origin[axis] = _origin
-        return convolve(
-            input,
-            weights,
-            mode=mode,
-            output=output,
-            origin=origin,
-            dtype_mode=dtype_mode,
-        )
+        from cupyimg._misc import _reshape_nd
+
+        axis = _misc._normalize_axis_index(axis, input.ndim)
+        if backend == "fast_upfirdn":
+            origin = _util._check_origin(origin, len(weights))
+
+            try:
+                from fast_upfirdn.cupy import convolve1d as _convolve1d_gpu
+            except ImportError as err:
+                msg = (
+                    "Use of fast_upfirdn backend requires installation of "
+                    "fast_upfirdn."
+                )
+                raise ImportError(msg) from err
+
+            w_len_half = len(weights) // 2
+            if crop:
+                offset = w_len_half + origin
+            else:
+                if origin != 0:
+                    raise ValueError("uncropped case requires origin == 0")
+                offset = 0
+
+            mode_kwargs = _util._get_ndimage_mode_kwargs(mode, cval)
+
+            if dtype_mode == "float":
+                dtype = functools.reduce(
+                    numpy.promote_types,
+                    [input.dtype, numpy.float32, weights.real.dtype],
+                )
+            elif dtype_mode == "ndimage":
+                dtype = functools.reduce(
+                    numpy.promote_types,
+                    [input.dtype, numpy.float64, weights.real.dtype],
+                )
+            else:
+                raise ValueError(
+                    "dtype_mode={} not supported by backend fast_upfirdn".format(
+                        dtype_mode
+                    )
+                )
+            if input.dtype != dtype:
+                warnings.warn(
+                    "input of dtype {input.dtype} promoted to {dtype}"
+                )
+            input = input.astype(dtype, copy=False)
+            if output is not None:
+                output = _util._get_output(output, input)
+                needs_temp = cupy.shares_memory(
+                    output, input, "MAY_SHARE_BOUNDS"
+                )
+                if needs_temp:
+                    output, temp = (
+                        _util._get_output(output.dtype, input),
+                        output,
+                    )
+
+            output = _convolve1d_gpu(
+                weights,
+                input,
+                axis=axis,
+                offset=offset,
+                crop=crop,
+                out=output,
+                **mode_kwargs,
+            )
+            if needs_temp:
+                temp[...] = output[...]
+                output = temp
+            return output
+        else:
+            if not crop:
+                raise ValueError("crop=False requires backend='fast_upfirdn'")
+            if output is input:
+                # warnings.warn(
+                #     "in-place convolution is not supported. A copy of input "
+                #     "will be made."
+                # )
+                input = input.copy()
+            weights = cupy.asarray(weights)
+            if weights.ndim != 1:
+                raise ValueError("expected a 1d weights array")
+            if input.ndim > 1:
+                weights = _reshape_nd(weights, ndim=input.ndim, axis=axis)
+                _origin = origin
+                origin = [0] * input.ndim
+                origin[axis] = _origin
+            return convolve(
+                input,
+                weights,
+                mode=mode,
+                output=output,
+                origin=origin,
+                dtype_mode=dtype_mode,
+            )
 
 
-# def _correlate_or_convolve(input, weights, output, mode, cval, origin,
-#                            convolution=False):
-#     origins, int_type = _filters_core._check_nd_args(input, weights,
-#                                                      mode, origin)
-#     if weights.size == 0:
-#         return cupy.zeros_like(input)
+def _correlate_or_convolve(
+    input,
+    weights,
+    output,
+    mode,
+    cval,
+    origin,
+    convolution=False,
+    dtype_mode="ndimage",
+):
+    origins, int_type = _filters_core._check_nd_args(
+        input, weights, mode, origin
+    )
+    if weights.size == 0:
+        return cupy.zeros_like(input)
 
-#     _util._check_cval(mode, cval, _util._is_integer_output(output, input))
+    _util._check_cval(mode, cval, _util._is_integer_output(output, input))
 
-#     if convolution:
-#         weights = weights[tuple([slice(None, None, -1)] * weights.ndim)]
-#         origins = list(origins)
-#         for i, wsize in enumerate(weights.shape):
-#             origins[i] = -origins[i]
-#             if wsize % 2 == 0:
-#                 origins[i] -= 1
-#         origins = tuple(origins)
-#     offsets = _filters_core._origins_to_offsets(origins, weights.shape)
-#     kernel = _get_correlate_kernel(mode, weights.shape, int_type,
-#                                    offsets, cval)
-#     output = _filters_core._call_kernel(kernel, input, weights, output)
-#     return output
+    if convolution:
+        weights = weights[tuple([slice(None, None, -1)] * weights.ndim)]
+        origins = list(origins)
+        for i, wsize in enumerate(weights.shape):
+            origins[i] = -origins[i]
+            if wsize % 2 == 0:
+                origins[i] -= 1
+        origins = tuple(origins)
+    elif weights.dtype.kind == "c":
+        # numpy.correlate conjugates weights rather than input.
+        weights = weights.conj()
+    if dtype_mode == "numpy":
+        # This "numpy" mode is used by cupyimg.scipy.signal.signaltools
+        # numpy.convolve and correlate do not always cast to floats
+        dtype = cupy.promote_types(input.dtype, weights.dtype)
+        output_dtype = dtype
+        if dtype.char == "e":
+            # promote internal float type to float32 for accuracy
+            dtype = "f"
+        if output is not None:
+            raise ValueError(
+                "dtype_mode == 'numpy' does not support the output " "argument"
+            )
+        weights_dtype = dtype
+        if weights.dtype != dtype:
+            weights = weights.astype(dtype)
+        if input.dtype != dtype:
+            input = input.astype(dtype)
+        output = cupy.zeros(input.shape, output_dtype)
+    else:
+        weights_dtype = _util._get_weights_dtype(input, weights, dtype_mode)
+    offsets = _filters_core._origins_to_offsets(origins, weights.shape)
+    kernel = _get_correlate_kernel(mode, weights.shape, int_type, offsets, cval)
+    output = _filters_core._call_kernel(
+        kernel, input, weights, output, weights_dtype=weights_dtype
+    )
+    return output
 
 
 @cupy._util.memoize(for_each_device=True)
@@ -391,7 +512,14 @@ def _get_correlate_kernel(mode, w_shape, int_type, offsets, cval):
 
 
 def _run_1d_correlates(
-    input, params, get_weights, output, mode, cval, origin=0
+    input,
+    params,
+    get_weights,
+    output,
+    mode,
+    cval,
+    origin=0,
+    dtype_mode="ndimage",
 ):
     """
     Enhanced version of _run_1d_filters that uses correlate1d as the filter
@@ -413,16 +541,51 @@ def _run_1d_correlates(
         mode,
         cval,
         origin,
+        dtype_mode=dtype_mode,
     )
 
 
 # TODO: grlee77: incorporate https://github.com/scipy/scipy/pull/7516
 def uniform_filter1d(
-    input, size, axis=-1, output=None, mode="reflect", cval=0.0, origin=0
+    input,
+    size,
+    axis=-1,
+    output=None,
+    mode="reflect",
+    cval=0.0,
+    origin=0,
+    *,
+    dtype_mode="ndimage",
 ):
-    """Calculate a one-dimensional uniform filter along the given axis.
+    """One-dimensional uniform filter along the given axis.
 
-    See ``scipy.ndimage.uniform_filter1d``
+    The lines of the array along the given axis are filtered with a uniform
+    filter of the given size.
+
+    Args:
+        input (cupy.ndarray): The input array.
+        size (int): Length of the uniform filter.
+        axis (int): The axis of input along which to calculate. Default is -1.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        origin (int): The origin parameter controls the placement of the
+            filter, relative to the center of the current element of the
+            input. Default is ``0``.
+
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.uniform_filter1d`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
     dtype_weights = numpy.promote_types(input.real.dtype, numpy.float32)
     if size < 1:
@@ -432,16 +595,47 @@ def uniform_filter1d(
         raise ValueError("invalid origin")
     weights = cupy.full((size,), 1 / size, dtype=dtype_weights)
     return correlate1d(
-        input, weights, axis, output, mode, cval, origin, dtype_mode="ndimage"
+        input, weights, axis, output, mode, cval, origin, dtype_mode=dtype_mode
     )
 
 
 def uniform_filter(
-    input, size=3, output=None, mode="reflect", cval=0.0, origin=0
+    input,
+    size=3,
+    output=None,
+    mode="reflect",
+    cval=0.0,
+    origin=0,
+    *,
+    dtype_mode="ndimage",
 ):
     """Multi-dimensional uniform filter.
 
-    See ``scipy.ndimage.uniform_filter``
+    Args:
+        input (cupy.ndarray): The input array.
+        size (int or sequence of int): Lengths of the uniform filter for each
+            dimension. A single value applies to all axes.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        origin (int or sequence of int): The origin parameter controls the
+            placement of the filter, relative to the center of the current
+            element of the input. Default of ``0`` is equivalent to
+            ``(0,)*input.ndim``.
+
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.uniform_filter`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
     output = _util._get_output(output, input)
     sizes = _util._normalize_sequence(size, input.ndim)
@@ -455,7 +649,16 @@ def uniform_filter(
     ]
     if len(axes) > 0:
         for axis, size, origin, mode in axes:
-            uniform_filter1d(input, int(size), axis, output, mode, cval, origin)
+            uniform_filter1d(
+                input,
+                int(size),
+                axis,
+                output,
+                mode,
+                cval,
+                origin,
+                dtype_mode=dtype_mode,
+            )
             input = output
     else:
         output[...] = input[...]
@@ -471,14 +674,40 @@ def gaussian_filter1d(
     mode="reflect",
     cval=0.0,
     truncate=4.0,
+    *,
+    dtype_mode="ndimage",
 ):
-    """One-dimensional Gaussian filter.
+    """One-dimensional Gaussian filter along the given axis.
 
-    See ``scipy.ndimage.gaussian_filter1d``
+    The lines of the array along the given axis are filtered with a Gaussian
+    filter of the given standard deviation.
 
-    This version supports only ``numpy.float32``, ``numpy.float64``,
-    ``numpy.complex64`` and ``numpy.complex128`` dtypes.
+    Args:
+        input (cupy.ndarray): The input array.
+        sigma (scalar): Standard deviation for Gaussian kernel.
+        axis (int): The axis of input along which to calculate. Default is -1.
+        order (int): An order of ``0``, the default, corresponds to convolution
+            with a Gaussian kernel. A positive order corresponds to convolution
+            with that derivative of a Gaussian.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        truncate (float): Truncate the filter at this many standard deviations.
+            Default is ``4.0``.
 
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.gaussian_filter1d`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
     dtype_weights = numpy.promote_types(input.real.dtype, numpy.float32)
 
@@ -488,15 +717,51 @@ def gaussian_filter1d(
     # Since we are calling correlate, not convolve, revert the kernel
     weights = _gaussian_kernel1d(sigma, order, lw)[::-1]
     weights = cupy.asarray(weights, dtype=dtype_weights)
-    return correlate1d(input, weights, axis, output, mode, cval, 0)
+    return correlate1d(
+        input, weights, axis, output, mode, cval, 0, dtype_mode=dtype_mode
+    )
 
 
 def gaussian_filter(
-    input, sigma, order=0, output=None, mode="reflect", cval=0.0, truncate=4.0
+    input,
+    sigma,
+    order=0,
+    output=None,
+    mode="reflect",
+    cval=0.0,
+    truncate=4.0,
+    *,
+    dtype_mode="ndimage",
 ):
-    """Multidimensional Gaussian filter.
+    """Multi-dimensional Gaussian filter.
 
-    See ``scipy.ndimage.gaussian_filter``
+    Args:
+        input (cupy.ndarray): The input array.
+        sigma (scalar or sequence of scalar): Standard deviations for each axis
+            of Gaussian kernel. A single value applies to all axes.
+        order (int or sequence of scalar): An order of ``0``, the default,
+            corresponds to convolution with a Gaussian kernel. A positive order
+            corresponds to convolution with that derivative of a Gaussian. A
+            single value applies to all axes.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        truncate (float): Truncate the filter at this many standard deviations.
+            Default is ``4.0``.
+
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.gaussian_filter`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
     output = _util._get_output(output, input)
     orders = _util._normalize_sequence(order, input.ndim)
@@ -511,7 +776,15 @@ def gaussian_filter(
     if len(axes) > 0:
         for axis, sigma, order, mode in axes:
             gaussian_filter1d(
-                input, sigma, axis, order, output, mode, cval, truncate
+                input,
+                sigma,
+                axis,
+                order,
+                output,
+                mode,
+                cval,
+                truncate,
+                dtype_mode=dtype_mode,
             )
             input = output
     else:
@@ -552,14 +825,41 @@ def _gaussian_kernel1d(sigma, order, radius):
         return q * phi_x
 
 
-def prewitt(input, axis=-1, output=None, mode="reflect", cval=0.0):
-    """Apply a Prewitt filter.
+def prewitt(
+    input,
+    axis=-1,
+    output=None,
+    mode="reflect",
+    cval=0.0,
+    *,
+    dtype_mode="ndimage",
+):
+    """Compute a Prewitt filter along the given axis.
 
-    See ``scipy.ndimage.prewitt``
+    Args:
+        input (cupy.ndarray): The input array.
+        axis (int): The axis of input along which to calculate. Default is -1.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.prewitt`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
     dtype_weights = numpy.promote_types(input.real.dtype, numpy.float32)
     axis = _misc._normalize_axis_index(axis, input.ndim)
-    output = _util._get_output(output, input)
+    output = _util._get_output(output, input, None, dtype_weights)
     modes = _util._normalize_sequence(mode, input.ndim)
     filt1 = [-1, 0, 1]
     filt2 = [1, 1, 1]
@@ -572,20 +872,54 @@ def prewitt(input, axis=-1, output=None, mode="reflect", cval=0.0):
         raise ValueError("invalid axis")
     axis = axis % ndim
 
-    correlate1d(input, filt1, axis, output, modes[axis], cval, 0)
+    correlate1d(
+        input, filt1, axis, output, modes[axis], cval, 0, dtype_mode=dtype_mode
+    )
     axes = [ii for ii in range(input.ndim) if ii != axis]
     for ii in axes:
-        correlate1d(output, filt2, ii, output, modes[ii], cval, 0)
+        correlate1d(
+            output, filt2, ii, output, modes[ii], cval, 0, dtype_mode=dtype_mode
+        )
     return output
+    # return _prewitt_or_sobel(
+    #     input, axis, output, mode, cval, cupy.ones(3), dtype_mode=dtype_mode
+    # )
 
 
-def sobel(input, axis=-1, output=None, mode="reflect", cval=0.0):
-    """Apply a sobel filter.
+def sobel(
+    input,
+    axis=-1,
+    output=None,
+    mode="reflect",
+    cval=0.0,
+    *,
+    dtype_mode="ndimage",
+):
+    """Compute a Sobel filter along the given axis.
 
-    See ``scipy.ndimage.sobel``
+    Args:
+        input (cupy.ndarray): The input array.
+        axis (int): The axis of input along which to calculate. Default is -1.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.sobel`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
     dtype_weights = numpy.promote_types(input.real.dtype, numpy.float32)
-    output = _util._get_output(output, input)
+    output = _util._get_output(output, input, None, dtype_weights)
     modes = _util._normalize_sequence(mode, input.ndim)
     filt1 = [-1, 0, 1]
     filt2 = [1, 2, 1]
@@ -596,11 +930,34 @@ def sobel(input, axis=-1, output=None, mode="reflect", cval=0.0):
     if axis < -ndim or axis >= ndim:
         raise ValueError("invalid axis")
     axis = axis % ndim
-    correlate1d(input, filt1, axis, output, modes[axis], cval, 0)
+    correlate1d(
+        input, filt1, axis, output, modes[axis], cval, 0, dtype_mode=dtype_mode
+    )
     axes = [ii for ii in range(input.ndim) if ii != axis]
     for ii in axes:
-        correlate1d(output, filt2, ii, output, modes[ii], cval, 0)
+        correlate1d(
+            output, filt2, ii, output, modes[ii], cval, 0, dtype_mode=dtype_mode
+        )
     return output
+    # return _prewitt_or_sobel(input, axis, output, mode, cval,
+    #                          cupy.array([1, 2, 1]), dtype_mode=dtype_mode)
+
+
+# def _prewitt_or_sobel(
+#     input, axis, output, mode, cval, weights, dtype_mode="ndimage"
+# ):
+#     axis = _misc._normalize_axis_index(axis, input.ndim)
+
+#     weights_dtype = _util._get_weights_dtype(input, weights, dtype_mode)
+#     weights = weights.astype(weights_dtype, copy=False)
+
+#     def get(is_diff):
+#         return cupy.array([-1, 0, 1], weights_dtype) if is_diff else weights
+
+#     return _run_1d_correlates(
+#         input, [a == axis for a in range(input.ndim)], get, output, mode, cval,
+#         dtype_mode=dtype_mode,
+#     )
 
 
 def generic_laplace(
@@ -612,10 +969,42 @@ def generic_laplace(
     extra_arguments=(),
     extra_keywords=None,
 ):
-    """
-    N-dimensional Laplace filter using a provided second derivative function.
+    """Multi-dimensional Laplace filter using a provided second derivative
+    function.
 
-    See ``scipy.ndimage.generic_laplace``
+    Args:
+        input (cupy.ndarray): The input array.
+        derivative2 (callable): Function or other callable with the following
+            signature that is called once per axis::
+
+                derivative2(input, axis, output, mode, cval,
+                            *extra_arguments, **extra_keywords)
+
+            where ``input`` and ``output`` are ``cupy.ndarray``, ``axis`` is an
+            ``int`` from ``0`` to the number of dimensions, and ``mode``,
+            ``cval``, ``extra_arguments``, ``extra_keywords`` are the values
+            given to this function.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        extra_arguments (sequence, optional):
+            Sequence of extra positional arguments to pass to ``derivative2``.
+        extra_keywords (dict, optional):
+            dict of extra keyword arguments to pass ``derivative2``.
+
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.generic_laplace`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
     if extra_keywords is None:
         extra_keywords = {}
@@ -649,16 +1038,38 @@ def generic_laplace(
     return output
 
 
-def laplace(input, output=None, mode="reflect", cval=0.0):
-    """N-dimensional Laplace filter based on approximate second derivatives.
+def laplace(
+    input, output=None, mode="reflect", cval=0.0, *, dtype_mode="ndimage"
+):
+    """Multi-dimensional Laplace filter based on approximate second
+    derivatives.
 
-    See ``scipy.ndimage.laplace``
+    Args:
+        input (cupy.ndarray): The input array.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.laplace`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
 
-    def derivative2(input, axis, output, mode, cval):
+    def derivative2(input, axis, output, mode, cval, dtype_mode=dtype_mode):
         h_dtype = numpy.promote_types(input.real.dtype, numpy.float32)
         h = cupy.asarray([1, -2, 1], dtype=h_dtype)
-        return correlate1d(input, h, axis, output, mode, cval, 0)
+        return correlate1d(
+            input, h, axis, output, mode, cval, 0, dtype_mode=dtype_mode
+        )
 
     return generic_laplace(input, derivative2, output, mode, cval)
 
@@ -666,10 +1077,31 @@ def laplace(input, output=None, mode="reflect", cval=0.0):
 def gaussian_laplace(
     input, sigma, output=None, mode="reflect", cval=0.0, **kwargs
 ):
-    """Multidimensional Laplace filter using Gaussian second derivatives.
+    """Multi-dimensional Laplace filter using Gaussian second derivatives.
 
-    See ``scipy.ndimage.gaussian_laplace``
+    Args:
+        input (cupy.ndarray): The input array.
+        sigma (scalar or sequence of scalar): Standard deviations for each axis
+            of Gaussian kernel. A single value applies to all axes.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        kwargs (dict, optional):
+            dict of extra keyword arguments to pass ``gaussian_filter()``.
 
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.gaussian_laplace`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
 
     def derivative2(input, axis, output, mode, cval, sigma, **kwargs):
@@ -699,10 +1131,42 @@ def generic_gradient_magnitude(
     extra_arguments=(),
     extra_keywords=None,
 ):
-    """Gradient magnitude using a provided gradient function.
+    """Multi-dimensional gradient magnitude filter using a provided derivative
+    function.
 
-    See ``scipy.ndimage.generic_gradient_magnitude``
+    Args:
+        input (cupy.ndarray): The input array.
+        derivative (callable): Function or other callable with the following
+            signature that is called once per axis::
 
+                derivative(input, axis, output, mode, cval,
+                           *extra_arguments, **extra_keywords)
+
+            where ``input`` and ``output`` are ``cupy.ndarray``, ``axis`` is an
+            ``int`` from ``0`` to the number of dimensions, and ``mode``,
+            ``cval``, ``extra_arguments``, ``extra_keywords`` are the values
+            given to this function.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        extra_arguments (sequence, optional):
+            Sequence of extra positional arguments to pass to ``derivative2``.
+        extra_keywords (dict, optional):
+            dict of extra keyword arguments to pass ``derivative2``.
+
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.generic_gradient_magnitude`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
     if extra_keywords is None:
         extra_keywords = {}
@@ -743,9 +1207,31 @@ def generic_gradient_magnitude(
 def gaussian_gradient_magnitude(
     input, sigma, output=None, mode="reflect", cval=0.0, **kwargs
 ):
-    """Multidimensional gradient magnitude using Gaussian derivatives.
+    """Multi-dimensional gradient magnitude using Gaussian derivatives.
 
-    See ``scipy.ndimage.gaussian_gradient_magnitude``
+    Args:
+        input (cupy.ndarray): The input array.
+        sigma (scalar or sequence of scalar): Standard deviations for each axis
+            of Gaussian kernel. A single value applies to all axes.
+        output (cupy.ndarray, dtype or None): The array in which to place the
+            output. Default is is same dtype as the input.
+        mode (str): The array borders are handled according to the given mode
+            (``'reflect'``, ``'constant'``, ``'nearest'``, ``'mirror'``,
+            ``'wrap'``). Default is ``'reflect'``.
+        cval (scalar): Value to fill past edges of input if mode is
+            ``'constant'``. Default is ``0.0``.
+        kwargs (dict, optional):
+            dict of extra keyword arguments to pass ``gaussian_filter()``.
+
+    Returns:
+        cupy.ndarray: The result of the filtering.
+
+    .. seealso:: :func:`scipy.ndimage.gaussian_gradient_magnitude`
+
+    .. note::
+        When the output data type is integral (or when no output is provided
+        and input is integral) the results may not perfectly match the results
+        from SciPy due to floating-point rounding of intermediate results.
     """
 
     def derivative(input, axis, output, mode, cval, sigma, **kwargs):

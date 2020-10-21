@@ -25,6 +25,21 @@ def _check_axis(axis, rank):
     return axis
 
 
+def _get_weights_dtype(input, weights, dtype_mode):
+    if weights.dtype.kind == "c" or input.dtype.kind == "c":
+        if dtype_mode == "ndimage":
+            weights_dtype = cupy.complex128
+        elif dtype_mode == "float":
+            weights_dtype = cupy.promote_types(input.real.dtype, cupy.complex64)
+    else:
+        if dtype_mode == "ndimage":
+            weights_dtype = cupy.float64
+        elif dtype_mode == "float":
+            weights_dtype = cupy.promote_types(input.real.dtype, cupy.float32)
+    weights_dtype = cupy.dtype(weights_dtype)
+    return weights_dtype
+
+
 def _get_output(
     output, input, shape=None, weights_dtype=None, allow_inplace=True
 ):
@@ -46,6 +61,7 @@ def _get_output(
             raise RuntimeError("in-place filtering is not supported")
     else:
         if weights_dtype is not None:
+            weights_dtype = cupy.dtype(weights_dtype)
             dtype = output
             if dtype is None:
                 if weights_dtype.kind == "c":

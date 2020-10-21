@@ -61,8 +61,8 @@ def _convert_1d_args(ndim, weights, origin, axis):
 
 
 def _check_nd_args(input, weights, mode, origin, wghts_name="filter weights"):
-    if input.dtype.kind == "c":
-        raise TypeError("Complex type not supported")
+    # if input.dtype.kind == "c":
+    #    raise TypeError("Complex type not supported")
     _util._check_mode(mode)
     # Weights must always be less than 2 GiB
     if weights.nbytes >= (1 << 31):
@@ -76,7 +76,9 @@ def _check_nd_args(input, weights, mode, origin, wghts_name="filter weights"):
     return tuple(origins), _util._get_inttype(input)
 
 
-def _run_1d_filters(filters, input, args, output, mode, cval, origin=0):
+def _run_1d_filters(
+    filters, input, args, output, mode, cval, origin=0, dtype_mode="ndimage"
+):
     """
     Runs a series of 1D filters forming an nd filter. The filters must be a
     list of callables that take input, arg, axis, output, mode, cval, origin.
@@ -142,7 +144,7 @@ def _call_kernel(
     if structure is not None:
         structure = cupy.ascontiguousarray(structure, structure_dtype)
         args.append(structure)
-    output = _util._get_output(output, input)
+    output = _util._get_output(output, input, None, cupy.dtype(weights_dtype))
     needs_temp = cupy.shares_memory(output, input, "MAY_SHARE_BOUNDS")
     if needs_temp:
         output, temp = _util._get_output(output.dtype, input), output
@@ -187,7 +189,7 @@ template<class T> struct is_floating_point
 template<class T> struct is_signed
     : public integral_constant<bool, (T)(-1)<0> {};
 template<> struct is_signed<float16> : public true_type {};
-template<class T> struct is_signed<complex<T>> : public is_signed<T> {};
+ template<class T> struct is_signed<complex<T>> : public is_signed<T> {};
 
 template <class B, class A>
 __device__
