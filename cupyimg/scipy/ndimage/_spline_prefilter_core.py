@@ -47,8 +47,6 @@ def _causal_init_code(mode):
 
     c is a 1d array of length n and z is a filter pole
     """
-    if mode in ["nearest", "constant"]:
-        mode = "mirror"
     code = """
         // causal init for mode={mode}""".format(
         mode=mode
@@ -65,7 +63,7 @@ def _causal_init_code(mode):
             z_i *= z;
         }}
         c[0] /= 1 - z_n_1 * z_n_1;"""
-    elif mode == "wrap":
+    elif mode == "grid-wrap":
         code += """
         z_i = z;
 
@@ -98,8 +96,6 @@ def _anticausal_init_code(mode):
 
     c is a 1d array of length n and z is a filter pole
     """
-    if mode in ["nearest", "constant"]:
-        mode = "mirror"
     code = """
         // anti-causal init for mode={mode}""".format(
         mode=mode
@@ -109,7 +105,7 @@ def _anticausal_init_code(mode):
         c[(n - 1) * element_stride] = (
             z * c[(n - 2) * element_stride] +
             c[(n - 1) * element_stride]) * z / (z * z - 1);"""
-    elif mode == "wrap":
+    elif mode == "grid-wrap":
         code += """
         z_i = z;
 
@@ -124,6 +120,16 @@ def _anticausal_init_code(mode):
     else:
         raise ValueError("invalid mode: {}".format(mode))
     return code
+
+
+def _get_spline_mode(mode):
+    # Return the best spline boundary condition for a give interpolation mode
+    if mode in ["reflect", "nearest", "grid-mirror"]:
+        return "reflect"
+    elif mode == "grid-wrap":
+        return mode
+    else:
+        return "mirror"
 
 
 def _get_spline1d_code(mode, poles, pole_type, n_boundary):
@@ -146,14 +152,17 @@ def _get_spline1d_code(mode, poles, pole_type, n_boundary):
         {pole_type} z, z_i;"""
     )
 
-    if mode in ["mirror", "constant", "nearest"]:
-        # variables specific to these modes
+    # retrieve the spline boundary extension mode to use
+    mode = _get_spline_mode(mode)
+
+    if mode == "mirror":
+        # variables specific to mirror boundary mode
         code.append(
             """
         {pole_type} z_n_1;"""
         )
     elif mode == "reflect":
-        # variables specific to this modes
+        # variables specific to reflect boundary mode
         code.append(
             """
         {pole_type} z_n;

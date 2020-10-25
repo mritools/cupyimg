@@ -4,7 +4,7 @@
 
 
 def _generate_boundary_condition_ops(mode, ix, xsize):
-    if mode == "reflect":
+    if mode in ["reflect", "grid-mirror"]:
         ops = """
         if ({ix} < 0) {{
             {ix} = -1 - {ix};
@@ -31,13 +31,22 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
         {ix} = min(max({ix}, 0), {xsize} - 1);""".format(
             ix=ix, xsize=xsize
         )
-    elif mode == "wrap":
+    elif mode == "grid-wrap":
         ops = """
         if ({ix} < 0) {{
             {ix} += (1 - ({ix} / {xsize})) * {xsize};
         }}
         {ix} %= {xsize};""".format(
             ix=ix, xsize=xsize
+        )
+    elif mode == "wrap":
+        ops = """
+        if ({ix} < 0) {{
+            {ix} += {sz} * (-{ix} / {sz} + 1);
+        }} else if ({ix} > {sz}) {{
+            {ix} -= {sz} * ({ix} / {sz});
+        }};""".format(
+            ix=ix, sz=xsize - 1
         )
     elif mode == "constant":
         ops = """
@@ -46,7 +55,7 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
         }}""".format(
             ix=ix, xsize=xsize
         )
-    elif mode == "constant2":
+    elif mode == "grid-constant":
         ops = """
         if (({ix} < 0) || ({ix} > ({xsize} - 1))) {{
             {ix} = -1;

@@ -5,10 +5,8 @@ from .support import _generate_boundary_condition_ops, _raw_ptr_ops
 from .spline import spline_weights_inline
 from cupyimg import memoize
 
-const_legacy_mode = False
 
-
-def _get_coord_map(ndim):
+def _get_coord_map(ndim, nprepad=0):
     """Extract target coordinate from coords array (for map_coordinates).
 
     Notes
@@ -30,17 +28,18 @@ def _get_coord_map(ndim):
     """
     ops = []
     ops.append("ptrdiff_t ncoords = _ind.size();")
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = coords_data[i + {j} * ncoords];""".format(
-                j=j
+            W c_{j} = coords_data[i + {j} * ncoords]{pre};""".format(
+                j=j, pre=pre
             )
         )
     return ops
 
 
-def _get_coord_zoom_and_shift(ndim):
+def _get_coord_zoom_and_shift(ndim, nprepad=0):
     """Compute target coordinate based on a shift followed by a zoom.
 
     Notes
@@ -57,17 +56,19 @@ def _get_coord_zoom_and_shift(ndim):
 
     """
     ops = []
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = zoom_data[{j}] * ((W)in_coord[{j}] - shift_data[{j}]);""".format(
-                j=j
+        W c_{j} = (zoom_data[{j}] *
+                   ((W)in_coord[{j}] - shift_data[{j}]){pre});""".format(
+                j=j, pre=pre
             )
         )
     return ops
 
 
-def _get_coord_zoom(ndim):
+def _get_coord_zoom(ndim, nprepad=0):
     """Compute target coordinate based on a zoom.
 
     Notes
@@ -83,17 +84,18 @@ def _get_coord_zoom(ndim):
 
     """
     ops = []
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = zoom_data[{j}] * (W)in_coord[{j}];""".format(
-                j=j
+    W c_{j} = zoom_data[{j}] * (W)in_coord[{j}]{pre};""".format(
+                j=j, pre=pre
             )
         )
     return ops
 
 
-def _get_coord_shift(ndim):
+def _get_coord_shift(ndim, nprepad=0):
     """Compute target coordinate based on a shift.
 
     Notes
@@ -109,17 +111,18 @@ def _get_coord_shift(ndim):
 
     """
     ops = []
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = (W)in_coord[{j}] - shift_data[{j}];""".format(
-                j=j
+    W c_{j} = (W)in_coord[{j}] - shift_data[{j}]{pre};""".format(
+                j=j, pre=pre
             )
         )
     return ops
 
 
-def _get_coord_affine(ndim):
+def _get_coord_affine(ndim, nprepad=0):
     """Compute target coordinate based on a homogeneous transformation matrix.
 
     The homogeneous matrix has shape (ndim, ndim + 1). It corresponds to
@@ -141,6 +144,7 @@ def _get_coord_affine(ndim):
     """
     ops = []
     ncol = ndim + 1
+    pre = " + {nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
@@ -158,8 +162,8 @@ def _get_coord_affine(ndim):
             )
         ops.append(
             """
-            c_{j} += mat_data[{m_index}];""".format(
-                j=j, m_index=ncol * j + ndim
+            c_{j} += mat_data[{m_index}]{pre};""".format(
+                j=j, m_index=ncol * j + ndim, pre=pre,
             )
         )
     return ops
@@ -208,6 +212,7 @@ def _generate_interp_custom(
     order,
     name="",
     integer_output=False,
+    nprepad=0,
 ):
     """
     Args:
@@ -227,9 +232,6 @@ def _generate_interp_custom(
         operation (str): code body for the ElementwiseKernel
         name (str): name for the ElementwiseKernel
     """
-
-    if mode == "constant" and not const_legacy_mode:
-        mode = "constant2"  # only set constant2 if want bug-fixed constant mode
 
     ops = []
     ops = ops + _raw_ptr_ops(in_params)
@@ -259,7 +261,7 @@ def _generate_interp_custom(
     ops.append(_unravel_loop_index(yshape, uint_t))
 
     # compute the transformed (target) coordinates, c_j
-    ops = ops + coord_func(ndim)
+    ops = ops + coord_func(ndim, nprepad)
 
     if mode == "constant":
         # use cval if coordinate is outside the bounds of x
@@ -310,7 +312,7 @@ def _generate_interp_custom(
                 )
             )
         _coord_idx = " + ".join(["ic_{}".format(j) for j in range(ndim)])
-        if mode == "constant2":
+        if mode == "grid-constant":
             _cond = " || ".join(["(ic_{0} < 0)".format(j) for j in range(ndim)])
             ops.append(
                 """
@@ -460,7 +462,7 @@ def _generate_interp_custom(
 
         _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
         _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
-        if mode == "constant2" or (order > 1 and mode == "constant"):
+        if mode == "grid-constant" or (order > 1 and mode == "constant"):
             _cond = " || ".join(["(ic_{0} < 0)".format(j) for j in range(ndim)])
             ops.append(
                 """
@@ -505,7 +507,14 @@ def _generate_interp_custom(
 
 @memoize(for_each_device=True)
 def _get_map_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W coords"
     out_params = "Y y"
@@ -520,13 +529,21 @@ def _get_map_kernel(
         order=order,
         name="map_coordinates",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
 @memoize(for_each_device=True)
 def _get_shift_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W shift"
     out_params = "Y y"
@@ -541,13 +558,21 @@ def _get_shift_kernel(
         order=order,
         name="shift",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
 @memoize(for_each_device=True)
 def _get_zoom_shift_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W shift, raw W zoom"
     out_params = "Y y"
@@ -562,13 +587,21 @@ def _get_zoom_shift_kernel(
         order=order,
         name="zoom_shift",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
 @memoize(for_each_device=True)
 def _get_zoom_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W zoom"
     out_params = "Y y"
@@ -583,13 +616,21 @@ def _get_zoom_kernel(
         order=order,
         name="zoom",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
 @memoize(for_each_device=True)
 def _get_affine_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W mat"
     out_params = "Y y"
@@ -604,5 +645,6 @@ def _get_affine_kernel(
         order=order,
         name="affine",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)

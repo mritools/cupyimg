@@ -1,5 +1,4 @@
 import math
-import warnings
 
 import cupy
 import numpy
@@ -45,32 +44,15 @@ def _get_output(output, input, shape=None):
 def _check_parameter(func_name, order, mode):
     if order < 0 or 5 < order:
         raise ValueError("spline order is not supported")
-
-    warn = False
-    if warn:
-        if order == 0 and mode == "constant":
-            from ._kernels import interp
-
-            if not interp.const_legacy_mode:
-                warnings.warn(
-                    "Boundary handling differs slightly from scipy for "
-                    "order=0 with mode == 'constant'. See "
-                    "https://github.com/scipy/scipy/issues/8465"
-                )
-        elif order > 1 and mode != "mirror":
-            warnings.warn(
-                (
-                    "Boundary handling differs slightly from scipy for "
-                    "order={order} with mode == '{mode}'. See "
-                    "https://github.com/scipy/scipy/issues/8465"
-                ).format(order=order, mode=mode)
-            )
     if mode not in (
         "constant",
+        "grid-constant",
         "nearest",
         "mirror",
         "reflect",
+        "grid-mirror",
         "wrap",
+        "grid-wrap",
         "opencv",
         "_opencv_edge",
     ):
@@ -268,6 +250,23 @@ def spline_filter(
     return output
 
 
+def _prepad_for_spline_filter(input, mode, cval):
+    if mode in ["nearest", "grid-constant"]:
+        npad = 12
+        if mode == "grid-constant":
+            padded = cupy.pad(
+                input, npad, mode="constant", constant_values=cval
+            )
+        elif mode == "nearest":
+            padded = cupy.pad(input, npad, mode="edge")
+    else:
+        # other modes have exact boundary conditions implemented so
+        # no prepadding is needed
+        npad = 0
+        padded = input
+    return padded, npad
+
+
 def map_coordinates(
     input,
     coordinates,
@@ -363,14 +362,16 @@ def map_coordinates(
         coordinates = coordinates.astype(coord_dtype, copy=False)
 
     if prefilter and order > 1:
+        padded, npad = _prepad_for_spline_filter(input, mode, cval)
         filtered = spline_filter(
-            input,
+            padded,
             order,
             output=input.dtype,
             mode=mode,
             allow_float32=allow_float32,
         )
     else:
+        npad = 0
         filtered = input
 
     large_int = max(_misc._prod(input.shape), coordinates.shape[0]) > 1 << 31
@@ -382,6 +383,7 @@ def map_coordinates(
         cval=cval,
         order=order,
         integer_output=integer_output,
+        nprepad=npad,
     )
     # kernel assumes C-contiguous arrays
     if not filtered.flags.c_contiguous:
@@ -506,14 +508,16 @@ def affine_transform(
         input = input.astype(cupy.float32)
 
     if prefilter and order > 1:
+        padded, npad = _prepad_for_spline_filter(input, mode, cval)
         filtered = spline_filter(
-            input,
+            padded,
             order,
             output=input.dtype,
             mode=mode,
             allow_float32=allow_float32,
         )
     else:
+        npad = 0
         filtered = input
 
     # kernel assumes C-contiguous arrays
@@ -537,6 +541,7 @@ def affine_transform(
             cval=cval,
             order=order,
             integer_output=integer_output,
+            nprepad=npad,
         )
         kern(filtered, offset, matrix, output)
     else:
@@ -548,6 +553,7 @@ def affine_transform(
             cval=cval,
             order=order,
             integer_output=integer_output,
+            nprepad=npad,
         )
         m = cupy.zeros((ndim, ndim + 1), dtype=float)
         m[:, :-1] = matrix
@@ -775,14 +781,16 @@ def shift(
             input = input.astype(cupy.float32)
 
         if prefilter and order > 1:
+            padded, npad = _prepad_for_spline_filter(input, mode, cval)
             filtered = spline_filter(
-                input,
+                padded,
                 order,
                 output=input.dtype,
                 mode=mode,
                 allow_float32=allow_float32,
             )
         else:
+            npad = 0
             filtered = input
 
         # kernel assumes C-contiguous arrays
@@ -799,6 +807,7 @@ def shift(
             cval=cval,
             order=order,
             integer_output=integer_output,
+            nprepad=npad,
         )
         shift = cupy.asarray(shift, dtype=float, order="C")
         if shift.ndim != 1:
@@ -909,6 +918,7 @@ def zoom(
             input = input.astype(cupy.float32)
 
         if prefilter and order > 1:
+            padded, npad = _prepad_for_spline_filter(input, mode, cval)
             filtered = spline_filter(
                 input,
                 order,
@@ -917,6 +927,7 @@ def zoom(
                 allow_float32=allow_float32,
             )
         else:
+            npad = 0
             filtered = input
 
         # kernel assumes C-contiguous arrays
@@ -934,6 +945,7 @@ def zoom(
             mode,
             order=order,
             integer_output=integer_output,
+            nprepad=npad,
         )
         zoom = cupy.asarray(zoom, dtype=float, order="C")
         if zoom.ndim != 1:
