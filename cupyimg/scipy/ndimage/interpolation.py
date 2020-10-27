@@ -7,7 +7,7 @@ from cupyimg import _misc
 from cupyimg.scipy.ndimage import _spline_prefilter_core
 from cupyimg.scipy.ndimage import _util
 
-from ._kernels.interp import (
+from ._interp_kerenls import (
     _get_map_kernel,
     _get_shift_kernel,
     _get_zoom_kernel,

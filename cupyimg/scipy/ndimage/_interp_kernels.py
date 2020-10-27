@@ -1,9 +1,15 @@
 import cupy
 import cupy.core.internal
+import numpy
 
-from .support import _generate_boundary_condition_ops, _raw_ptr_ops
-from .spline import spline_weights_inline
 from cupyimg import memoize
+from cupyimg.scipy.ndimage import _spline_kernel_weights
+from cupyimg.scipy.ndimage import _util
+
+spline_weights_inline = _spline_kernel_weights.spline_weights_inline
+
+
+math_constants_preamble = "#include <math_constants.h>\n"
 
 
 def _get_coord_map(ndim, nprepad=0):
@@ -32,7 +38,7 @@ def _get_coord_map(ndim, nprepad=0):
     for j in range(ndim):
         ops.append(
             """
-            W c_{j} = coords_data[i + {j} * ncoords]{pre};""".format(
+            W c_{j} = coords[i + {j} * ncoords]{pre};""".format(
                 j=j, pre=pre
             )
         )
@@ -60,8 +66,8 @@ def _get_coord_zoom_and_shift(ndim, nprepad=0):
     for j in range(ndim):
         ops.append(
             """
-        W c_{j} = (zoom_data[{j}] *
-                   ((W)in_coord[{j}] - shift_data[{j}]){pre});""".format(
+        W c_{j} = (zoom[{j}] *
+                   ((W)in_coord[{j}] - shift[{j}]){pre});""".format(
                 j=j, pre=pre
             )
         )
@@ -88,7 +94,7 @@ def _get_coord_zoom(ndim, nprepad=0):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = zoom_data[{j}] * (W)in_coord[{j}]{pre};""".format(
+    W c_{j} = zoom[{j}] * (W)in_coord[{j}]{pre};""".format(
                 j=j, pre=pre
             )
         )
@@ -115,7 +121,7 @@ def _get_coord_shift(ndim, nprepad=0):
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = (W)in_coord[{j}] - shift_data[{j}]{pre};""".format(
+    W c_{j} = (W)in_coord[{j}] - shift[{j}]{pre};""".format(
                 j=j, pre=pre
             )
         )
@@ -156,13 +162,13 @@ def _get_coord_affine(ndim, nprepad=0):
             m_index = ncol * j + k
             ops.append(
                 """
-            c_{j} += mat_data[{m_index}] * (W)in_coord[{k}];""".format(
+            c_{j} += mat[{m_index}] * (W)in_coord[{k}];""".format(
                     j=j, k=k, m_index=m_index
                 )
             )
         ops.append(
             """
-            c_{j} += mat_data[{m_index}]{pre};""".format(
+            c_{j} += mat[{m_index}]{pre};""".format(
                 j=j, m_index=ncol * j + ndim, pre=pre,
             )
         )
@@ -234,7 +240,6 @@ def _generate_interp_custom(
     """
 
     ops = []
-    ops = ops + _raw_ptr_ops(in_params)
     ops.append("double out = 0.0;")
 
     if large_int:
@@ -263,6 +268,14 @@ def _generate_interp_custom(
     # compute the transformed (target) coordinates, c_j
     ops = ops + coord_func(ndim, nprepad)
 
+    if cval is numpy.nan:
+        cval = "CUDART_NAN"
+    elif cval == numpy.inf:
+        cval = "CUDART_INF"
+    elif cval == -numpy.inf:
+        cval = "-CUDART_INF"
+    else:
+        cval = "(double){cval}".format(cval=cval)
     if mode == "constant":
         # use cval if coordinate is outside the bounds of x
         _cond = " || ".join(
@@ -298,7 +311,7 @@ def _generate_interp_custom(
             if mode != "constant":
                 ixvar = "cf_{j}".format(j=j)
                 ops.append(
-                    _generate_boundary_condition_ops(
+                    _util._generate_boundary_condition_ops(
                         mode, ixvar, "xsize_{}".format(j)
                     )
                 )
@@ -319,7 +332,7 @@ def _generate_interp_custom(
             if ({cond}) {{
                 out = (double){cval};
             }} else {{
-                out = x_data[{coord_idx}];
+                out = x[{coord_idx}];
             }}
             """.format(
                     cond=_cond, cval=cval, coord_idx=_coord_idx
@@ -328,7 +341,7 @@ def _generate_interp_custom(
         else:
             ops.append(
                 """
-                out = x_data[{coord_idx}];
+                out = x[{coord_idx}];
                 """.format(
                     coord_idx=_coord_idx
                 )
@@ -359,13 +372,13 @@ def _generate_interp_custom(
             if mode != "constant":
                 ixvar = "cf_bounded_{j}".format(j=j)
                 ops.append(
-                    _generate_boundary_condition_ops(
+                    _util._generate_boundary_condition_ops(
                         mode, ixvar, "xsize_{}".format(j)
                     )
                 )
                 ixvar = "cc_bounded_{j}".format(j=j)
                 ops.append(
-                    _generate_boundary_condition_ops(
+                    _util._generate_boundary_condition_ops(
                         mode, ixvar, "xsize_{}".format(j)
                     )
                 )
@@ -439,7 +452,7 @@ def _generate_interp_custom(
                 )
                 ixvar = "ci_{j}[{k}]".format(j=j, k=k)
                 ops.append(
-                    _generate_boundary_condition_ops(
+                    _util._generate_boundary_condition_ops(
                         mode, ixvar, "xsize_{}".format(j)
                     )
                 )
@@ -469,7 +482,7 @@ def _generate_interp_custom(
             if ({cond}) {{
                 out += (double){cval} * ({weight});
             }} else {{
-                X val = x_data[{coord_idx}];
+                X val = x[{coord_idx}];
                 out += val * ({weight});
             }}
             """.format(
@@ -479,7 +492,7 @@ def _generate_interp_custom(
         else:
             ops.append(
                 """
-            X val = x_data[{coord_idx}];
+            X val = x[{coord_idx}];
             out += val * ({weight});
             """.format(
                     coord_idx=_coord_idx, weight=_weight
@@ -560,7 +573,9 @@ def _get_shift_kernel(
         integer_output=integer_output,
         nprepad=nprepad,
     )
-    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
+    return cupy.ElementwiseKernel(
+        in_params, out_params, operation, name, preamble=math_constants_preamble
+    )
 
 
 @memoize(for_each_device=True)
@@ -589,7 +604,9 @@ def _get_zoom_shift_kernel(
         integer_output=integer_output,
         nprepad=nprepad,
     )
-    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
+    return cupy.ElementwiseKernel(
+        in_params, out_params, operation, name, preamble=math_constants_preamble
+    )
 
 
 @memoize(for_each_device=True)
@@ -618,7 +635,9 @@ def _get_zoom_kernel(
         integer_output=integer_output,
         nprepad=nprepad,
     )
-    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
+    return cupy.ElementwiseKernel(
+        in_params, out_params, operation, name, preamble=math_constants_preamble
+    )
 
 
 @memoize(for_each_device=True)
@@ -647,4 +666,6 @@ def _get_affine_kernel(
         integer_output=integer_output,
         nprepad=nprepad,
     )
-    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
+    return cupy.ElementwiseKernel(
+        in_params, out_params, operation, name, preamble=math_constants_preamble
+    )
