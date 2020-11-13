@@ -28,7 +28,7 @@ def test_PSNR_vs_IPOL():
     # https://www.ipol.im/pub/art/2011/g_lmii/
     p_IPOL = 22.4497
     p = peak_signal_noise_ratio(cam, cam_noisy)
-    assert_almost_equal(p, p_IPOL, decimal=4)
+    assert_almost_equal(p, p_IPOL, decimal=3)
 
 
 def test_PSNR_float():

@@ -637,7 +637,7 @@ def corner_harris(image, method="k", k=0.05, eps=1e-6, sigma=1):
            [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
-    >>> corner_peaks(corner_harris(square), min_distance=1, threshold_rel=0)
+    >>> corner_peaks(corner_harris(square), min_distance=1)
     array([[2, 2],
            [2, 7],
            [7, 2],
@@ -707,8 +707,7 @@ def corner_shi_tomasi(image, sigma=1):
            [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]])
-    >>> corner_peaks(corner_shi_tomasi(square), min_distance=1,
-    ...              threshold_rel=0)
+    >>> corner_peaks(corner_shi_tomasi(square), min_distance=1)
     array([[2, 2],
            [2, 7],
            [7, 2],
@@ -792,7 +791,7 @@ def corner_foerstner(image, sigma=1):
     >>> accuracy_thresh = 0.5
     >>> roundness_thresh = 0.3
     >>> foerstner = (q > roundness_thresh) * (w > accuracy_thresh) * w
-    >>> corner_peaks(foerstner, min_distance=1, threshold_rel=0)
+    >>> corner_peaks(foerstner, min_distance=1)
     array([[2, 2],
            [2, 7],
            [7, 2],
@@ -868,9 +867,13 @@ def corner_peaks(
 
     Notes
     -----
-    The `num_peaks` limit is applied before suppression of
-    connected peaks. If you want to limit the number of peaks
-    after suppression, you should set `num_peaks=np.inf` and
+    .. versionchanged:: 0.18
+        The default value of `threshold_rel` has changed to None, which
+        corresponds to letting `skimage.feature.peak_local_max` decide on the
+        default. This is equivalent to `threshold_rel=0`.
+
+    The `num_peaks` limit is applied before suppression of connected peaks.
+    To limit the number of peaks after suppression, set `num_peaks=np.inf` and
     post-process the output of this function.
 
     Examples
@@ -889,23 +892,10 @@ def corner_peaks(
            [2, 3],
            [3, 2],
            [3, 3]])
-    >>> corner_peaks(response, threshold_rel=0)
+    >>> corner_peaks(response)
     array([[2, 2]])
 
     """
-    if threshold_rel is None:
-        threshold_rel = 0.1
-        warn(
-            "Until version 0.16, threshold_rel was set to 0.1 by default. "
-            "Starting from version 0.16, the default value is set to None. "
-            "Until version 0.18, a None value corresponds to a threshold "
-            "value of 0.1. The default behavior will match "
-            "skimage.feature.peak_local_max. To avoid this warning, set "
-            "threshold_rel=0.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-
     if cp.isinf(num_peaks):
         num_peaks = None
 
