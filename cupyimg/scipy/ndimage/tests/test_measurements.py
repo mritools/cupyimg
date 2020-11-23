@@ -1034,7 +1034,7 @@ def test_center_of_mass09():
     expected = [(0.5, 0.0), (0.5, 1.0)]
     input = cp.asarray([[1, 2], [1, 1]], bool)
     output = ndimage.center_of_mass(input, labels, cp.asarray([1, 2]))
-    assert_array_almost_equal(output, expected)
+    assert_array_almost_equal([cp.asnumpy(v) for v in output], expected)
 
 
 def test_histogram01():
