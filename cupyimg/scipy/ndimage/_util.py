@@ -167,7 +167,7 @@ def _get_ndimage_mode_kwargs(mode, cval=0):
     return mode_kwargs
 
 
-def _generate_boundary_condition_ops(mode, ix, xsize):
+def _generate_boundary_condition_ops(mode, ix, xsize, int_t="int"):
     if mode in ["reflect", "grid-mirror"]:
         ops = """
         if ({ix} < 0) {{
@@ -211,14 +211,13 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
     #            ix=ix, xsize=xsize
     #        )
     elif mode == "wrap":
-        print(f"mode={mode}")
         ops = """
         if ({ix} < 0) {{
-            {ix} += ({sz} - 1) * ((int)(-{ix} / ({sz} - 1)) + 1);
+            {ix} += ({sz} - 1) * (({int_t})(-{ix} / ({sz} - 1)) + 1);
         }} else if ({ix} > ({sz} - 1)) {{
-            {ix} -= ({sz} - 1) * (int)({ix} / ({sz} - 1));
+            {ix} -= ({sz} - 1) * ({int_t})({ix} / ({sz} - 1));
         }};""".format(
-            ix=ix, sz=xsize
+            ix=ix, sz=xsize, int_t=int_t
         )
     elif mode == "constant":
         ops = """

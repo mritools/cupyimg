@@ -207,6 +207,17 @@ def _unravel_loop_index(shape, uint_t="unsigned int"):
     return "\n".join(code)
 
 
+def _get_spline_boundary_mode(mode):
+    """spline boundary mode for interpolation with order >= 2."""
+    if mode in ["mirror", "reflect", "grid-wrap"]:
+        # exact analytic boundary conditions exist for these modes.
+        return mode
+    # No exact analytical spline boundary condition implemented. Reflect gives
+    # lower error than using mirror or wrap for mode 'nearest'. Otherwise, a
+    # mirror spline boundary condition is used.
+    return "reflect" if mode == "nearest" else "mirror"
+
+
 def _generate_interp_custom(
     in_params,
     coord_func,
@@ -318,7 +329,7 @@ def _generate_interp_custom(
                     ixvar = "cf_{j}".format(j=j)
                 ops.append(
                     _util._generate_boundary_condition_ops(
-                        mode, ixvar, "xsize_{}".format(j)
+                        mode, ixvar, "xsize_{}".format(j), int_t
                     )
                 )
                 if mode == "wrap":
@@ -392,24 +403,25 @@ def _generate_interp_custom(
                     ixvar = "cf_bounded_{j}".format(j=j)
                 ops.append(
                     _util._generate_boundary_condition_ops(
-                        mode, ixvar, "xsize_{}".format(j)
+                        mode, ixvar, "xsize_{}".format(j), int_t
                     )
                 )
                 if mode == "wrap":
                     ixvar = "dcoordc"
+                else:
+                    ixvar = "cc_bounded_{j}".format(j=j)
+                    ops.append(
+                        _util._generate_boundary_condition_ops(
+                            mode, ixvar, "xsize_{}".format(j), int_t
+                        )
+                    )
+                if mode == "wrap":
                     ops.append(
                         """
                     {int_t} cf_bounded_{j} = ({int_t})floor(dcoordf);;
                     {int_t} cc_bounded_{j} = ({int_t})floor(dcoordf + 1);;
                     """.format(
                             int_t=int_t, j=j
-                        )
-                    )
-                else:
-                    ixvar = "cc_bounded_{j}".format(j=j)
-                    ops.append(
-                        _util._generate_boundary_condition_ops(
-                            mode, ixvar, "xsize_{}".format(j)
                         )
                     )
 
@@ -433,6 +445,8 @@ def _generate_interp_custom(
             )
 
     elif order > 1:
+        spline_mode = _get_spline_boundary_mode(mode)
+
         # wx, wy are temporary variables used during spline weight computation
         if order == 1:
             ops.append(
@@ -461,13 +475,29 @@ def _generate_interp_custom(
             ops.append(spline_weights_inline[order].format(j=j, order=order))
 
             # get starting coordinates for spline interpolation along axis j
+            if mode == "wrap":
+                ops.append("double dcoord = c_{j};".format(j=j))
+                ixvar = "dcoord"
+                ops.append(
+                    _util._generate_boundary_condition_ops(
+                        mode, ixvar, "xsize_{}".format(j), int_t
+                    )
+                )
+                coord_var = "dcoord"
+            else:
+                coord_var = "(double)c_{j}".format(j=j)
+
             if order & 1:
                 op_str = """
-                start = ({int_t})floor((double)c_{j}) - {order_2};"""
+                start = ({int_t})floor({coord_var}) - {order_2};"""
             else:
                 op_str = """
-                start = ({int_t})floor((double)c_{j} + 0.5) - {order_2};"""
-            ops.append(op_str.format(int_t=int_t, j=j, order_2=order // 2))
+                start = ({int_t})floor({coord_var} + 0.5) - {order_2};"""
+            ops.append(
+                op_str.format(
+                    int_t=int_t, coord_var=coord_var, order_2=order // 2
+                )
+            )
 
             # set of coordinate values within spline footprint along axis j
             ops.append(
@@ -483,7 +513,7 @@ def _generate_interp_custom(
                 ixvar = "ci_{j}[{k}]".format(j=j, k=k)
                 ops.append(
                     _util._generate_boundary_condition_ops(
-                        mode, ixvar, "xsize_{}".format(j)
+                        spline_mode, ixvar, "xsize_{}".format(j), int_t
                     )
                 )
 
