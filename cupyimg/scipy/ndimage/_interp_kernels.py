@@ -299,22 +299,34 @@ def _generate_interp_custom(
     if order == 0:
         for j in range(ndim):
             # determine nearest neighbor
-            ops.append(
-                """
-            {int_t} cf_{j} = ({int_t})lrint((double)c_{j});
-            """.format(
-                    int_t=int_t, j=j
+            if mode == "wrap":
+                ops.append("double dcoord = c_{j};".format(j=j))
+            else:
+                ops.append(
+                    """
+                {int_t} cf_{j} = ({int_t})lrint((double)c_{j});
+                """.format(
+                        int_t=int_t, j=j
+                    )
                 )
-            )
 
             # handle boundary
             if mode != "constant":
-                ixvar = "cf_{j}".format(j=j)
+                if mode == "wrap":
+                    ixvar = "dcoord"
+                else:
+                    ixvar = "cf_{j}".format(j=j)
                 ops.append(
                     _util._generate_boundary_condition_ops(
                         mode, ixvar, "xsize_{}".format(j)
                     )
                 )
+                if mode == "wrap":
+                    ops.append(
+                        "{int_t} cf_{j} = ({int_t})floor(dcoord + 0.5);".format(
+                            j=j, int_t=int_t
+                        )
+                    )
 
             # sum over ic_j will give the raveled coordinate in the input
             ops.append(
@@ -360,28 +372,46 @@ def _generate_interp_custom(
                 )
             )
 
-            # handle boundaries for extension modes.
-            ops.append(
-                """
-            {int_t} cf_bounded_{j} = cf_{j};
-            {int_t} cc_bounded_{j} = cc_{j};
-            """.format(
-                    int_t=int_t, j=j
+            if mode == "wrap":
+                ops.append("double dcoordf = c_{j};".format(j=j))
+                ops.append("double dcoordc = c_{j} + 1;".format(j=j))
+            else:
+                # handle boundaries for extension modes.
+                ops.append(
+                    """
+                {int_t} cf_bounded_{j} = cf_{j};
+                {int_t} cc_bounded_{j} = cc_{j};
+                """.format(
+                        int_t=int_t, j=j
+                    )
                 )
-            )
             if mode != "constant":
-                ixvar = "cf_bounded_{j}".format(j=j)
+                if mode == "wrap":
+                    ixvar = "dcoordf"
+                else:
+                    ixvar = "cf_bounded_{j}".format(j=j)
                 ops.append(
                     _util._generate_boundary_condition_ops(
                         mode, ixvar, "xsize_{}".format(j)
                     )
                 )
-                ixvar = "cc_bounded_{j}".format(j=j)
-                ops.append(
-                    _util._generate_boundary_condition_ops(
-                        mode, ixvar, "xsize_{}".format(j)
+                if mode == "wrap":
+                    ixvar = "dcoordc"
+                    ops.append(
+                        """
+                    {int_t} cf_bounded_{j} = ({int_t})floor(dcoordf);;
+                    {int_t} cc_bounded_{j} = ({int_t})floor(dcoordf + 1);;
+                    """.format(
+                            int_t=int_t, j=j
+                        )
                     )
-                )
+                else:
+                    ixvar = "cc_bounded_{j}".format(j=j)
+                    ops.append(
+                        _util._generate_boundary_condition_ops(
+                            mode, ixvar, "xsize_{}".format(j)
+                        )
+                    )
 
             ops.append(
                 """
@@ -402,7 +432,7 @@ def _generate_interp_custom(
                 )
             )
 
-    elif order >= 1:
+    elif order > 1:
         # wx, wy are temporary variables used during spline weight computation
         if order == 1:
             ops.append(
@@ -510,8 +540,9 @@ def _generate_interp_custom(
         ops.append("y = (Y)out;")
     operation = "\n".join(ops)
 
+    modestr = mode.replace("-", "_")
     name = "interpolate_{}_order{}_{}_{}d_y{}".format(
-        name, order, mode, ndim, "_".join(["{}".format(j) for j in yshape]),
+        name, order, modestr, ndim, "_".join(["{}".format(j) for j in yshape]),
     )
     if uint_t == "size_t":
         name += "_i64"

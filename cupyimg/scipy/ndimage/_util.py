@@ -103,9 +103,19 @@ def _check_origin(origin, width):
 
 
 def _check_mode(mode):
-    if mode not in ("reflect", "constant", "nearest", "mirror", "wrap"):
+    if mode not in (
+        "reflect",
+        "constant",
+        "nearest",
+        "mirror",
+        "wrap",
+        "grid-mirror",
+        "grid-wrap",
+        "grid-constant",
+    ):
         msg = "boundary mode not supported (actual: {})".format(mode)
         raise RuntimeError(msg)
+
     return mode
 
 
@@ -201,17 +211,18 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
     #            ix=ix, xsize=xsize
     #        )
     elif mode == "wrap":
+        print(f"mode={mode}")
         ops = """
         if ({ix} < 0) {{
-            {ix} += {sz} * (-{ix} / {sz} + 1);
-        }} else if ({ix} > {sz}) {{
-            {ix} -= {sz} * ({ix} / {sz});
+            {ix} += ({sz} - 1) * ((int)(-{ix} / ({sz} - 1)) + 1);
+        }} else if ({ix} > ({sz} - 1)) {{
+            {ix} -= ({sz} - 1) * (int)({ix} / ({sz} - 1));
         }};""".format(
-            ix=ix, sz=xsize - 1
+            ix=ix, sz=xsize
         )
     elif mode == "constant":
         ops = """
-        if ({ix} >= {xsize}) {{
+        if (({ix} < 0) || {ix} >= {xsize}) {{
             {ix} = -1;
         }}""".format(
             ix=ix, xsize=xsize

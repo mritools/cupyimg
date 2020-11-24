@@ -2,12 +2,12 @@ import warnings
 
 import cupy
 from .support import (
-    _generate_boundary_condition_ops,
     _masked_loop_init,
     _raw_ptr_ops,
 )
 
 from cupyimg.scipy.ndimage import _util
+from cupyimg.scipy.ndimage._util import _generate_boundary_condition_ops
 from cupyimg import memoize
 from cupyimg import _misc
 
