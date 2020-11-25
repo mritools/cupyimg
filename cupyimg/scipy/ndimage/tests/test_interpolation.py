@@ -11,7 +11,7 @@ try:
     import scipy.ndimage
 
     version = numpy.lib.NumpyVersion
-    scipy1_6 = version(scipy.__version__) > version("1.5.9")
+    scipy1_6 = version(scipy.__version__) >= version("1.6.0")
 except ImportError:
     pass
 
