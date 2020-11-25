@@ -911,7 +911,7 @@ def zoom(
             if out_size > 1:
                 zoom.append(float(in_size - 1) / (out_size - 1))
             else:
-                zoom.append(0)
+                zoom.append(1)
 
         output = _get_output(output, input, shape=output_shape)
         if input.dtype.kind in "iu":
@@ -920,7 +920,7 @@ def zoom(
         if prefilter and order > 1:
             padded, npad = _prepad_for_spline_filter(input, mode, cval)
             filtered = spline_filter(
-                input,
+                padded,
                 order,
                 output=input.dtype,
                 mode=mode,
@@ -947,6 +947,7 @@ def zoom(
             integer_output=integer_output,
             nprepad=npad,
         )
+
         zoom = cupy.asarray(zoom, dtype=float, order="C")
         if zoom.ndim != 1:
             raise ValueError("zoom must be 1d")

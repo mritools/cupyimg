@@ -167,15 +167,19 @@ def _get_ndimage_mode_kwargs(mode, cval=0):
     return mode_kwargs
 
 
-def _generate_boundary_condition_ops(mode, ix, xsize, int_t="int"):
+def _generate_boundary_condition_ops(
+    mode, ix, xsize, int_t="int", float_ix=False
+):
+    min_func = "fmin" if float_ix else "min"
+    max_func = "fmax" if float_ix else "max"
     if mode in ["reflect", "grid-mirror"]:
         ops = """
         if ({ix} < 0) {{
             {ix} = -1 - {ix};
         }}
         {ix} %= {xsize} * 2;
-        {ix} = min({ix}, 2 * {xsize} - 1 - {ix});""".format(
-            ix=ix, xsize=xsize
+        {ix} = {min}({ix}, 2 * {xsize} - 1 - {ix});""".format(
+            ix=ix, xsize=xsize, min=min_func
         )
     elif mode == "mirror":
         ops = """
@@ -186,14 +190,14 @@ def _generate_boundary_condition_ops(mode, ix, xsize, int_t="int"):
                 {ix} = -{ix};
             }}
             {ix} = 1 + ({ix} - 1) % (({xsize} - 1) * 2);
-            {ix} = min({ix}, 2 * {xsize} - 2 - {ix});
+            {ix} = {min}({ix}, 2 * {xsize} - 2 - {ix});
         }}""".format(
-            ix=ix, xsize=xsize
+            ix=ix, xsize=xsize, min=min_func
         )
     elif mode == "nearest":
         ops = """
-        {ix} = min(max({ix}, 0), {xsize} - 1);""".format(
-            ix=ix, xsize=xsize
+        {ix} = {min}({max}({ix}, 0), {xsize} - 1);""".format(
+            ix=ix, xsize=xsize, min=min_func, max=max_func
         )
     elif mode == "grid-wrap":
         ops = """
@@ -203,13 +207,6 @@ def _generate_boundary_condition_ops(mode, ix, xsize, int_t="int"):
         }}""".format(
             ix=ix, xsize=xsize
         )
-    #        ops = """
-    #        if ({ix} < 0) {{
-    #            {ix} += (1 - ({ix} / {xsize})) * {xsize};
-    #        }}
-    #        {ix} %= {xsize};""".format(
-    #            ix=ix, xsize=xsize
-    #        )
     elif mode == "wrap":
         ops = """
         if ({ix} < 0) {{
@@ -219,16 +216,9 @@ def _generate_boundary_condition_ops(mode, ix, xsize, int_t="int"):
         }};""".format(
             ix=ix, sz=xsize, int_t=int_t
         )
-    elif mode == "constant":
+    elif mode in ["constant", "grid-constant"]:
         ops = """
         if (({ix} < 0) || {ix} >= {xsize}) {{
-            {ix} = -1;
-        }}""".format(
-            ix=ix, xsize=xsize
-        )
-    elif mode == "grid-constant":
-        ops = """
-        if (({ix} < 0) || ({ix} > ({xsize} - 1))) {{
             {ix} = -1;
         }}""".format(
             ix=ix, xsize=xsize

@@ -123,13 +123,17 @@ def _anticausal_init_code(mode):
 
 
 def _get_spline_mode(mode):
-    # Return the best spline boundary condition for a give interpolation mode
-    if mode in ["reflect", "nearest", "grid-mirror"]:
-        return "reflect"
-    elif mode == "grid-wrap":
+    """spline boundary mode for interpolation with order >= 2."""
+    if mode in ["mirror", "reflect", "grid-wrap"]:
+        # exact analytic boundary conditions exist for these modes.
         return mode
-    else:
-        return "mirror"
+    elif mode == "grid-mirror":
+        # grid-mirror is a synonym for 'reflect'
+        return "reflect"
+    # No exact analytical spline boundary condition implemented. Reflect gives
+    # lower error than using mirror or wrap for mode 'nearest'. Otherwise, a
+    # mirror spline boundary condition is used.
+    return "reflect" if mode == "nearest" else "mirror"
 
 
 def _get_spline1d_code(mode, poles, pole_type, n_boundary):
