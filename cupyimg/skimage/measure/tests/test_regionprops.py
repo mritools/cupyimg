@@ -19,7 +19,7 @@ from cupyimg.skimage.measure._regionprops import (
 )
 
 
-SAMPLE = cp.asarray(
+SAMPLE = cp.array(
     [
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
@@ -182,7 +182,8 @@ def test_convex_image():
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ]
+        ],
+        dtype=bool,
     )
     assert_array_equal(img, ref)
 

@@ -324,7 +324,9 @@ class RegionProperties:
         # TODO: grlee77: avoid host/device transfers
         from skimage.morphology.convex_hull import convex_hull_image
 
-        return cp.asarray(convex_hull_image(cp.asnumpy(self.image)))
+        # copy required here to avoid unexpected behavior reported in
+        #     https://github.com/cupy/cupy/issues/4354
+        return cp.asarray(convex_hull_image(cp.asnumpy(self.image))).copy()
 
     @property
     def coords(self):
