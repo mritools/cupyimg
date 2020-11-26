@@ -132,8 +132,8 @@ def test_masked_registration_random_masks_non_equal_sizes():
 
 
 def test_masked_registration_padfield_data():
-    """ Masked translation registration should behave like in the original
-    publication """
+    """Masked translation registration should behave like in the original
+    publication"""
     # Test translated from MATLABimplementation `MaskedFFTRegistrationTest`
     # file. You can find the source code here:
     # http://www.dirkpadfield.com/Home/MaskedFFTRegistrationCode.zip

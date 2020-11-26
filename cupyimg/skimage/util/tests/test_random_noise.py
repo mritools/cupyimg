@@ -178,6 +178,8 @@ def test_clip_poisson():
     assert (cam_poisson2.max() > 1.3) and (cam_poisson2.min() == -1.0)
 
 
+# TODO: update values for new cameraman image from skimage 0.18
+@cp.testing.with_requires("skimage<=1.17.9")
 def test_clip_gaussian():
     seed = 42
     data = camera()  # 512x512 grayscale uint8

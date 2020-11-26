@@ -166,9 +166,7 @@ def _umeyama(src, dst, estimate_scale):
 
 
 class GeometricTransform(object):
-    """Base class for geometric transformations.
-
-    """
+    """Base class for geometric transformations."""
 
     def __call__(self, coords):
         """Apply forward transformation.
@@ -225,9 +223,7 @@ class GeometricTransform(object):
         return xp.sqrt(xp.sum((self(src) - dst) ** 2, axis=1))
 
     def __add__(self, other):
-        """Combine this transformation with another.
-
-        """
+        """Combine this transformation with another."""
         raise NotImplementedError()
 
 

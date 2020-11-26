@@ -180,6 +180,8 @@ def test_structural_similarity_multichannel_chelsea():
     assert_equal(structural_similarity(Xc, Xc, multichannel=True), 1.0)
 
 
+# TODO: update values for new cameraman image from skimage 0.18
+@cp.testing.with_requires("skimage<=1.17.9")
 def test_gaussian_structural_similarity_vs_IPOL():
     # Tests vs. imdiff result from the following IPOL article and code:
     # https://www.ipol.im/pub/art/2011/g_lmii/
@@ -190,6 +192,8 @@ def test_gaussian_structural_similarity_vs_IPOL():
     assert_almost_equal(mssim, mssim_IPOL, decimal=3)
 
 
+# TODO: update values for new cameraman image from skimage 0.18
+@cp.testing.with_requires("skimage<=1.17.9")
 def test_gaussian_mssim_vs_author_ref():
     """
     test vs. result from original author's Matlab implementation available at
@@ -207,6 +211,8 @@ def test_gaussian_mssim_vs_author_ref():
     assert_almost_equal(mssim, mssim_matlab, decimal=10)
 
 
+# TODO: update values for new cameraman image from skimage 0.18
+@cp.testing.with_requires("skimage<=1.17.9")
 def test_gaussian_mssim_and_gradient_vs_Matlab():
     # comparison to Matlab implementation of N. Avanaki:
     # https://ece.uwaterloo.ca/~nnikvand/Coderep/SHINE%20TOOLBOX/SHINEtoolbox/
@@ -233,6 +239,8 @@ def test_gaussian_mssim_and_gradient_vs_Matlab():
     assert_array_almost_equal(grad_matlab[5:-5], grad[5:-5])
 
 
+# TODO: update values for new cameraman image from skimage 0.18
+@cp.testing.with_requires("skimage<=1.17.9")
 def test_mssim_vs_legacy():
     # check that ssim with default options matches skimage 0.11 result
     mssim_skimage_0pt11 = 0.34192589699605191

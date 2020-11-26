@@ -174,7 +174,7 @@ def ellipse(width, height, dtype=np.uint8):
 
 
 def cube(width, dtype=np.uint8):
-    """ Generates a cube-shaped structuring element.
+    """Generates a cube-shaped structuring element.
 
     This is the 3D equivalent of a square.
     Every pixel along the perimeter has a chessboard distance

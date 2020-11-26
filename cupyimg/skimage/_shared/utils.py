@@ -244,9 +244,7 @@ class deprecated(object):
 
 
 def get_bound_method_class(m):
-    """Return the class for a bound method.
-
-    """
+    """Return the class for a bound method."""
     return m.__self__.__class__
 
 
