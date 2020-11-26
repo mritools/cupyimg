@@ -1,14 +1,19 @@
 import cupy
 import cupy.core.internal
+import numpy
 
-from .support import _generate_boundary_condition_ops, _raw_ptr_ops
-from .spline import spline_weights_inline
 from cupyimg import memoize
+from cupyimg.scipy.ndimage import _spline_prefilter_core
+from cupyimg.scipy.ndimage import _spline_kernel_weights
+from cupyimg.scipy.ndimage import _util
 
-const_legacy_mode = False
+spline_weights_inline = _spline_kernel_weights.spline_weights_inline
+boundary_ops = _util._generate_boundary_condition_ops
+
+math_constants_preamble = "#include <math_constants.h>\n"
 
 
-def _get_coord_map(ndim):
+def _get_coord_map(ndim, nprepad=0):
     """Extract target coordinate from coords array (for map_coordinates).
 
     Notes
@@ -30,17 +35,18 @@ def _get_coord_map(ndim):
     """
     ops = []
     ops.append("ptrdiff_t ncoords = _ind.size();")
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = coords_data[i + {j} * ncoords];""".format(
-                j=j
+            W c_{j} = coords[i + {j} * ncoords]{pre};""".format(
+                j=j, pre=pre
             )
         )
     return ops
 
 
-def _get_coord_zoom_and_shift(ndim):
+def _get_coord_zoom_and_shift(ndim, nprepad=0):
     """Compute target coordinate based on a shift followed by a zoom.
 
     Notes
@@ -57,17 +63,19 @@ def _get_coord_zoom_and_shift(ndim):
 
     """
     ops = []
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = zoom_data[{j}] * ((W)in_coord[{j}] - shift_data[{j}]);""".format(
-                j=j
+        W c_{j} = (zoom[{j}] *
+                   ((W)in_coord[{j}] - shift[{j}]){pre});""".format(
+                j=j, pre=pre
             )
         )
     return ops
 
 
-def _get_coord_zoom(ndim):
+def _get_coord_zoom(ndim, nprepad=0):
     """Compute target coordinate based on a zoom.
 
     Notes
@@ -83,17 +91,18 @@ def _get_coord_zoom(ndim):
 
     """
     ops = []
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = zoom_data[{j}] * (W)in_coord[{j}];""".format(
-                j=j
+    W c_{j} = zoom[{j}] * (W)in_coord[{j}]{pre};""".format(
+                j=j, pre=pre
             )
         )
     return ops
 
 
-def _get_coord_shift(ndim):
+def _get_coord_shift(ndim, nprepad=0):
     """Compute target coordinate based on a shift.
 
     Notes
@@ -109,17 +118,18 @@ def _get_coord_shift(ndim):
 
     """
     ops = []
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
-    W c_{j} = (W)in_coord[{j}] - shift_data[{j}];""".format(
-                j=j
+    W c_{j} = (W)in_coord[{j}] - shift[{j}]{pre};""".format(
+                j=j, pre=pre
             )
         )
     return ops
 
 
-def _get_coord_affine(ndim):
+def _get_coord_affine(ndim, nprepad=0):
     """Compute target coordinate based on a homogeneous transformation matrix.
 
     The homogeneous matrix has shape (ndim, ndim + 1). It corresponds to
@@ -141,6 +151,7 @@ def _get_coord_affine(ndim):
     """
     ops = []
     ncol = ndim + 1
+    pre = " + {nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
     for j in range(ndim):
         ops.append(
             """
@@ -152,14 +163,14 @@ def _get_coord_affine(ndim):
             m_index = ncol * j + k
             ops.append(
                 """
-            c_{j} += mat_data[{m_index}] * (W)in_coord[{k}];""".format(
+            c_{j} += mat[{m_index}] * (W)in_coord[{k}];""".format(
                     j=j, k=k, m_index=m_index
                 )
             )
         ops.append(
             """
-            c_{j} += mat_data[{m_index}];""".format(
-                j=j, m_index=ncol * j + ndim
+            c_{j} += mat[{m_index}]{pre};""".format(
+                j=j, m_index=ncol * j + ndim, pre=pre,
             )
         )
     return ops
@@ -208,6 +219,7 @@ def _generate_interp_custom(
     order,
     name="",
     integer_output=False,
+    nprepad=0,
 ):
     """
     Args:
@@ -228,11 +240,7 @@ def _generate_interp_custom(
         name (str): name for the ElementwiseKernel
     """
 
-    if mode == "constant" and not const_legacy_mode:
-        mode = "constant2"  # only set constant2 if want bug-fixed constant mode
-
     ops = []
-    ops = ops + _raw_ptr_ops(in_params)
     ops.append("double out = 0.0;")
 
     if large_int:
@@ -259,8 +267,16 @@ def _generate_interp_custom(
     ops.append(_unravel_loop_index(yshape, uint_t))
 
     # compute the transformed (target) coordinates, c_j
-    ops = ops + coord_func(ndim)
+    ops = ops + coord_func(ndim, nprepad)
 
+    if cval is numpy.nan:
+        cval = "CUDART_NAN"
+    elif cval == numpy.inf:
+        cval = "CUDART_INF"
+    elif cval == -numpy.inf:
+        cval = "-CUDART_INF"
+    else:
+        cval = "(double){cval}".format(cval=cval)
     if mode == "constant":
         # use cval if coordinate is outside the bounds of x
         _cond = " || ".join(
@@ -282,24 +298,39 @@ def _generate_interp_custom(
         )
 
     if order == 0:
+        ops.append("double dcoord;")
         for j in range(ndim):
             # determine nearest neighbor
-            ops.append(
-                """
-            {int_t} cf_{j} = ({int_t})lrint((double)c_{j});
-            """.format(
-                    int_t=int_t, j=j
+            if mode == "wrap":
+                ops.append("dcoord = c_{j};".format(j=j))
+            else:
+                ops.append(
+                    """
+                {int_t} cf_{j} = ({int_t})lrint((double)c_{j});
+                """.format(
+                        int_t=int_t, j=j
+                    )
                 )
-            )
 
             # handle boundary
             if mode != "constant":
-                ixvar = "cf_{j}".format(j=j)
+                if mode == "wrap":
+                    ixvar = "dcoord"
+                    float_ix = True
+                else:
+                    ixvar = "cf_{j}".format(j=j)
+                    float_ix = False
                 ops.append(
-                    _generate_boundary_condition_ops(
-                        mode, ixvar, "xsize_{}".format(j)
+                    boundary_ops(
+                        mode, ixvar, "xsize_{}".format(j), int_t, float_ix
                     )
                 )
+                if mode == "wrap":
+                    ops.append(
+                        "{int_t} cf_{j} = ({int_t})floor(dcoord + 0.5);".format(
+                            j=j, int_t=int_t
+                        )
+                    )
 
             # sum over ic_j will give the raveled coordinate in the input
             ops.append(
@@ -310,14 +341,14 @@ def _generate_interp_custom(
                 )
             )
         _coord_idx = " + ".join(["ic_{}".format(j) for j in range(ndim)])
-        if mode == "constant2":
+        if mode == "grid-constant":
             _cond = " || ".join(["(ic_{0} < 0)".format(j) for j in range(ndim)])
             ops.append(
                 """
             if ({cond}) {{
                 out = (double){cval};
             }} else {{
-                out = x_data[{coord_idx}];
+                out = x[{coord_idx}];
             }}
             """.format(
                     cond=_cond, cval=cval, coord_idx=_coord_idx
@@ -326,7 +357,7 @@ def _generate_interp_custom(
         else:
             ops.append(
                 """
-                out = x_data[{coord_idx}];
+                out = x[{coord_idx}];
                 """.format(
                     coord_idx=_coord_idx
                 )
@@ -345,28 +376,49 @@ def _generate_interp_custom(
                 )
             )
 
-            # handle boundaries for extension modes.
-            ops.append(
-                """
-            {int_t} cf_bounded_{j} = cf_{j};
-            {int_t} cc_bounded_{j} = cc_{j};
-            """.format(
-                    int_t=int_t, j=j
+            if mode == "wrap":
+                ops.append("double dcoordf = c_{j};".format(j=j))
+                ops.append("double dcoordc = c_{j} + 1;".format(j=j))
+            else:
+                # handle boundaries for extension modes.
+                ops.append(
+                    """
+                {int_t} cf_bounded_{j} = cf_{j};
+                {int_t} cc_bounded_{j} = cc_{j};
+                """.format(
+                        int_t=int_t, j=j
+                    )
                 )
-            )
             if mode != "constant":
-                ixvar = "cf_bounded_{j}".format(j=j)
+                if mode == "wrap":
+                    ixvar = "dcoordf"
+                    float_ix = True
+                else:
+                    ixvar = "cf_bounded_{j}".format(j=j)
+                    float_ix = False
                 ops.append(
-                    _generate_boundary_condition_ops(
-                        mode, ixvar, "xsize_{}".format(j)
+                    boundary_ops(
+                        mode, ixvar, "xsize_{}".format(j), int_t, float_ix
                     )
                 )
-                ixvar = "cc_bounded_{j}".format(j=j)
-                ops.append(
-                    _generate_boundary_condition_ops(
-                        mode, ixvar, "xsize_{}".format(j)
+                if mode == "wrap":
+                    ixvar = "dcoordc"
+                else:
+                    ixvar = "cc_bounded_{j}".format(j=j)
+                    ops.append(
+                        boundary_ops(
+                            mode, ixvar, "xsize_{}".format(j), int_t, float_ix
+                        )
                     )
-                )
+                if mode == "wrap":
+                    ops.append(
+                        """
+                    {int_t} cf_bounded_{j} = ({int_t})floor(dcoordf);;
+                    {int_t} cc_bounded_{j} = ({int_t})floor(dcoordf + 1);;
+                    """.format(
+                            int_t=int_t, j=j
+                        )
+                    )
 
             ops.append(
                 """
@@ -387,7 +439,14 @@ def _generate_interp_custom(
                 )
             )
 
-    elif order >= 1:
+    elif order > 1:
+        if mode == "grid-constant":
+            spline_mode = "constant"
+        elif mode == "nearest":
+            spline_mode = "nearest"
+        else:
+            spline_mode = _spline_prefilter_core._get_spline_mode(mode)
+
         # wx, wy are temporary variables used during spline weight computation
         if order == 1:
             ops.append(
@@ -415,14 +474,30 @@ def _generate_interp_custom(
             )
             ops.append(spline_weights_inline[order].format(j=j, order=order))
 
-            # get starting coordinates for spline interpolation along axis j
+            # get starting coordinate for spline interpolation along axis j
+            if mode in ["wrap"]:
+                ops.append("double dcoord = c_{j};".format(j=j))
+                ixvar = "dcoord"
+                ops.append(
+                    boundary_ops(
+                        mode, ixvar, "xsize_{}".format(j), int_t, True,
+                    )
+                )
+                coord_var = "dcoord"
+            else:
+                coord_var = "(double)c_{j}".format(j=j)
+
             if order & 1:
                 op_str = """
-                start = ({int_t})floor((double)c_{j}) - {order_2};"""
+                start = ({int_t})floor({coord_var}) - {order_2};"""
             else:
                 op_str = """
-                start = ({int_t})floor((double)c_{j} + 0.5) - {order_2};"""
-            ops.append(op_str.format(int_t=int_t, j=j, order_2=order // 2))
+                start = ({int_t})floor({coord_var} + 0.5) - {order_2};"""
+            ops.append(
+                op_str.format(
+                    int_t=int_t, coord_var=coord_var, order_2=order // 2
+                )
+            )
 
             # set of coordinate values within spline footprint along axis j
             ops.append(
@@ -437,8 +512,8 @@ def _generate_interp_custom(
                 )
                 ixvar = "ci_{j}[{k}]".format(j=j, k=k)
                 ops.append(
-                    _generate_boundary_condition_ops(
-                        mode, ixvar, "xsize_{}".format(j)
+                    boundary_ops(
+                        spline_mode, ixvar, "xsize_{}".format(j), int_t
                     )
                 )
 
@@ -460,14 +535,14 @@ def _generate_interp_custom(
 
         _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
         _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
-        if mode == "constant2" or (order > 1 and mode == "constant"):
+        if mode == "grid-constant" or (order > 1 and mode == "constant"):
             _cond = " || ".join(["(ic_{0} < 0)".format(j) for j in range(ndim)])
             ops.append(
                 """
             if ({cond}) {{
-                out += (double){cval} * ({weight});
+                out += (X){cval} * ({weight});
             }} else {{
-                X val = x_data[{coord_idx}];
+                X val = x[{coord_idx}];
                 out += val * ({weight});
             }}
             """.format(
@@ -477,7 +552,7 @@ def _generate_interp_custom(
         else:
             ops.append(
                 """
-            X val = x_data[{coord_idx}];
+            X val = x[{coord_idx}];
             out += val * ({weight});
             """.format(
                     coord_idx=_coord_idx, weight=_weight
@@ -495,8 +570,9 @@ def _generate_interp_custom(
         ops.append("y = (Y)out;")
     operation = "\n".join(ops)
 
+    modestr = mode.replace("-", "_")
     name = "interpolate_{}_order{}_{}_{}d_y{}".format(
-        name, order, mode, ndim, "_".join(["{}".format(j) for j in yshape]),
+        name, order, modestr, ndim, "_".join(["{}".format(j) for j in yshape]),
     )
     if uint_t == "size_t":
         name += "_i64"
@@ -505,7 +581,14 @@ def _generate_interp_custom(
 
 @memoize(for_each_device=True)
 def _get_map_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W coords"
     out_params = "Y y"
@@ -520,13 +603,21 @@ def _get_map_kernel(
         order=order,
         name="map_coordinates",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
     return cupy.ElementwiseKernel(in_params, out_params, operation, name)
 
 
 @memoize(for_each_device=True)
 def _get_shift_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W shift"
     out_params = "Y y"
@@ -541,13 +632,23 @@ def _get_shift_kernel(
         order=order,
         name="shift",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
-    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
+    return cupy.ElementwiseKernel(
+        in_params, out_params, operation, name, preamble=math_constants_preamble
+    )
 
 
 @memoize(for_each_device=True)
 def _get_zoom_shift_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W shift, raw W zoom"
     out_params = "Y y"
@@ -562,13 +663,23 @@ def _get_zoom_shift_kernel(
         order=order,
         name="zoom_shift",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
-    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
+    return cupy.ElementwiseKernel(
+        in_params, out_params, operation, name, preamble=math_constants_preamble
+    )
 
 
 @memoize(for_each_device=True)
 def _get_zoom_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W zoom"
     out_params = "Y y"
@@ -583,13 +694,23 @@ def _get_zoom_kernel(
         order=order,
         name="zoom",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
-    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
+    return cupy.ElementwiseKernel(
+        in_params, out_params, operation, name, preamble=math_constants_preamble
+    )
 
 
 @memoize(for_each_device=True)
 def _get_affine_kernel(
-    ndim, large_int, yshape, mode, cval=0.0, order=1, integer_output=False
+    ndim,
+    large_int,
+    yshape,
+    mode,
+    cval=0.0,
+    order=1,
+    integer_output=False,
+    nprepad=0,
 ):
     in_params = "raw X x, raw W mat"
     out_params = "Y y"
@@ -604,5 +725,8 @@ def _get_affine_kernel(
         order=order,
         name="affine",
         integer_output=integer_output,
+        nprepad=nprepad,
     )
-    return cupy.ElementwiseKernel(in_params, out_params, operation, name)
+    return cupy.ElementwiseKernel(
+        in_params, out_params, operation, name, preamble=math_constants_preamble
+    )

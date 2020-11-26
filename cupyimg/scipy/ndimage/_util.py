@@ -103,9 +103,19 @@ def _check_origin(origin, width):
 
 
 def _check_mode(mode):
-    if mode not in ("reflect", "constant", "nearest", "mirror", "wrap"):
+    if mode not in (
+        "reflect",
+        "constant",
+        "nearest",
+        "mirror",
+        "wrap",
+        "grid-mirror",
+        "grid-wrap",
+        "grid-constant",
+    ):
         msg = "boundary mode not supported (actual: {})".format(mode)
         raise RuntimeError(msg)
+
     return mode
 
 
@@ -157,15 +167,19 @@ def _get_ndimage_mode_kwargs(mode, cval=0):
     return mode_kwargs
 
 
-def _generate_boundary_condition_ops(mode, ix, xsize):
-    if mode == "reflect":
+def _generate_boundary_condition_ops(
+    mode, ix, xsize, int_t="int", float_ix=False
+):
+    min_func = "fmin" if float_ix else "min"
+    max_func = "fmax" if float_ix else "max"
+    if mode in ["reflect", "grid-mirror"]:
         ops = """
         if ({ix} < 0) {{
-            {ix} = - 1 -{ix};
+            {ix} = -1 - {ix};
         }}
         {ix} %= {xsize} * 2;
-        {ix} = min({ix}, 2 * {xsize} - 1 - {ix});""".format(
-            ix=ix, xsize=xsize
+        {ix} = {min}({ix}, 2 * {xsize} - 1 - {ix});""".format(
+            ix=ix, xsize=xsize, min=min_func
         )
     elif mode == "mirror":
         ops = """
@@ -176,16 +190,16 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
                 {ix} = -{ix};
             }}
             {ix} = 1 + ({ix} - 1) % (({xsize} - 1) * 2);
-            {ix} = min({ix}, 2 * {xsize} - 2 - {ix});
+            {ix} = {min}({ix}, 2 * {xsize} - 2 - {ix});
         }}""".format(
-            ix=ix, xsize=xsize
+            ix=ix, xsize=xsize, min=min_func
         )
     elif mode == "nearest":
         ops = """
-        {ix} = min(max({ix}, 0), {xsize} - 1);""".format(
-            ix=ix, xsize=xsize
+        {ix} = {min}({max}({ix}, 0), {xsize} - 1);""".format(
+            ix=ix, xsize=xsize, min=min_func, max=max_func
         )
-    elif mode == "wrap":
+    elif mode == "grid-wrap":
         ops = """
         {ix} %= {xsize};
         if ({ix} < 0) {{
@@ -193,13 +207,24 @@ def _generate_boundary_condition_ops(mode, ix, xsize):
         }}""".format(
             ix=ix, xsize=xsize
         )
-    elif mode == "constant":
+    elif mode == "wrap":
         ops = """
-        if ({ix} >= {xsize}) {{
+        if ({ix} < 0) {{
+            {ix} += ({sz} - 1) * (({int_t})(-{ix} / ({sz} - 1)) + 1);
+        }} else if ({ix} > ({sz} - 1)) {{
+            {ix} -= ({sz} - 1) * ({int_t})({ix} / ({sz} - 1));
+        }};""".format(
+            ix=ix, sz=xsize, int_t=int_t
+        )
+    elif mode in ["constant", "grid-constant"]:
+        ops = """
+        if (({ix} < 0) || {ix} >= {xsize}) {{
             {ix} = -1;
         }}""".format(
             ix=ix, xsize=xsize
         )
+    else:
+        raise ValueError("unrecognized mode: {}".format(mode))
     return ops
 
 
