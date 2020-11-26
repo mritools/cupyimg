@@ -1,6 +1,5 @@
 from .colorconv import (  # noqa
     convert_colorspace,
-    guess_spatial_dimensions,
     rgba2rgb,
     rgb2hsv,
     hsv2rgb,
@@ -73,7 +72,6 @@ from .delta_e import (
 
 __all__ = [
     "convert_colorspace",
-    "guess_spatial_dimensions",
     "rgba2rgb",
     "rgb2hsv",
     "hsv2rgb",

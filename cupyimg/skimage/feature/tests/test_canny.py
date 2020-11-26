@@ -49,7 +49,7 @@ class TestCanny(unittest.TestCase):
 
     def test_01_02_circle_with_noise(self):
         """Test that the Canny filter finds the circle outlines
-         in a noisy image"""
+        in a noisy image"""
         cp.random.seed(0)
         i, j = cp.mgrid[-200:200, -200:200].astype(float) / 200
         c = cp.abs(cp.sqrt(i * i + j * j) - 0.5) < 0.02
@@ -75,6 +75,8 @@ class TestCanny(unittest.TestCase):
         result2 = F.canny(cp.zeros((20, 20)), 4, 0, 0)
         self.assertTrue(cp.all(result1 == result2))
 
+    # TODO: update values for new cameraman image from skimage 0.18
+    @cp.testing.with_requires("skimage<=1.17.9")
     def test_use_quantiles(self):
         image = img_as_float(cp.asarray(data.camera()[::50, ::50]))
 

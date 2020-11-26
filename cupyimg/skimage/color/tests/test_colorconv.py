@@ -358,7 +358,7 @@ class TestColorconv(TestCase):
         )
 
         for i, space in enumerate(colspaces):
-            print(f"space={space}")
+            # print(f"space={space}")
             gt = colfuncs_from[i](self.colbars_array)
             assert_array_almost_equal(
                 convert_colorspace(self.colbars_array, space, "RGB"), gt
@@ -934,7 +934,6 @@ def test_gray2rgba_alpha():
 )
 def test_nD_gray_conversion(func, shape):
     img = cp.random.rand(*shape)
-    out = func(img)
 
     msg_list = []
     if img.ndim == 3 and func == gray2rgb:

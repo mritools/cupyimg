@@ -27,6 +27,7 @@ from cupyimg.skimage.feature import (
     # corner_fast,
     # corner_orientations,
     structure_tensor,
+    structure_tensor_eigenvalues,
     structure_tensor_eigvals,
     hessian_matrix,
     hessian_matrix_eigvals,
@@ -47,9 +48,9 @@ def im3d():
 def test_structure_tensor():
     square = cp.zeros((5, 5))
     square[2, 2] = 1
-    Axx, Axy, Ayy = structure_tensor(square, sigma=0.1)
+    Arr, Arc, Acc = structure_tensor(square, sigma=0.1, order="rc")
     assert_array_equal(
-        Axx,
+        Acc,
         cp.asarray(
             [
                 [0, 0, 0, 0, 0],
@@ -61,7 +62,7 @@ def test_structure_tensor():
         ),
     )
     assert_array_equal(
-        Axy,
+        Arc,
         cp.asarray(
             [
                 [0, 0, 0, 0, 0],  # noqa
@@ -73,7 +74,7 @@ def test_structure_tensor():
         ),
     )
     assert_array_equal(
-        Ayy,
+        Arr,
         cp.asarray(
             [
                 [0, 0, 0, 0, 0],
@@ -84,6 +85,19 @@ def test_structure_tensor():
             ]
         ),
     )
+
+
+def test_structure_tensor_orders():
+    square = cp.zeros((5, 5))
+    square[2, 2] = 1
+    with expected_warnings(["the default order of the structure"]):
+        A_elems_default = structure_tensor(square, sigma=0.1)
+    A_elems_xy = structure_tensor(square, sigma=0.1, order="xy")
+    A_elems_rc = structure_tensor(square, sigma=0.1, order="rc")
+    for elem_xy, elem_def in zip(A_elems_xy, A_elems_default):
+        assert_array_equal(elem_xy, elem_def)
+    for elem_xy, elem_rc in zip(A_elems_xy, A_elems_rc[::-1]):
+        assert_array_equal(elem_xy, elem_rc)
 
 
 def test_hessian_matrix():
@@ -155,11 +169,44 @@ def test_hessian_matrix_3d():
     # fmt: on
 
 
+def test_structure_tensor_eigenvalues():
+    square = cp.zeros((5, 5))
+    square[2, 2] = 1
+    A_elems = structure_tensor(square, sigma=0.1, order="rc")
+    l1, l2 = structure_tensor_eigenvalues(A_elems)
+    assert_array_equal(
+        l1,
+        np.array(
+            [
+                [0, 0, 0, 0, 0],
+                [0, 2, 4, 2, 0],
+                [0, 4, 0, 4, 0],
+                [0, 2, 4, 2, 0],
+                [0, 0, 0, 0, 0],
+            ]
+        ),
+    )
+    assert_array_equal(
+        l2,
+        np.array(
+            [
+                [0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+            ]
+        ),
+    )
+
+
 def test_structure_tensor_eigvals():
     square = cp.zeros((5, 5))
     square[2, 2] = 1
-    Axx, Axy, Ayy = structure_tensor(square, sigma=0.1)
-    l1, l2 = structure_tensor_eigvals(Axx, Axy, Ayy)
+
+    Arr, Arc, Acc = structure_tensor(square, sigma=0.1)
+    with expected_warnings(["deprecation warning: "]):
+        l1, l2 = structure_tensor_eigvals(Arr, Arc, Acc)
 
     assert_array_equal(
         l1,
@@ -493,16 +540,13 @@ def test_corner_peaks():
     )
     assert corners.shape == (2, 2)
 
-    with pytest.warns(
-        FutureWarning, match="Until version 0.16, threshold_rel.*"
-    ):
-        corners = corner_peaks(response, exclude_border=False, min_distance=1)
-        assert corners.shape == (5, 2)
+    corners = corner_peaks(response, exclude_border=False, min_distance=1)
+    assert corners.shape == (5, 2)
 
-        corners = corner_peaks(
-            response, exclude_border=False, min_distance=1, indices=False
-        )
-        assert cp.sum(corners) == 5
+    corners = corner_peaks(
+        response, exclude_border=False, min_distance=1, indices=False
+    )
+    assert cp.sum(corners) == 5
 
 
 def test_blank_image_nans():

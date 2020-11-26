@@ -17,9 +17,7 @@ def _min_limit(x, val=eps):
 
 
 def _centre(x, oshape):
-    """Return an array of oshape from the centre of x.
-
-    """
+    """Return an array of oshape from the centre of x."""
     start = (np.array(x.shape) - np.array(oshape)) // 2 + 1
     out = x[tuple(slice(s, s + n) for s, n in zip(start, oshape))]
     return out
@@ -41,9 +39,7 @@ def _pad(data, shape):
 
 
 class LPIFilter2D(object):
-    """Linear Position-Invariant Filter (2-dimensional)
-
-    """
+    """Linear Position-Invariant Filter (2-dimensional)"""
 
     def __init__(self, impulse_response, **filter_params):
         """
@@ -84,9 +80,7 @@ class LPIFilter2D(object):
         self._cache = None
 
     def _prepare(self, data):
-        """Calculate filter and data FFT in preparation for filtering.
-
-        """
+        """Calculate filter and data FFT in preparation for filtering."""
         dshape = np.array(data.shape)
         dshape += dshape % 2 == 0  # all filter dimensions must be uneven
         oshape = np.array(data.shape) * 2 - 1

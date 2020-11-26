@@ -293,8 +293,8 @@ def cross_correlate_masked(
 
 
 def _centered(arr, newshape, axes):
-    """ Return the center `newshape` portion of `arr`, leaving axes not
-    in `axes` untouched. """
+    """Return the center `newshape` portion of `arr`, leaving axes not
+    in `axes` untouched."""
     currshape = arr.shape
 
     slices = [slice(None, None)] * arr.ndim
@@ -308,8 +308,8 @@ def _centered(arr, newshape, axes):
 
 
 def _flip(arr, axes=None):
-    """ Reverse array over many axes. Generalization of arr[::-1] for many
-    dimensions. If `axes` is `None`, flip along all axes. """
+    """Reverse array over many axes. Generalization of arr[::-1] for many
+    dimensions. If `axes` is `None`, flip along all axes."""
     if axes is None:
         reverse = [slice(None, None, -1)] * arr.ndim
     else:

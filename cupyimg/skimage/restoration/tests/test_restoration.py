@@ -5,8 +5,10 @@ import numpy as np
 from scipy.signal import convolve2d
 from cupyimg.scipy import ndimage as ndi
 
+from cupyimg.skimage.color import rgb2gray
 from cupyimg.skimage import restoration
 from cupyimg.skimage.restoration import uft
+from cupy import testing
 
 try:
     from skimage._shared.testing import fetch
@@ -21,6 +23,13 @@ def camera():
     import skimage.data
 
     return cp.asarray(skimage.img_as_float(skimage.data.camera()))
+
+
+def astronaut():
+    import skimage
+    import skimage.data
+
+    return cp.asarray(skimage.img_as_float(skimage.data.astronaut()))
 
 
 test_img = camera()
@@ -87,6 +96,8 @@ def test_unsupervised_wiener():
     # cp.testing.assert_allclose(cp.real(deconvolved), np.load(path), rtol=1e-3)
 
 
+# TODO: update values for new cameraman image from skimage 0.18
+@cp.testing.with_requires("skimage<=1.17.9")
 def test_image_shape():
     """Test that shape of output image in deconvolution is same as input.
 
@@ -125,3 +136,17 @@ def test_richardson_lucy():
     else:
         path = pjoin(dirname(abspath(__file__)), "camera_rl.npy")
     cp.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3)
+
+
+@testing.with_requires("scikit-image>=0.18")
+def test_richardson_lucy_filtered():
+    from skimage.data import image_fetcher
+
+    test_img_astro = rgb2gray(astronaut())
+
+    psf = cp.ones((5, 5)) / 25
+    data = cp.asarray(convolve2d(test_img_astro.get(), psf.get(), "same"))
+    deconvolved = restoration.richardson_lucy(data, psf, 5, filter_epsilon=1e-6)
+
+    path = image_fetcher.fetch("restoration/tests/astronaut_rl.npy")
+    np.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3, atol=1e-6)

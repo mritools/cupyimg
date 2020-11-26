@@ -19,7 +19,7 @@ from cupyimg.skimage.measure._regionprops import (
 )
 
 
-SAMPLE = cp.asarray(
+SAMPLE = cp.array(
     [
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
@@ -35,6 +35,10 @@ SAMPLE = cp.asarray(
 )
 INTENSITY_SAMPLE = SAMPLE.copy()
 INTENSITY_SAMPLE[1, 9:11] = 2
+
+SAMPLE_MULTIPLE = cp.eye(10, dtype=np.int32)
+SAMPLE_MULTIPLE[3:5, 7:8] = 2
+INTENSITY_SAMPLE_MULTIPLE = SAMPLE_MULTIPLE.copy() * 2.0
 
 SAMPLE_3D = cp.zeros((6, 6, 6), dtype=cp.uint8)
 SAMPLE_3D[1:3, 1:3, 1:3] = 1
@@ -83,6 +87,26 @@ def test_ndim():
     regionprops(cp.zeros((1, 1, 1), dtype=cp.int))
     with pytest.raises(TypeError):
         regionprops(cp.zeros((10, 10, 10, 2), dtype=cp.int))
+
+
+# def test_feret_diameter_max():
+#     # comparator result is based on SAMPLE from manually-inspected computations
+#     comparator_result = 18
+#     test_result = regionprops(SAMPLE)[0].feret_diameter_max
+#     assert cp.abs(test_result - comparator_result) < 1
+#     # square, test that Feret diameter is sqrt(2) * square side
+#     img = cp.zeros((20, 20), dtype=cp.uint8)
+#     img[2:-2, 2:-2] = 1
+#     feret_diameter_max = regionprops(img)[0].feret_diameter_max
+#     assert np.abs(feret_diameter_max - 16 * math.sqrt(2)) < 1
+
+
+# def test_feret_diameter_max_3d():
+#     img = cp.zeros((20, 20), dtype=cp.uint8)
+#     img[2:-2, 2:-2] = 1
+#     img_3d = cp.dstack((img,) * 3)
+#     feret_diameter_max = regionprops(img_3d)[0].feret_diameter_max
+#     assert cp.abs(feret_diameter_max - 16 * math.sqrt(2)) < 1
 
 
 def test_area():
@@ -140,8 +164,7 @@ def test_centroid_3d():
 
 def test_convex_area():
     area = regionprops(SAMPLE)[0].convex_area
-    # determined with MATLAB
-    assert area == 124
+    assert area == 125
 
 
 def test_convex_image():
@@ -157,9 +180,10 @@ def test_convex_image():
             [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
             [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ]
+        ],
+        dtype=bool,
     )
     assert_array_equal(img, ref)
 
@@ -353,8 +377,7 @@ def test_perimeter():
 
 def test_solidity():
     solidity = regionprops(SAMPLE)[0].solidity
-    # determined with MATLAB
-    assert_almost_equal(solidity, 0.580645161290323)
+    assert_almost_equal(solidity, 0.576)
 
 
 def test_weighted_moments_central():
@@ -573,6 +596,8 @@ def test_regionprops_table():
         "bbox+3": cp.asarray([18]),
     }
 
+
+def test_regionprops_table_no_regions():
     out = regionprops_table(
         cp.zeros((2, 2), dtype=int),
         properties=("label", "area", "bbox"),
@@ -637,3 +662,71 @@ def test_deprecated_coords_argument():
         regionprops(SAMPLE, coordinates="rc")
     with pytest.raises(ValueError):
         regionprops(SAMPLE, coordinates="xy")
+
+
+def pixelcount(regionmask):
+    """a short test for an extra property"""
+    return cp.sum(regionmask)
+
+
+def median_intensity(regionmask, intensity_image):
+    return cp.median(intensity_image[regionmask])
+
+
+def too_many_args(regionmask, intensity_image, superfluous):
+    return 1
+
+
+def too_few_args():
+    return 1
+
+
+def test_extra_properties():
+    region = regionprops(SAMPLE, extra_properties=(pixelcount,))[0]
+    assert region.pixelcount == cp.sum(SAMPLE == 1)
+
+
+def test_extra_properties_intensity():
+    region = regionprops(
+        SAMPLE,
+        intensity_image=INTENSITY_SAMPLE,
+        extra_properties=(median_intensity,),
+    )[0]
+    assert region.median_intensity == cp.median(INTENSITY_SAMPLE[SAMPLE == 1])
+
+
+def test_extra_properties_no_intensity_provided():
+    with pytest.raises(AttributeError):
+        region = regionprops(SAMPLE, extra_properties=(median_intensity,))[0]
+        _ = region.median_intensity
+
+
+def test_extra_properties_nr_args():
+    with pytest.raises(AttributeError):
+        region = regionprops(SAMPLE, extra_properties=(too_few_args,))[0]
+        _ = region.too_few_args
+    with pytest.raises(AttributeError):
+        region = regionprops(SAMPLE, extra_properties=(too_many_args,))[0]
+        _ = region.too_many_args
+
+
+def test_extra_properties_mixed():
+    # mixed properties, with and without intensity
+    region = regionprops(
+        SAMPLE,
+        intensity_image=INTENSITY_SAMPLE,
+        extra_properties=(median_intensity, pixelcount),
+    )[0]
+    assert region.median_intensity == cp.median(INTENSITY_SAMPLE[SAMPLE == 1])
+    assert region.pixelcount == cp.sum(SAMPLE == 1)
+
+
+def test_extra_properties_table():
+    out = regionprops_table(
+        SAMPLE_MULTIPLE,
+        intensity_image=INTENSITY_SAMPLE_MULTIPLE,
+        properties=("label",),
+        extra_properties=(median_intensity, pixelcount),
+    )
+    assert_array_almost_equal(out["median_intensity"], np.array([2.0, 4.0]))
+    assert_array_equal(out["pixelcount"], np.array([10, 2]))

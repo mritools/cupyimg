@@ -23,12 +23,14 @@ assert_equal = cp.testing.assert_array_equal
 assert_almost_equal = cp.testing.assert_array_almost_equal
 
 
+# TODO: update values for new cameraman image from skimage 0.18
+@cp.testing.with_requires("skimage<=1.17.9")
 def test_PSNR_vs_IPOL():
     # Tests vs. imdiff result from the following IPOL article and code:
     # https://www.ipol.im/pub/art/2011/g_lmii/
     p_IPOL = 22.4497
     p = peak_signal_noise_ratio(cam, cam_noisy)
-    assert_almost_equal(p, p_IPOL, decimal=4)
+    assert_almost_equal(p, p_IPOL, decimal=3)
 
 
 def test_PSNR_float():

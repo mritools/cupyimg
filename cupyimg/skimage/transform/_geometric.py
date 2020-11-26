@@ -166,9 +166,7 @@ def _umeyama(src, dst, estimate_scale):
 
 
 class GeometricTransform(object):
-    """Base class for geometric transformations.
-
-    """
+    """Base class for geometric transformations."""
 
     def __call__(self, coords):
         """Apply forward transformation.
@@ -225,9 +223,7 @@ class GeometricTransform(object):
         return xp.sqrt(xp.sum((self(src) - dst) ** 2, axis=1))
 
     def __add__(self, other):
-        """Combine this transformation with another.
-
-        """
+        """Combine this transformation with another."""
         raise NotImplementedError()
 
 
@@ -864,6 +860,9 @@ class AffineTransform(ProjectiveTransform):
     scale : {s as float or (sx, sy) as array, list or tuple}, optional
         Scale factor(s). If a single value, it will be assigned to both
         sx and sy. Only available for 2D.
+
+        .. versionadded:: 0.17
+           Added support for supplying a single scalar value.
     rotation : float, optional
         Rotation angle in counter-clockwise direction as radians. Only
         available for 2D.
