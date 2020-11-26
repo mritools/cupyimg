@@ -1,70 +1,7 @@
 """Building blocks used by multiple ndimage kernels.
 
 """
-
-
-def _generate_boundary_condition_ops(mode, ix, xsize):
-    if mode in ["reflect", "grid-mirror"]:
-        ops = """
-        if ({ix} < 0) {{
-            {ix} = -1 - {ix};
-        }}
-        {ix} %= {xsize} * 2;
-        {ix} = min({ix}, 2 * {xsize} - 1 - {ix});""".format(
-            ix=ix, xsize=xsize
-        )
-    elif mode == "mirror":
-        ops = """
-        if ({ix} < 0) {{
-            {ix} = -{ix};
-        }}
-        if ({xsize} == 1) {{
-            {ix} = 0;
-        }} else {{
-            {ix} = 1 + ({ix} - 1) % (({xsize} - 1) * 2);
-            {ix} = min({ix}, 2 * {xsize} - 2 - {ix});
-        }}""".format(
-            ix=ix, xsize=xsize
-        )
-    elif mode == "nearest":
-        ops = """
-        {ix} = min(max({ix}, 0), {xsize} - 1);""".format(
-            ix=ix, xsize=xsize
-        )
-    elif mode == "grid-wrap":
-        ops = """
-        if ({ix} < 0) {{
-            {ix} += (1 - ({ix} / {xsize})) * {xsize};
-        }}
-        {ix} %= {xsize};""".format(
-            ix=ix, xsize=xsize
-        )
-    elif mode == "wrap":
-        ops = """
-        if ({ix} < 0) {{
-            {ix} += {sz} * (-{ix} / {sz} + 1);
-        }} else if ({ix} > {sz}) {{
-            {ix} -= {sz} * ({ix} / {sz});
-        }};""".format(
-            ix=ix, sz=xsize - 1
-        )
-    elif mode == "constant":
-        ops = """
-        if ({ix} >= {xsize}) {{
-            {ix} = -1;
-        }}""".format(
-            ix=ix, xsize=xsize
-        )
-    elif mode == "grid-constant":
-        ops = """
-        if (({ix} < 0) || ({ix} > ({xsize} - 1))) {{
-            {ix} = -1;
-        }}""".format(
-            ix=ix, xsize=xsize
-        )
-    else:
-        raise ValueError("unrecognized mode: {}".format(mode))
-    return ops
+from cupyimg.scipy.ndimage._util import _generate_boundary_condition_ops
 
 
 def _get_init_loop_vars(xshape, fshape, origin):

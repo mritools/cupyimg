@@ -8,7 +8,7 @@ from cupyimg.scipy.ndimage import _spline_kernel_weights
 from cupyimg.scipy.ndimage import _util
 
 spline_weights_inline = _spline_kernel_weights.spline_weights_inline
-
+boundary_ops = _util._generate_boundary_condition_ops
 
 math_constants_preamble = "#include <math_constants.h>\n"
 
@@ -313,7 +313,6 @@ def _generate_interp_custom(
                 )
 
             # handle boundary
-            boundary_func = _util._generate_boundary_condition_ops
             if mode != "constant":
                 if mode == "wrap":
                     ixvar = "dcoord"
@@ -322,7 +321,7 @@ def _generate_interp_custom(
                     ixvar = "cf_{j}".format(j=j)
                     float_ix = False
                 ops.append(
-                    boundary_func(
+                    boundary_ops(
                         mode, ixvar, "xsize_{}".format(j), int_t, float_ix
                     )
                 )
@@ -390,7 +389,6 @@ def _generate_interp_custom(
                         int_t=int_t, j=j
                     )
                 )
-            boundary_func = _util._generate_boundary_condition_ops
             if mode != "constant":
                 if mode == "wrap":
                     ixvar = "dcoordf"
@@ -399,7 +397,7 @@ def _generate_interp_custom(
                     ixvar = "cf_bounded_{j}".format(j=j)
                     float_ix = False
                 ops.append(
-                    boundary_func(
+                    boundary_ops(
                         mode, ixvar, "xsize_{}".format(j), int_t, float_ix
                     )
                 )
@@ -408,7 +406,7 @@ def _generate_interp_custom(
                 else:
                     ixvar = "cc_bounded_{j}".format(j=j)
                     ops.append(
-                        boundary_func(
+                        boundary_ops(
                             mode, ixvar, "xsize_{}".format(j), int_t, float_ix
                         )
                     )
@@ -476,13 +474,12 @@ def _generate_interp_custom(
             )
             ops.append(spline_weights_inline[order].format(j=j, order=order))
 
-            # get starting coordinates for spline interpolation along axis j
+            # get starting coordinate for spline interpolation along axis j
             if mode in ["wrap"]:
-                print(f"mode={mode}, spline_mode={spline_mode}")
                 ops.append("double dcoord = c_{j};".format(j=j))
                 ixvar = "dcoord"
                 ops.append(
-                    _util._generate_boundary_condition_ops(
+                    boundary_ops(
                         mode, ixvar, "xsize_{}".format(j), int_t, True,
                     )
                 )
@@ -515,7 +512,7 @@ def _generate_interp_custom(
                 )
                 ixvar = "ci_{j}[{k}]".format(j=j, k=k)
                 ops.append(
-                    _util._generate_boundary_condition_ops(
+                    boundary_ops(
                         spline_mode, ixvar, "xsize_{}".format(j), int_t
                     )
                 )
