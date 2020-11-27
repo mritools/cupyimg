@@ -96,8 +96,7 @@ def test_unsupervised_wiener():
     # cp.testing.assert_allclose(cp.real(deconvolved), np.load(path), rtol=1e-3)
 
 
-# TODO: update values for new cameraman image from skimage 0.18
-@cp.testing.with_requires("skimage<=1.17.9")
+@cp.testing.with_requires("skimage>=1.18")
 def test_image_shape():
     """Test that shape of output image in deconvolution is same as input.
 
@@ -107,7 +106,7 @@ def test_image_shape():
     point[2, 2] = 1.0
     psf = ndi.gaussian_filter(point, sigma=1.0)
     # image shape: (45, 45), as reported in #1172
-    image = cp.asarray(test_img[110:155, 225:270])  # just the face
+    image = cp.asarray(test_img[65:165, 215:315])  # just the face
     image_conv = ndi.convolve(image, psf)
     deconv_sup = restoration.wiener(image_conv, psf, 1)
     deconv_un = restoration.unsupervised_wiener(image_conv, psf)[0]

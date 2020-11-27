@@ -273,16 +273,66 @@ def threshold_local(
     return thresh_image - offset
 
 
-def threshold_otsu(image, nbins=256):
-    """Return threshold value based on Otsu's method.
+def _validate_image_histogram(image, hist, nbins=None):
+    """Ensure that either image or hist were given, return valid histogram.
+
+    If hist is given, image is ignored.
 
     Parameters
     ----------
-    image : (N, M) ndarray
+    image : array or None
+        Grayscale image.
+    hist : array, 2-tuple of array, or None
+        Histogram, either a 1D counts array, or an array of counts together
+        with an array of bin centers.
+    nbins : int, optional
+        The number of bins with which to compute the histogram, if `hist` is
+        None.
+
+    Returns
+    -------
+    counts : 1D array of float
+        Each element is the number of pixels falling in each intensity bin.
+    bin_centers : 1D array
+        Each element is the value corresponding to the center of each intensity bin.
+
+    Raises
+    ------
+    ValueError : if image and hist are both None
+    """
+    if image is None and hist is None:
+        raise Exception("Either image or hist must be provided.")
+
+    if hist is not None:
+        if isinstance(hist, (tuple, list)):
+            counts, bin_centers = hist
+        else:
+            counts = hist
+            bin_centers = cp.arange(counts.size)
+    else:
+        counts, bin_centers = histogram(
+            image.ravel(), nbins, source_range="image"
+        )
+    return counts.astype(float), bin_centers
+
+
+def threshold_otsu(image=None, nbins=256, *, hist=None):
+    """Return threshold value based on Otsu's method.
+
+    Either image or hist must be provided. If hist is provided, the actual
+    histogram of the image is ignored.
+
+    Parameters
+    ----------
+    image : (N, M) ndarray, optional
         Grayscale input image.
     nbins : int, optional
         Number of bins used to calculate histogram. This value is ignored for
         integer arrays.
+    hist : array, or 2-tuple of arrays, optional
+        Histogram from which to determine the threshold, and optionally a
+        corresponding array of bin center intensities.
+        An alternative use of this function is to pass it only hist.
 
     Returns
     -------
@@ -305,7 +355,7 @@ def threshold_otsu(image, nbins=256):
     -----
     The input image must be grayscale.
     """
-    if image.ndim > 2 and image.shape[-1] in (3, 4):
+    if image is not None and image.ndim > 2 and image.shape[-1] in (3, 4):
         msg = (
             "threshold_otsu is expected to work correctly only for "
             "grayscale images; image shape {0} looks like an RGB image"
@@ -313,19 +363,21 @@ def threshold_otsu(image, nbins=256):
         warn(msg.format(image.shape))
 
     # Check if the image is multi-colored or not
-    first_pixel = image.ravel()[0]
-    if cp.all(image == first_pixel):  # device synchronization!
-        return first_pixel
+    # Check if the image has more than one intensity value; if not, return that
+    # value
+    if image is not None:
+        first_pixel = image.ravel()[0]
+        if cp.all(image == first_pixel):  # device synchronization!
+            return first_pixel
 
-    hist, bin_centers = histogram(image.ravel(), nbins, source_range="image")
-    hist = hist.astype(float)
+    counts, bin_centers = _validate_image_histogram(image, hist, nbins)
 
     # class probabilities for all possible thresholds
-    weight1 = cp.cumsum(hist)
-    weight2 = cp.cumsum(hist[::-1])[::-1]
+    weight1 = cp.cumsum(counts)
+    weight2 = cp.cumsum(counts[::-1])[::-1]
     # class means for all possible thresholds
-    mean1 = cp.cumsum(hist * bin_centers) / weight1
-    mean2 = (cp.cumsum((hist * bin_centers)[::-1]) / weight2[::-1])[::-1]
+    mean1 = cp.cumsum(counts * bin_centers) / weight1
+    mean2 = (cp.cumsum((counts * bin_centers)[::-1]) / weight2[::-1])[::-1]
 
     # Clip ends to align class 1 and class 2 variables:
     # The last value of ``weight1``/``mean1`` should pair with zero values in
@@ -333,20 +385,27 @@ def threshold_otsu(image, nbins=256):
     variance12 = weight1[:-1] * weight2[1:] * (mean1[:-1] - mean2[1:]) ** 2
 
     idx = cp.argmax(variance12)
-    threshold = bin_centers[:-1][idx]
+    threshold = bin_centers[idx]
+
     return threshold
 
 
-def threshold_yen(image, nbins=256):
+def threshold_yen(image=None, nbins=256, *, hist=None):
     """Return threshold value based on Yen's method.
+    Either image or hist must be provided. In case hist is given, the actual
+    histogram of the image is ignored.
 
     Parameters
     ----------
-    image : (N, M) ndarray
+    image : (N, M) ndarray, optional
         Input image.
     nbins : int, optional
         Number of bins used to calculate histogram. This value is ignored for
         integer arrays.
+    hist : array, or 2-tuple of arrays, optional
+        Histogram from which to determine the threshold, and optionally a
+        corresponding array of bin center intensities.
+        An alternative use of this function is to pass it only hist.
 
     Returns
     -------
@@ -372,14 +431,15 @@ def threshold_yen(image, nbins=256):
     >>> thresh = threshold_yen(image)
     >>> binary = image <= thresh
     """
-    hist, bin_centers = histogram(image.ravel(), nbins, source_range="image")
+    counts, bin_centers = _validate_image_histogram(image, hist, nbins)
+
     # On blank images (e.g. filled with 0) with int dtype, `histogram()`
     # returns ``bin_centers`` containing only one value. Speed up with it.
     if bin_centers.size == 1:
         return bin_centers[0]
 
     # Calculate probability mass function
-    pmf = hist.astype(cp.float32) / hist.sum()
+    pmf = counts.astype(cp.float32) / counts.sum()
     P1 = cp.cumsum(pmf)  # Cumulative normalized histogram
     P1_sq = cp.cumsum(pmf * pmf)
     # Get cumsum calculated from end of squared array:
@@ -392,7 +452,7 @@ def threshold_yen(image, nbins=256):
     return bin_centers[crit.argmax()]
 
 
-def threshold_isodata(image, nbins=256, return_all=False):
+def threshold_isodata(image=None, nbins=256, return_all=False, *, hist=None):
     """Return threshold value(s) based on ISODATA method.
 
     Histogram-based threshold, known as Ridler-Calvard method or inter-means.
@@ -408,9 +468,12 @@ def threshold_isodata(image, nbins=256, return_all=False):
     For integer images, the above equality holds to within one; for floating-
     point images, the equality holds to within the histogram bin-width.
 
+    Either image or hist must be provided. In case hist is given, the actual
+    histogram of the image is ignored.
+
     Parameters
     ----------
-    image : (N, M) ndarray
+    image : (N, M) ndarray, optional
         Input image.
     nbins : int, optional
         Number of bins used to calculate histogram. This value is ignored for
@@ -418,6 +481,10 @@ def threshold_isodata(image, nbins=256, return_all=False):
     return_all : bool, optional
         If False (default), return only the lowest threshold that satisfies
         the above equality. If True, return all valid thresholds.
+    hist : array, or 2-tuple of arrays, optional
+        Histogram to determine the threshold from and a corresponding array
+        of bin center intensities. Alternatively, only the histogram can be
+        passed.
 
     Returns
     -------
@@ -445,7 +512,7 @@ def threshold_isodata(image, nbins=256, return_all=False):
     >>> thresh = threshold_isodata(image)
     >>> binary = image > thresh
     """
-    hist, bin_centers = histogram(image.ravel(), nbins, source_range="image")
+    counts, bin_centers = _validate_image_histogram(image, hist, nbins)
 
     # image only contains one unique value
     if len(bin_centers) == 1:
@@ -454,15 +521,15 @@ def threshold_isodata(image, nbins=256, return_all=False):
         else:
             return bin_centers[0]
 
-    hist = hist.astype(cp.float32)
+    counts = counts.astype(cp.float32)
 
     # csuml and csumh contain the count of pixels in that bin or lower, and
     # in all bins strictly higher than that bin, respectively
-    csuml = cp.cumsum(hist)
+    csuml = cp.cumsum(counts)
     csumh = csuml[-1] - csuml
 
     # intensity_sum contains the total pixel intensity from each bin
-    intensity_sum = hist * bin_centers
+    intensity_sum = counts * bin_centers
 
     # l and h contain average value of all pixels in that bin or lower, and
     # in all bins strictly higher than that bin, respectively.
@@ -698,22 +765,29 @@ def threshold_li(
     return threshold
 
 
-def threshold_minimum(image, nbins=256, max_iter=10000):
+def threshold_minimum(image=None, nbins=256, max_iter=10000, *, hist=None):
     """Return threshold value based on minimum method.
 
-    The histogram of the input ``image`` is computed and smoothed until
-    there are only two maxima. Then the minimum in between is the threshold
-    value.
+    The histogram of the input ``image`` is computed if not provided and
+    smoothed until there are only two maxima. Then the minimum in between is
+    the threshold value.
+
+    Either image or hist must be provided. In case hist is given, the actual
+    histogram of the image is ignored.
 
     Parameters
     ----------
-    image : (M, N) ndarray
+    image : (M, N) ndarray, optional
         Input image.
     nbins : int, optional
         Number of bins used to calculate histogram. This value is ignored for
         integer arrays.
     max_iter : int, optional
         Maximum number of iterations to smooth the histogram.
+    hist : array, or 2-tuple of arrays, optional
+        Histogram to determine the threshold from and a corresponding array
+        of bin center intensities. Alternatively, only the histogram can be
+        passed.
 
     Returns
     -------
@@ -764,9 +838,9 @@ def threshold_minimum(image, nbins=256, max_iter=10000):
 
         return maximum_idxs
 
-    hist, bin_centers = histogram(image.ravel(), nbins, source_range="image")
+    counts, bin_centers = _validate_image_histogram(image, hist, nbins)
 
-    smooth_hist = hist.astype(cp.float64, copy=False)
+    smooth_hist = counts.astype(cp.float64, copy=False)
 
     for counter in range(max_iter):
         smooth_hist = ndi.uniform_filter1d(smooth_hist, 3)
@@ -786,7 +860,7 @@ def threshold_minimum(image, nbins=256, max_iter=10000):
         smooth_hist[maximum_idxs[0] : maximum_idxs[1] + 1]
     )
 
-    return bin_centers[maximum_idxs[0] + threshold_idx]
+    return bin_centers[maximum_idxs[0] + int(threshold_idx)]
 
 
 def threshold_mean(image):

@@ -4,6 +4,8 @@
 """
 
 from functools import partial
+from itertools import combinations_with_replacement
+
 
 import cupy as cp
 import numpy as np
@@ -12,7 +14,7 @@ from cupyimg import numpy as cnp
 from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage.transform import warp
 
-from ._optical_flow_utils import coarse_to_fine
+from ._optical_flow_utils import coarse_to_fine, get_warp_points
 
 
 def _tvl1(
@@ -129,7 +131,7 @@ def _tvl1(
                         g[tuple(s_g)] = cp.diff(flow_current[idx], axis=ax)
                         s_g[ax + 1] = slice(None)
 
-                    norm = cp.sqrt((g ** 2).sum(0))[cp.newaxis, ...]
+                    norm = cp.sqrt((g * g).sum(0, keepdims=True))
                     norm *= f1
                     norm += 1.0
                     proj[idx] -= dt * g
@@ -246,6 +248,164 @@ def optical_flow_tvl1(
         num_warp=num_warp,
         num_iter=num_iter,
         tol=tol,
+        prefilter=prefilter,
+    )
+
+    return coarse_to_fine(reference_image, moving_image, solver, dtype=dtype)
+
+
+def _ilk(
+    reference_image, moving_image, flow0, radius, num_warp, gaussian, prefilter
+):
+    """Iterative Lucas-Kanade (iLK) solver for optical flow estimation.
+
+    Parameters
+    ----------
+    reference_image : ndarray, shape (M, N[, P[, ...]])
+        The first gray scale image of the sequence.
+    moving_image : ndarray, shape (M, N[, P[, ...]])
+        The second gray scale image of the sequence.
+    flow0 : ndarray, shape (reference_image.ndim, M, N[, P[, ...]])
+        Initialization for the vector field.
+    radius : int
+        Radius of the window considered around each pixel.
+    num_warp : int
+        Number of times moving_image is warped.
+    gaussian : bool
+        if True, a gaussian kernel is used for the local
+        integration. Otherwise, a uniform kernel is used.
+    prefilter : bool
+        Whether to prefilter the estimated optical flow before each
+        image warp. This helps to remove potential outliers.
+
+    Returns
+    -------
+    flow : ndarray, shape ((reference_image.ndim, M, N[, P[, ...]])
+        The estimated optical flow components for each axis.
+
+    """
+    dtype = reference_image.dtype
+    ndim = reference_image.ndim
+    size = 2 * radius + 1
+
+    if gaussian:
+        sigma = ndim * (size / 4,)
+        filter_func = partial(ndi.gaussian_filter, sigma=sigma, mode="mirror")
+    else:
+        filter_func = partial(
+            ndi.uniform_filter, size=ndim * (size,), mode="mirror"
+        )
+
+    flow = flow0
+    # For each pixel location (i, j), the optical flow X = flow[:, i, j]
+    # is the solution of the ndim x ndim linear system
+    # A[i, j] * X = b[i, j]
+    A = cp.zeros(reference_image.shape + (ndim, ndim), dtype=dtype)
+    b = cp.zeros(reference_image.shape + (ndim,), dtype=dtype)
+
+    grid = cp.meshgrid(
+        *[cp.arange(n, dtype=dtype) for n in reference_image.shape],
+        indexing="ij",
+        sparse=True,
+    )
+
+    for _ in range(num_warp):
+        if prefilter:
+            flow = ndi.filters.median_filter(flow, (1,) + ndim * (3,))
+
+        moving_image_warp = warp(
+            moving_image, get_warp_points(grid, flow), mode="nearest"
+        )
+        grad = cp.stack(cp.gradient(moving_image_warp), axis=0)
+        error_image = (
+            (grad * flow).sum(axis=0) + reference_image - moving_image_warp
+        )
+
+        # Local linear systems creation
+        for i, j in combinations_with_replacement(range(ndim), 2):
+            A[..., i, j] = A[..., j, i] = filter_func(grad[i] * grad[j])
+
+        for i in range(ndim):
+            b[..., i] = filter_func(grad[i] * error_image)
+
+        # Don't consider badly conditioned linear systems
+        idx = abs(cp.linalg.det(A)) < 1e-14
+        A[idx] = cp.eye(ndim, dtype=dtype)
+        b[idx] = 0
+
+        # Solve the local linear systems
+        flow = cp.moveaxis(cp.linalg.solve(A, b), ndim, 0)
+
+    return flow
+
+
+def optical_flow_ilk(
+    reference_image,
+    moving_image,
+    *,
+    radius=7,
+    num_warp=10,
+    gaussian=False,
+    prefilter=False,
+    dtype=np.float32,
+):
+    """Coarse to fine optical flow estimator.
+
+    The iterative Lucas-Kanade (iLK) solver is applied at each level
+    of the image pyramid. iLK [1]_ is a fast and robust alternative to
+    TVL1 algorithm although less accurate for rendering flat surfaces
+    and object boundaries (see [2]_).
+
+    Parameters
+    ----------
+    reference_image : ndarray, shape (M, N[, P[, ...]])
+        The first gray scale image of the sequence.
+    moving_image : ndarray, shape (M, N[, P[, ...]])
+        The second gray scale image of the sequence.
+    radius : int, optional
+        Radius of the window considered around each pixel.
+    num_warp : int, optional
+        Number of times moving_image is warped.
+    gaussian : bool, optional
+        If True, a Gaussian kernel is used for the local
+        integration. Otherwise, a uniform kernel is used.
+    prefilter : bool, optional
+        Whether to prefilter the estimated optical flow before each
+        image warp. When True, a median filter with window size 3
+        along each axis is applied. This helps to remove potential
+        outliers.
+    dtype : dtype, optional
+        Output data type: must be floating point. Single precision
+        provides good results and saves memory usage and computation
+        time compared to double precision.
+
+    Returns
+    -------
+    flow : ndarray, shape ((reference_image.ndim, M, N[, P[, ...]])
+        The estimated optical flow components for each axis.
+
+    Notes
+    -----
+    - The implemented algorithm is described in **Table2** of [1]_.
+    - Color images are not supported.
+
+    References
+    ----------
+    .. [1] Le Besnerais, G., & Champagnat, F. (2005, September). Dense
+       optical flow by iterative local window registration. In IEEE
+       International Conference on Image Processing 2005 (Vol. 1,
+       pp. I-137). IEEE. :DOI:`10.1109/ICIP.2005.1529706`
+    .. [2] Plyer, A., Le Besnerais, G., & Champagnat,
+       F. (2016). Massively parallel Lucas Kanade optical flow for
+       real-time video processing applications. Journal of Real-Time
+       Image Processing, 11(4), 713-730. :DOI:`10.1007/s11554-014-0423-0`
+    """
+
+    solver = partial(
+        _ilk,
+        radius=radius,
+        num_warp=num_warp,
+        gaussian=gaussian,
         prefilter=prefilter,
     )
 

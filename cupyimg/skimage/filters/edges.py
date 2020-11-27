@@ -528,9 +528,9 @@ def prewitt_h(image, mask=None):
     -----
     We use the following kernel::
 
-      1   1   1
-      0   0   0
-     -1  -1  -1
+      1/3   1/3   1/3
+       0     0     0
+     -1/3  -1/3  -1/3
 
     """
     check_nD(image, 2)
@@ -558,9 +558,9 @@ def prewitt_v(image, mask=None):
     -----
     We use the following kernel::
 
-      1   0  -1
-      1   0  -1
-      1   0  -1
+      1/3   0  -1/3
+      1/3   0  -1/3
+      1/3   0  -1/3
 
     """
     check_nD(image, 2)
