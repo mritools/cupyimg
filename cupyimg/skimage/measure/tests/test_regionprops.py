@@ -5,12 +5,16 @@ import numpy as np
 import pytest
 from cupy.testing import assert_array_equal, assert_array_almost_equal
 from numpy.testing import assert_equal, assert_almost_equal
-
+from skimage import data
 from skimage._shared._warnings import expected_warnings
+from skimage.segmentation import slic
+
 from cupyimg.skimage.measure._regionprops import (
     regionprops,
     PROPS,
     perimeter,
+    perimeter_crofton,
+    euler_number,
     _parse_docs,
     _props_to_dict,
     regionprops_table,
@@ -169,7 +173,6 @@ def test_convex_area():
 
 def test_convex_image():
     img = regionprops(SAMPLE)[0].convex_image
-    # determined with MATLAB
     ref = cp.asarray(
         [
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
@@ -183,7 +186,6 @@ def test_convex_image():
             [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
             [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
         ],
-        dtype=bool,
     )
     assert_array_equal(img, ref)
 
@@ -228,12 +230,34 @@ def test_equiv_diameter():
 
 def test_euler_number():
     en = regionprops(SAMPLE)[0].euler_number
-    assert en == 1
+    assert en == 0
 
     SAMPLE_mod = SAMPLE.copy()
     SAMPLE_mod[7, -3] = 0
     en = regionprops(SAMPLE_mod)[0].euler_number
-    assert en == 0
+    assert en == -1
+
+    en = euler_number(SAMPLE, 1)
+    assert en == 2
+
+    en = euler_number(SAMPLE_mod, 1)
+    assert en == 1
+
+    en = euler_number(SAMPLE_3D, 1)
+    assert en == 1
+
+    en = euler_number(SAMPLE_3D, 3)
+    assert en == 1
+
+    # for convex body, Euler number is 1
+    SAMPLE_3D_2 = cp.zeros((100, 100, 100))
+    SAMPLE_3D_2[40:60, 40:60, 40:60] = 1
+    en = euler_number(SAMPLE_3D_2, 3)
+    assert en == 1
+
+    SAMPLE_3D_2[45:55, 45:55, 45:55] = 0
+    en = euler_number(SAMPLE_3D_2, 3)
+    assert en == 2
 
 
 def test_extent():
@@ -375,6 +399,14 @@ def test_perimeter():
     assert_almost_equal(per, 46.8284271247)
 
 
+def test_perimeter_crofton():
+    per = regionprops(SAMPLE)[0].perimeter_crofton
+    assert_almost_equal(per, 61.0800637973)
+
+    per = perimeter_crofton(SAMPLE.astype("double"), directions=2)
+    assert_almost_equal(per, 64.4026493985)
+
+
 def test_solidity():
     solidity = regionprops(SAMPLE)[0].solidity
     assert_almost_equal(solidity, 0.576)
@@ -386,15 +418,15 @@ def test_weighted_moments_central():
     ].weighted_moments_central
     # fmt: off
     ref = cp.asarray(
-        [[7.4000000000e+01, 3.7303493627e-14, 1.2602837838e+03,
-          -7.6561796932e+02],
-         [-2.1316282073e-13, -8.7837837838e+01, 2.1571526662e+03,
-          -4.2385971907e+03],
-         [4.7837837838e+02, -1.4801314828e+02, 6.6989799420e+03,
-          -9.9501164076e+03],
-         [-7.5943608473e+02, -1.2714707125e+03, 1.5304076361e+04,
-          -3.3156729271e+04]])
+        [
+            [7.4000000000e01, 3.7303493627e-14, 1.2602837838e03, -7.6561796932e02],
+            [-2.1316282073e-13, -8.7837837838e01, 2.1571526662e03, -4.2385971907e03],
+            [4.7837837838e02, -1.4801314828e02, 6.6989799420e03, -9.9501164076e03],
+            [-7.5943608473e02, -1.2714707125e03, 1.5304076361e04, -3.3156729271e04],
+        ]
+    )
     # fmt: on
+
     np.set_printoptions(precision=10)
     assert_array_almost_equal(wmu, ref)
 
@@ -730,3 +762,33 @@ def test_extra_properties_table():
     )
     assert_array_almost_equal(out["median_intensity"], np.array([2.0, 4.0]))
     assert_array_equal(out["pixelcount"], np.array([10, 2]))
+
+
+def test_multichannel():
+    """Test that computing multichannel properties works."""
+    astro = data.astronaut()[::4, ::4]
+    labels = slic(astro.astype(float), start_label=1)
+
+    astro = cp.asarray(astro)
+    astro_green = astro[..., 1]
+    labels = cp.asarray(labels)
+
+    segment_idx = int(cp.max(labels) // 2)
+    region = regionprops(labels, astro_green)[segment_idx]
+    region_multi = regionprops(labels, astro)[segment_idx]
+    for prop in PROPS:
+        p = region[prop]
+        p_multi = region_multi[prop]
+        if isinstance(p, (list, tuple)):
+            p = tuple([cp.asnumpy(p_) for p_ in p])
+            p = np.stack(p)
+        if isinstance(p_multi, (list, tuple)):
+            p_multi = tuple([cp.asnumpy(p_) for p_ in p_multi])
+            p_multi = np.stack(p_multi)
+        if np.shape(p) == np.shape(p_multi):
+            # property does not depend on multiple channels
+            assert_array_equal(p, p_multi)
+        else:
+            # property uses multiple channels, returns props stacked along
+            # final axis
+            assert_array_equal(p, p_multi[..., 1])

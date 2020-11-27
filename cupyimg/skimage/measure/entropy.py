@@ -29,11 +29,6 @@ def shannon_entropy(image, base=2):
     .. [1] `https://en.wikipedia.org/wiki/Entropy_(information_theory) <https://en.wikipedia.org/wiki/Entropy_(information_theory)>`_
     .. [2] https://en.wiktionary.org/wiki/Shannon_entropy
 
-    Examples
-    --------
-    >>> from skimage import data
-    >>> float(shannon_entropy(cupy.asarray(data.camera())))
-    7.047955232423087
     """
 
     _, counts = cp.unique(image, return_counts=True)

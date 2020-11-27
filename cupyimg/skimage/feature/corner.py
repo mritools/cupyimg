@@ -9,14 +9,14 @@ from scipy import spatial  # TODO: use RAPIDS cuSpatial?
 import cupyimg.numpy as cnp
 from cupyimg.scipy import ndimage as ndi
 from .peak import peak_local_max
-from .util import _prepare_grayscale_input_2D
+from .util import _prepare_grayscale_input_nD
 
 # from ..transform import integral_image
 from .. import img_as_float
 
 
 def _compute_derivatives(image, mode="constant", cval=0):
-    """Compute derivatives in x and y direction using the Sobel operator.
+    """Compute derivatives in axis directions using the Sobel operator.
 
     Parameters
     ----------
@@ -30,29 +30,30 @@ def _compute_derivatives(image, mode="constant", cval=0):
 
     Returns
     -------
-    imx : ndarray
-        Derivative in x-direction.
-    imy : ndarray
-        Derivative in y-direction.
+    derivatives : list of ndarray
+        Derivatives in each axis direction.
 
     """
 
-    imy = ndi.sobel(image, axis=0, mode=mode, cval=cval)
-    imx = ndi.sobel(image, axis=1, mode=mode, cval=cval)
+    derivatives = [
+        ndi.sobel(image, axis=i, mode=mode, cval=cval)
+        for i in range(image.ndim)
+    ]
 
-    return imx, imy
+    return derivatives
 
 
 def structure_tensor(image, sigma=1, mode="constant", cval=0, order=None):
     """Compute structure tensor using sum of squared differences.
 
-    The structure tensor A is defined as::
+    The (2-dimensional) structure tensor A is defined as::
 
         A = [Arr Arc]
             [Arc Acc]
 
     which is approximated by the weighted sum of squared differences in a local
-    window around each pixel in the image.
+    window around each pixel in the image. This formula can be extended to a
+    larger number of dimensions (see [1]_).
 
     Parameters
     ----------
@@ -67,6 +68,7 @@ def structure_tensor(image, sigma=1, mode="constant", cval=0, order=None):
         Used in conjunction with mode 'constant', the value outside
         the image boundaries.
     order : {'rc', 'xy'}, optional
+        NOTE: Only applies in 2D. Higher dimensions must always use 'rc' order.
         This parameter allows for the use of reverse or forward order of
         the image axes in gradient computation. 'rc' indicates the use of
         the first axis initially (Arr, Arc, Acc), whilst 'xy' indicates the
@@ -74,12 +76,17 @@ def structure_tensor(image, sigma=1, mode="constant", cval=0, order=None):
 
     Returns
     -------
-    Arr : ndarray
-        Element of the structure tensor for each pixel in the input image.
-    Arc : ndarray
-        Element of the structure tensor for each pixel in the input image.
-    Acc : ndarray
-        Element of the structure tensor for each pixel in the input image.
+    A_elems : list of ndarray
+        Upper-diagonal elements of the structure tensor for each pixel in the
+        input image.
+
+    See also
+    --------
+    structure_tensor_eigenvalues
+
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Structure_tensor\
 
     Examples
     --------
@@ -95,6 +102,9 @@ def structure_tensor(image, sigma=1, mode="constant", cval=0, order=None):
            [0., 0., 0., 0., 0.]])
 
     """
+    if order == "xy" and image.ndim > 2:
+        raise ValueError('Only "rc" order is supported for dim > 2.')
+
     if order is None:
         if image.ndim == 2:
             # The legacy 2D code followed (x, y) convention, so we swap the
@@ -112,11 +122,11 @@ def structure_tensor(image, sigma=1, mode="constant", cval=0, order=None):
         else:
             order = "rc"
 
-    image = _prepare_grayscale_input_2D(image)
+    image = _prepare_grayscale_input_nD(image)
 
     derivatives = _compute_derivatives(image, mode=mode, cval=cval)
 
-    if order == "rc":
+    if order == "xy":
         derivatives = reversed(derivatives)
 
     # structure tensor

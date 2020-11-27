@@ -2,6 +2,7 @@ import cupy as cp
 import numpy as np
 import pytest
 from cupy.testing import assert_array_equal, assert_array_almost_equal
+from numpy.testing import assert_equal
 
 from skimage import data
 from skimage import draw
@@ -85,6 +86,59 @@ def test_structure_tensor():
             ]
         ),
     )
+
+
+def test_structure_tensor_3d():
+    cube = cp.zeros((5, 5, 5))
+    cube[2, 2, 2] = 1
+    A_elems = structure_tensor(cube, sigma=0.1)
+    assert_equal(len(A_elems), 6)
+    assert_array_equal(
+        A_elems[0][:, 1, :],
+        cp.asarray(
+            [
+                [0, 0, 0, 0, 0],
+                [0, 1, 4, 1, 0],
+                [0, 0, 0, 0, 0],
+                [0, 1, 4, 1, 0],
+                [0, 0, 0, 0, 0],
+            ]
+        ),
+    )
+    assert_array_equal(
+        A_elems[0][1],
+        cp.asarray(
+            [
+                [0, 0, 0, 0, 0],
+                [0, 1, 4, 1, 0],
+                [0, 4, 16, 4, 0],
+                [0, 1, 4, 1, 0],
+                [0, 0, 0, 0, 0],
+            ]
+        ),
+    )
+    assert_array_equal(
+        A_elems[3][2],
+        cp.asarray(
+            [
+                [0, 0, 0, 0, 0],
+                [0, 4, 16, 4, 0],
+                [0, 0, 0, 0, 0],
+                [0, 4, 16, 4, 0],
+                [0, 0, 0, 0, 0],
+            ]
+        ),
+    )
+
+
+def test_structure_tensor_3d_rc_only():
+    cube = cp.zeros((5, 5, 5))
+    with pytest.raises(ValueError):
+        structure_tensor(cube, sigma=0.1, order="xy")
+    A_elems_rc = structure_tensor(cube, sigma=0.1, order="rc")
+    A_elems_none = structure_tensor(cube, sigma=0.1)
+    for a_rc, a_none in zip(A_elems_rc, A_elems_none):
+        assert_array_equal(a_rc, a_none)
 
 
 def test_structure_tensor_orders():

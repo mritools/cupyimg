@@ -238,7 +238,11 @@ class TestPeakLocalMax:
         nd_image[2, 2, 2] = 1
         expected = cp.zeros_like(nd_image, dtype=cp.bool)
         expected[2, 2, 2] = True
-        expectedNoBorder = nd_image > 0
+        expectedNoBorder = np.zeros_like(nd_image, dtype=bool)
+        expectedNoBorder[2, 2, 2] = True
+        expectedNoBorder[0, 0, 1] = True
+        expectedNoBorder[3, 0, 0] = True
+        expectedNoBorder = cp.asarray(expectedNoBorder)
         with expected_warnings(["indices argument is deprecated"]):
             result = peak.peak_local_max(
                 nd_image, min_distance=2, exclude_border=2, indices=False
@@ -275,7 +279,7 @@ class TestPeakLocalMax:
                 peak.peak_local_max(
                     nd_image, exclude_border=False, indices=False
                 ),
-                expectedNoBorder,
+                nd_image.astype(bool),
             )
 
     def test_empty(self):
@@ -297,7 +301,7 @@ class TestPeakLocalMax:
         image = cp.zeros((10, 10, 10))
         result = peak.peak_local_max(
             image,
-            footprint=cp.ones((3, 3), bool),
+            footprint=cp.ones((3, 3, 3), bool),
             min_distance=1,
             threshold_rel=0,
             exclude_border=False,
@@ -459,7 +463,7 @@ class TestPeakLocalMax:
         with expected_warnings(["indices argument is deprecated"]):
             result = peak.peak_local_max(
                 image,
-                labels=cp.ones((10, 20)),
+                labels=cp.ones((10, 20), dtype=int),
                 footprint=footprint,
                 min_distance=1,
                 threshold_rel=0,
@@ -529,7 +533,11 @@ class TestPeakLocalMax:
         assert_array_equal(peak.peak_local_max(image), [[2, 2]])
 
         image[2, 2] = 0
-        assert len(peak.peak_local_max(image, min_distance=0)) == image.size - 1
+        with expected_warnings(["When min_distance < 1"]):
+            assert (
+                len(peak.peak_local_max(image, min_distance=0))
+                == image.size - 1
+            )
 
 
 @pytest.mark.parametrize(
@@ -657,7 +665,7 @@ class TestProminentPeaks(unittest.TestCase):
         image = cp.zeros((10, 20))
         labels = cp.zeros((10, 20), int)
         image[5, 5] = 1
-        labels[5, 5] = 1
+        labels[5, 5] = 3
         labelsin = labels.copy()
         with expected_warnings(["indices argument is deprecated"]):
             peak.peak_local_max(

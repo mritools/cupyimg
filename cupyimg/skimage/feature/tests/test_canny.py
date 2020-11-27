@@ -5,19 +5,21 @@ from cupy.testing import assert_array_equal
 from skimage import data
 
 from cupyimg.scipy.ndimage import binary_dilation, binary_erosion
-import cupyimg.skimage.feature as F
-from cupyimg.skimage import img_as_float
+from cupyimg.skimage import feature
+from cupyimg.skimage.util import img_as_float
 
 
 class TestCanny(unittest.TestCase):
     def test_00_00_zeros(self):
         """Test that the Canny filter finds no points for a blank field"""
-        result = F.canny(cp.zeros((20, 20)), 4, 0, 0, cp.ones((20, 20), bool))
+        result = feature.canny(
+            cp.zeros((20, 20)), 4, 0, 0, cp.ones((20, 20), bool)
+        )
         self.assertFalse(cp.any(result))
 
     def test_00_01_zeros_mask(self):
         """Test that the Canny filter finds no points in a masked image"""
-        result = F.canny(
+        result = feature.canny(
             cp.random.uniform(size=(20, 20)), 4, 0, 0, cp.zeros((20, 20), bool)
         )
         self.assertFalse(cp.any(result))
@@ -26,7 +28,7 @@ class TestCanny(unittest.TestCase):
         """Test that the Canny filter finds the outlines of a circle"""
         i, j = cp.mgrid[-200:200, -200:200].astype(float) / 200
         c = cp.abs(cp.sqrt(i * i + j * j) - 0.5) < 0.02
-        result = F.canny(c.astype(float), 4, 0, 0, cp.ones(c.shape, bool))
+        result = feature.canny(c.astype(float), 4, 0, 0, cp.ones(c.shape, bool))
         #
         # erode and dilate the circle to get rings that should contain the
         # outlines
@@ -54,7 +56,7 @@ class TestCanny(unittest.TestCase):
         i, j = cp.mgrid[-200:200, -200:200].astype(float) / 200
         c = cp.abs(cp.sqrt(i * i + j * j) - 0.5) < 0.02
         cf = c.astype(float) * 0.5 + cp.random.uniform(size=c.shape) * 0.5
-        result = F.canny(cf, 4, 0.1, 0.2, cp.ones(c.shape, bool))
+        result = feature.canny(cf, 4, 0.1, 0.2, cp.ones(c.shape, bool))
         #
         # erode and dilate the circle to get rings that should contain the
         # outlines
@@ -68,38 +70,35 @@ class TestCanny(unittest.TestCase):
         self.assertTrue(point_count < 1600)
 
     def test_image_shape(self):
-        self.assertRaises(ValueError, F.canny, cp.zeros((20, 20, 20)), 4, 0, 0)
+        self.assertRaises(
+            ValueError, feature.canny, cp.zeros((20, 20, 20)), 4, 0, 0
+        )
 
     def test_mask_none(self):
-        result1 = F.canny(cp.zeros((20, 20)), 4, 0, 0, cp.ones((20, 20), bool))
-        result2 = F.canny(cp.zeros((20, 20)), 4, 0, 0)
+        result1 = feature.canny(
+            cp.zeros((20, 20)), 4, 0, 0, cp.ones((20, 20), bool)
+        )
+        result2 = feature.canny(cp.zeros((20, 20)), 4, 0, 0)
         self.assertTrue(cp.all(result1 == result2))
 
-    # TODO: update values for new cameraman image from skimage 0.18
-    @cp.testing.with_requires("skimage<=1.17.9")
+    @cp.testing.with_requires("skimage>=1.18")
     def test_use_quantiles(self):
-        image = img_as_float(cp.asarray(data.camera()[::50, ::50]))
+        image = img_as_float(cp.asarray(data.camera()[::100, ::100]))
 
         # Correct output produced manually with quantiles
         # of 0.8 and 0.6 for high and low respectively
         correct_output = cp.asarray(
             [
-                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0],
-                [0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0],
-                [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0],
-                [0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0],
-                [0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-                [0, 1, 0, 0, 1, 1, 0, 0, 0, 0, 0],
-                [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-                [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                [False, False, False, False, False, False],
+                [False, True, True, True, False, False],
+                [False, False, False, True, False, False],
+                [False, False, False, True, False, False],
+                [False, False, True, True, False, False],
+                [False, False, False, False, False, False],
             ],
-            dtype=bool,
         )
 
-        result = F.canny(
+        result = feature.canny(
             image, low_threshold=0.6, high_threshold=0.8, use_quantiles=True
         )
 
@@ -110,7 +109,7 @@ class TestCanny(unittest.TestCase):
 
         self.assertRaises(
             ValueError,
-            F.canny,
+            feature.canny,
             image,
             use_quantiles=True,
             low_threshold=0.5,
@@ -119,7 +118,7 @@ class TestCanny(unittest.TestCase):
 
         self.assertRaises(
             ValueError,
-            F.canny,
+            feature.canny,
             image,
             use_quantiles=True,
             low_threshold=-5,
@@ -128,7 +127,7 @@ class TestCanny(unittest.TestCase):
 
         self.assertRaises(
             ValueError,
-            F.canny,
+            feature.canny,
             image,
             use_quantiles=True,
             low_threshold=99,
@@ -137,7 +136,7 @@ class TestCanny(unittest.TestCase):
 
         self.assertRaises(
             ValueError,
-            F.canny,
+            feature.canny,
             image,
             use_quantiles=True,
             low_threshold=0.5,
@@ -148,7 +147,7 @@ class TestCanny(unittest.TestCase):
         image = data.camera()
         self.assertRaises(
             ValueError,
-            F.canny,
+            feature.canny,
             image,
             use_quantiles=True,
             low_threshold=50,
@@ -160,7 +159,7 @@ class TestCanny(unittest.TestCase):
         image_uint8 = cp.asarray(data.camera())
         image_float = img_as_float(image_uint8)
 
-        result_uint8 = F.canny(image_uint8)
-        result_float = F.canny(image_float)
+        result_uint8 = feature.canny(image_uint8)
+        result_float = feature.canny(image_float)
 
         assert_array_equal(result_uint8, result_float)
