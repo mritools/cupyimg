@@ -1,4 +1,5 @@
 import math
+import warnings
 
 import cupy
 import numpy
@@ -827,6 +828,7 @@ def zoom(
     cval=0.0,
     prefilter=True,
     *,
+    grid_mode=False,
     allow_float32=True,
 ):
     """Zoom an array.
@@ -850,6 +852,22 @@ def zoom(
             0.0
         prefilter (bool): It is not used yet. It just exists for compatibility
             with :mod:`scipy.ndimage`.
+        grid_mode (bool, optional): If False, the distance from the pixel
+            centers is zoomed. Otherwise, the distance including the full pixel
+            extent is used. For example, a 1d signal of length 5 is considered
+            to have length 4 when `grid_mode` is False, but length 5 when
+            `grid_mode` is True. See the following visual illustration:
+
+            .. code-block:: text
+
+                    | pixel 1 | pixel 2 | pixel 3 | pixel 4 | pixel 5 |
+                         |<-------------------------------------->|
+                                            vs.
+                    |<----------------------------------------------->|
+
+            The starting point of the arrow in the diagram above corresponds to
+            coordinate location 0 in each mode. This option is unused if
+            ``mode='opencv'``.
 
     Returns:
         cupy.ndarray or None:
@@ -906,10 +924,28 @@ def zoom(
         if order is None:
             order = 1
 
+        if grid_mode:
+            # warn about modes that may have surprising behavior
+            suggest_mode = None
+            if mode == "constant":
+                suggest_mode = "grid-constant"
+            elif mode == "wrap":
+                suggest_mode = "grid-wrap"
+            if suggest_mode is not None:
+                warnings.warn(
+                    (
+                        "It is recommended to use mode = {} instead of {} when "
+                        "grid_mode is True."
+                    ).format(suggest_mode, mode)
+                )
+
         zoom = []
         for in_size, out_size in zip(input.shape, output_shape):
             if out_size > 1:
-                zoom.append(float(in_size - 1) / (out_size - 1))
+                if grid_mode:
+                    zoom.append(in_size / out_size)
+                else:
+                    zoom.append((in_size - 1) / (out_size - 1))
             else:
                 zoom.append(1)
 
@@ -946,6 +982,7 @@ def zoom(
             order=order,
             integer_output=integer_output,
             nprepad=npad,
+            grid_mode=grid_mode,
         )
 
         zoom = cupy.asarray(zoom, dtype=float, order="C")
