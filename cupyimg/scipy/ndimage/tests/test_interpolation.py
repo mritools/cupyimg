@@ -641,6 +641,39 @@ class TestZoom(unittest.TestCase):
 
 
 @testing.parameterize(
+    *(
+        testing.product(
+            {
+                "shape": [(2, 3), (4, 4)],
+                "zoom": [(1, 1), (3, 5), (8, 2), (8, 8)],
+                "mode": [
+                    "nearest",
+                    "reflect",
+                    "mirror",
+                    "grid-wrap",
+                    "grid-constant",
+                ],
+            }
+        )
+    )
+)
+@testing.gpu
+@testing.with_requires("scipy>=1.6")
+class TestZoomIntegerGrid(unittest.TestCase):
+    def test_zoom_grid_by_int_order0(self):
+        # When grid_mode is True,  order 0 zoom should be the same as
+        # replication via numpy.kron. The only exceptions to this are the
+        # non-grid modes 'constant' and 'wrap'.
+        x = cupy.arange(numpy.prod(self.shape), dtype=float).reshape(self.shape)
+        testing.assert_array_almost_equal(
+            cupyimg.scipy.ndimage.zoom(
+                x, self.zoom, order=0, mode=self.mode, grid_mode=True
+            ),
+            cupy.kron(x, cupy.ones(self.zoom)),
+        )
+
+
+@testing.parameterize(
     {"zoom": 3}, {"zoom": 0.3},
 )
 @testing.gpu

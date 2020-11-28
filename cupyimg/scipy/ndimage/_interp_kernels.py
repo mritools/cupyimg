@@ -49,6 +49,8 @@ def _get_coord_map(ndim, nprepad=0):
 def _get_coord_zoom_and_shift(ndim, nprepad=0):
     """Compute target coordinate based on a shift followed by a zoom.
 
+    This version zooms from the center of the edge pixels.
+
     Notes
     -----
     Assumes the following variables have been initialized on the device::
@@ -75,8 +77,42 @@ def _get_coord_zoom_and_shift(ndim, nprepad=0):
     return ops
 
 
+def _get_coord_zoom_and_shift_grid(ndim, nprepad=0):
+    """Compute target coordinate based on a shift followed by a zoom.
+
+    This version zooms from the outer edges of the grid pixels.
+
+    Notes
+    -----
+    Assumes the following variables have been initialized on the device::
+
+        in_coord[ndim]: array containing the source coordinate
+        zoom[ndim]: array containing the zoom for each axis
+        shift[ndim]: array containing the zoom for each axis
+
+    computes::
+
+        c_j = zoom[j] * (in_coord[j] - shift[j])
+
+    """
+    ops = []
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
+    for j in range(ndim):
+        ops.append(
+            """
+        W c_{j} = (
+            zoom[{j}] * ((W)in_coord[{j}] - shift[{j}] + 0.5) - 0.5{pre}
+        );""".format(
+                j=j, pre=pre
+            )
+        )
+    return ops
+
+
 def _get_coord_zoom(ndim, nprepad=0):
     """Compute target coordinate based on a zoom.
+
+    This version zooms from the center of the edge pixels.
 
     Notes
     -----
@@ -96,6 +132,35 @@ def _get_coord_zoom(ndim, nprepad=0):
         ops.append(
             """
     W c_{j} = zoom[{j}] * (W)in_coord[{j}]{pre};""".format(
+                j=j, pre=pre
+            )
+        )
+    return ops
+
+
+def _get_coord_zoom_grid(ndim, nprepad=0):
+    """Compute target coordinate based on a zoom (grid_mode=True version).
+
+    This version zooms from the outer edges of the grid pixels.
+
+    Notes
+    -----
+    Assumes the following variables have been initialized on the device::
+
+        in_coord[ndim]: array containing the source coordinate
+        zoom[ndim]: array containing the zoom for each axis
+
+    computes::
+
+        c_j = zoom[j] * in_coord[j]
+
+    """
+    ops = []
+    pre = " + (W){nprepad}".format(nprepad=nprepad) if nprepad > 0 else ""
+    for j in range(ndim):
+        ops.append(
+            """
+    W c_{j} = zoom[{j}] * ((W)in_coord[{j}] + 0.5) - 0.5{pre};""".format(
                 j=j, pre=pre
             )
         )
@@ -649,19 +714,24 @@ def _get_zoom_shift_kernel(
     order=1,
     integer_output=False,
     nprepad=0,
+    grid_mode=False,
 ):
     in_params = "raw X x, raw W shift, raw W zoom"
     out_params = "Y y"
+    if grid_mode:
+        zoom_shift_func = _get_coord_zoom_and_shift_grid
+    else:
+        zoom_shift_func = _get_coord_zoom_and_shift
     operation, name = _generate_interp_custom(
         in_params=in_params,
-        coord_func=_get_coord_zoom_and_shift,
+        coord_func=zoom_shift_func,
         ndim=ndim,
         large_int=large_int,
         yshape=yshape,
         mode=mode,
         cval=cval,
         order=order,
-        name="zoom_shift",
+        name="zoom_shift_grid" if grid_mode else "zoom_shift",
         integer_output=integer_output,
         nprepad=nprepad,
     )
@@ -680,19 +750,20 @@ def _get_zoom_kernel(
     order=1,
     integer_output=False,
     nprepad=0,
+    grid_mode=False,
 ):
     in_params = "raw X x, raw W zoom"
     out_params = "Y y"
     operation, name = _generate_interp_custom(
         in_params=in_params,
-        coord_func=_get_coord_zoom,
+        coord_func=_get_coord_zoom_grid if grid_mode else _get_coord_zoom,
         ndim=ndim,
         large_int=large_int,
         yshape=yshape,
         mode=mode,
         cval=cval,
         order=order,
-        name="zoom",
+        name="zoom_grid" if grid_mode else "zoom",
         integer_output=integer_output,
         nprepad=nprepad,
     )
