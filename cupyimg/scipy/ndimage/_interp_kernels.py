@@ -92,7 +92,7 @@ def _get_coord_zoom_and_shift_grid(ndim, nprepad=0):
 
     computes::
 
-        c_j = zoom[j] * (in_coord[j] - shift[j])
+        c_j = zoom[j] * (in_coord[j] - shift[j] + 0.5) - 0.5
 
     """
     ops = []
@@ -152,7 +152,7 @@ def _get_coord_zoom_grid(ndim, nprepad=0):
 
     computes::
 
-        c_j = zoom[j] * in_coord[j]
+        c_j = zoom[j] * (in_coord[j] + 0.5) - 0.5
 
     """
     ops = []
@@ -317,16 +317,10 @@ def _generate_interp_custom(
 
     # determine strides of x (in elements, not bytes)
     for j in range(ndim):
-        ops.append(
-            "const {int_t} xsize_{j} = x.shape()[{j}];".format(int_t=int_t, j=j)
-        )
-    ops.append("const {uint_t} sx_{j} = 1;".format(uint_t=uint_t, j=ndim - 1))
+        ops.append(f"const {int_t} xsize_{j} = x.shape()[{j}];")
+    ops.append(f"const {uint_t} sx_{ndim - 1} = 1;")
     for j in range(ndim - 1, 0, -1):
-        ops.append(
-            "const {uint_t} sx_{jm} = sx_{j} * xsize_{j};".format(
-                uint_t=uint_t, jm=j - 1, j=j,
-            )
-        )
+        ops.append(f"const {uint_t} sx_{j - 1} = sx_{j} * xsize_{j};")
 
     # create out_coords array to store the unraveled indices into the output
     ops.append(_unravel_loop_index(yshape, uint_t))
@@ -345,21 +339,16 @@ def _generate_interp_custom(
     if mode == "constant":
         # use cval if coordinate is outside the bounds of x
         _cond = " || ".join(
-            [
-                "(c_{j} < 0) || (c_{j} > xsize_{j} - 1)".format(j=j)
-                for j in range(ndim)
-            ]
+            [f"(c_{j} < 0) || (c_{j} > xsize_{j} - 1)" for j in range(ndim)]
         )
         ops.append(
-            """
-        if ({cond})
+            f"""
+        if ({_cond})
         {{
             out = (double){cval};
         }}
         else
-        {{""".format(
-                cond=_cond, cval=cval
-            )
+        {{"""
         )
 
     if order == 0:
@@ -367,14 +356,12 @@ def _generate_interp_custom(
         for j in range(ndim):
             # determine nearest neighbor
             if mode == "wrap":
-                ops.append("dcoord = c_{j};".format(j=j))
+                ops.append(f"dcoord = c_{j};")
             else:
                 ops.append(
-                    """
+                    f"""
                 {int_t} cf_{j} = ({int_t})lrint((double)c_{j});
-                """.format(
-                        int_t=int_t, j=j
-                    )
+                """
                 )
 
             # handle boundary
@@ -383,110 +370,90 @@ def _generate_interp_custom(
                     ixvar = "dcoord"
                     float_ix = True
                 else:
-                    ixvar = "cf_{j}".format(j=j)
+                    ixvar = f"cf_{j}"
                     float_ix = False
                 ops.append(
-                    boundary_ops(
-                        mode, ixvar, "xsize_{}".format(j), int_t, float_ix
-                    )
+                    boundary_ops(mode, ixvar, f"xsize_{j}", int_t, float_ix)
                 )
                 if mode == "wrap":
                     ops.append(
-                        "{int_t} cf_{j} = ({int_t})floor(dcoord + 0.5);".format(
-                            j=j, int_t=int_t
-                        )
+                        f"{int_t} cf_{j} = ({int_t})floor(dcoord + 0.5);"
                     )
 
             # sum over ic_j will give the raveled coordinate in the input
             ops.append(
-                """
+                f"""
             {int_t} ic_{j} = cf_{j} * sx_{j};
-            """.format(
-                    int_t=int_t, j=j
-                )
+            """
             )
-        _coord_idx = " + ".join(["ic_{}".format(j) for j in range(ndim)])
+        _coord_idx = " + ".join([f"ic_{j}" for j in range(ndim)])
         if mode == "grid-constant":
-            _cond = " || ".join(["(ic_{0} < 0)".format(j) for j in range(ndim)])
+            _cond = " || ".join([f"(ic_{j} < 0)" for j in range(ndim)])
             ops.append(
-                """
-            if ({cond}) {{
+                f"""
+            if ({_cond}) {{
                 out = (double){cval};
             }} else {{
-                out = x[{coord_idx}];
+                out = x[{_coord_idx}];
             }}
-            """.format(
-                    cond=_cond, cval=cval, coord_idx=_coord_idx
-                )
+            """
             )
         else:
             ops.append(
+                f"""
+                out = x[{_coord_idx}];
                 """
-                out = x[{coord_idx}];
-                """.format(
-                    coord_idx=_coord_idx
-                )
             )
 
     elif order == 1:
         for j in range(ndim):
             # get coordinates for linear interpolation along axis j
             ops.append(
-                """
+                f"""
             {int_t} cf_{j} = ({int_t})floor((double)c_{j});
             {int_t} cc_{j} = cf_{j} + 1;
             {int_t} n_{j} = (c_{j} == cf_{j}) ? 1 : 2;  // points needed
-            """.format(
-                    int_t=int_t, j=j
-                )
+            """
             )
 
             if mode == "wrap":
-                ops.append("double dcoordf = c_{j};".format(j=j))
-                ops.append("double dcoordc = c_{j} + 1;".format(j=j))
+                ops.append(f"double dcoordf = c_{j};")
+                ops.append(f"double dcoordc = c_{j} + 1;")
             else:
                 # handle boundaries for extension modes.
                 ops.append(
-                    """
+                    f"""
                 {int_t} cf_bounded_{j} = cf_{j};
                 {int_t} cc_bounded_{j} = cc_{j};
-                """.format(
-                        int_t=int_t, j=j
-                    )
+                """
                 )
             if mode != "constant":
                 if mode == "wrap":
                     ixvar = "dcoordf"
                     float_ix = True
                 else:
-                    ixvar = "cf_bounded_{j}".format(j=j)
+                    ixvar = f"cf_bounded_{j}"
                     float_ix = False
                 ops.append(
-                    boundary_ops(
-                        mode, ixvar, "xsize_{}".format(j), int_t, float_ix
-                    )
+                    boundary_ops(mode, ixvar, f"xsize_{j}", int_t, float_ix)
                 )
                 if mode == "wrap":
                     ixvar = "dcoordc"
                 else:
-                    ixvar = "cc_bounded_{j}".format(j=j)
+                    ixvar = f"cc_bounded_{j}"
                     ops.append(
-                        boundary_ops(
-                            mode, ixvar, "xsize_{}".format(j), int_t, float_ix
-                        )
+                        boundary_ops(mode, ixvar, f"xsize_{j}", int_t, float_ix)
                     )
                 if mode == "wrap":
                     ops.append(
-                        """
+                        f"""
                     {int_t} cf_bounded_{j} = ({int_t})floor(dcoordf);;
                     {int_t} cc_bounded_{j} = ({int_t})floor(dcoordf + 1);;
-                    """.format(
-                            int_t=int_t, j=j
-                        )
+                    """
                     )
 
             ops.append(
-                """
+                f"""
             W w_{j};
             {int_t} ic_{j};
             for (int s_{j} = 0; s_{j} < n_{j}; s_{j}++)
@@ -499,9 +466,7 @@ def _generate_interp_custom(
                     {{
                         w_{j} = c_{j} - (W)cf_{j};
                         ic_{j} = cc_bounded_{j} * sx_{j};
-                    }}""".format(
-                    int_t=int_t, j=j
-                )
+                    }}"""
             )
 
     elif order > 1:
@@ -524,33 +489,25 @@ def _generate_interp_custom(
             W wx, wy;"""
             )
         ops.append(
-            """
-        {int_t} start;""".format(
-                int_t=int_t
-            )
+            f"""
+        {int_t} start;"""
         )
         for j in range(ndim):
             # determine weights along the current axis
             ops.append(
-                """
-            W weights_{j}[{n}];""".format(
-                    j=j, n=order + 1
-                )
+                f"""
+            W weights_{j}[{order + 1}];"""
             )
             ops.append(spline_weights_inline[order].format(j=j, order=order))
 
             # get starting coordinate for spline interpolation along axis j
             if mode in ["wrap"]:
-                ops.append("double dcoord = c_{j};".format(j=j))
+                ops.append(f"double dcoord = c_{j};")
                 ixvar = "dcoord"
-                ops.append(
-                    boundary_ops(
-                        mode, ixvar, "xsize_{}".format(j), int_t, True,
-                    )
-                )
+                ops.append(boundary_ops(mode, ixvar, f"xsize_{j}", int_t, True))
                 coord_var = "dcoord"
             else:
-                coord_var = "(double)c_{j}".format(j=j)
+                coord_var = f"(double)c_{j}"
 
             if order & 1:
                 op_str = """
@@ -565,17 +522,13 @@ def _generate_interp_custom(
             )
 
             # set of coordinate values within spline footprint along axis j
-            ops.append(
-                """{int_t} ci_{j}[{n}];""".format(int_t=int_t, j=j, n=order + 1)
-            )
+            ops.append(f"""{int_t} ci_{j}[{order + 1}];""")
             for k in range(order + 1):
                 ops.append(
-                    """
-                ci_{j}[{k}] = start + {k};""".format(
-                        j=j, k=k
-                    )
+                    f"""
+                ci_{j}[{k}] = start + {k};"""
                 )
-                ixvar = "ci_{j}[{k}]".format(j=j, k=k)
+                ixvar = f"ci_{j}[{k}]"
                 ops.append(
                     boundary_ops(
                         spline_mode, ixvar, "xsize_{}".format(j), int_t
@@ -584,44 +537,38 @@ def _generate_interp_custom(
 
             # loop over the order + 1 values in the spline filter
             ops.append(
-                """
+                f"""
             W w_{j};
             {int_t} ic_{j};
             for (int k_{j} = 0; k_{j} <= {order}; k_{j}++)
                 {{
                     w_{j} = weights_{j}[k_{j}];
                     ic_{j} = ci_{j}[k_{j}] * sx_{j};
-            """.format(
-                    int_t=int_t, j=j, order=order
-                )
+            """
             )
 
     if order > 0:
 
-        _weight = " * ".join(["w_{j}".format(j=j) for j in range(ndim)])
-        _coord_idx = " + ".join(["ic_{j}".format(j=j) for j in range(ndim)])
+        _weight = " * ".join([f"w_{j}" for j in range(ndim)])
+        _coord_idx = " + ".join([f"ic_{j}" for j in range(ndim)])
         if mode == "grid-constant" or (order > 1 and mode == "constant"):
-            _cond = " || ".join(["(ic_{0} < 0)".format(j) for j in range(ndim)])
+            _cond = " || ".join([f"(ic_{j} < 0)" for j in range(ndim)])
             ops.append(
-                """
-            if ({cond}) {{
-                out += (X){cval} * ({weight});
+                f"""
+            if ({_cond}) {{
+                out += (X){cval} * ({_weight});
             }} else {{
-                X val = x[{coord_idx}];
-                out += val * ({weight});
+                X val = x[{_coord_idx}];
+                out += val * ({_weight});
             }}
-            """.format(
-                    cond=_cond, cval=cval, coord_idx=_coord_idx, weight=_weight
-                )
+            """
             )
         else:
             ops.append(
-                """
-            X val = x[{coord_idx}];
-            out += val * ({weight});
-            """.format(
-                    coord_idx=_coord_idx, weight=_weight
-                )
+                f"""
+            X val = x[{_coord_idx}];
+            out += val * ({_weight});
+            """
             )
 
         ops.append("}" * ndim)
