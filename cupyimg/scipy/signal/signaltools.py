@@ -478,11 +478,17 @@ def _freq_domain_conv(in1, in2, axes, shape, calc_fast_len=False):
 
     if not complex_result:
         fft, ifft = sp_fft.rfftn, sp_fft.irfftn
-        plan_fft = sp_fft.get_fft_plan(in1, fshape, axes, value_type="R2C")
+        try:
+            plan_fft = sp_fft.get_fft_plan(in1, fshape, axes, value_type="R2C")
+        except ValueError:  # in1.ndim > 3
+            plan_fft = None
         plan_ifft = None  # don't store as it is only used once
     else:
         fft, ifft = sp_fft.fftn, sp_fft.ifftn
-        plan_fft = sp_fft.get_fft_plan(in1, fshape, axes, value_type="C2C")
+        try:
+            plan_fft = sp_fft.get_fft_plan(in1, fshape, axes, value_type="C2C")
+        except ValueError:
+            plan_fft = None
         plan_ifft = plan_fft
 
     sp1 = fft(in1, fshape, axes=axes, plan=plan_fft)
