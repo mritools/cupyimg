@@ -121,7 +121,7 @@ def spline_filter1d(
         input (cupy.ndarray): The input array.
         order (int): The order of the spline interpolation. If it is not given,
             order 1 is used. It is different from :mod:`scipy.ndimage` and can
-            change in the future. Currently it supports only order 0 and 1.
+            change in the future. The order has to be in the range 0-5.
         axis (int): The axis along which the spline filter is applied. Default
             is the last axis.
         output (cupy.ndarray or dtype, optional): The array in which to place
@@ -207,7 +207,7 @@ def spline_filter(
         input (cupy.ndarray): The input array.
         order (int): The order of the spline interpolation. If it is not given,
             order 1 is used. It is different from :mod:`scipy.ndimage` and can
-            change in the future. Currently it supports only order 0 and 1.
+            change in the future. The order has to be in the range 0-5.
         output (cupy.ndarray or dtype, optional): The array in which to place
             the output, or the dtype of the returned array. Default is
             ``numpy.float64``.
@@ -295,8 +295,9 @@ def map_coordinates(
             evaluated.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. Must be between 0
-            and 5.
+        order (int): The order of the spline interpolation. If it is not given,
+            order 1 is used. It is different from :mod:`scipy.ndimage` and can
+            change in the future. The order has to be in the range 0-5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
@@ -314,14 +315,12 @@ def map_coordinates(
     Notes
     -----
     This implementation handles boundary modes 'wrap' and 'reflect' correctly,
-    while SciPy does not (at least as of release 1.4.0). So, if comparing to
-    SciPy, some disagreement near the borders may occur unless
-    ``mode == 'mirror'``.
+    while SciPy prior to release 1.6.0 does not. So, if comparing to older
+    SciPy, some disagreement near the borders may occur.
 
     For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
     conditions are implemented correctly only for modes 'mirror', 'reflect'
-    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
-    innacuracy near the boundary of the array.
+    and 'grid-wrap'.
 
     .. seealso:: :func:`scipy.ndimage.map_coordinates`
     """
@@ -439,8 +438,9 @@ def affine_transform(
         output_shape (tuple of ints): Shape tuple.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. Must be between 0
-            and 5.
+        order (int): The order of the spline interpolation. If it is not given,
+            order 1 is used. It is different from :mod:`scipy.ndimage` and can
+            change in the future. The order has to be in the range 0-5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
@@ -458,14 +458,12 @@ def affine_transform(
     Notes
     -----
     This implementation handles boundary modes 'wrap' and 'reflect' correctly,
-    while SciPy does not (at least as of release 1.4.0). So, if comparing to
-    SciPy, some disagreement near the borders may occur unless
-    ``mode == 'mirror'``.
+    while SciPy prior to release 1.6.0 does not. So, if comparing to older
+    SciPy, some disagreement near the borders may occur.
 
     For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
     conditions are implemented correctly only for modes 'mirror', 'reflect'
-    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
-    innacuracy near the boundary of the array.
+    and 'grid-wrap'.
 
     .. seealso:: :func:`scipy.ndimage.affine_transform`
     """
@@ -603,8 +601,9 @@ def rotate(
             is True.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. Must be between 0
-            and 5.
+        order (int): The order of the spline interpolation. If it is not given,
+            order 1 is used. It is different from :mod:`scipy.ndimage` and can
+            change in the future. The order has to be in the range 0-5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
@@ -621,14 +620,12 @@ def rotate(
     Notes
     -----
     This implementation handles boundary modes 'wrap' and 'reflect' correctly,
-    while SciPy does not (at least as of release 1.4.0). So, if comparing to
-    SciPy, some disagreement near the borders may occur unless
-    ``mode == 'mirror'``.
+    while SciPy prior to release 1.6.0 does not. So, if comparing to older
+    SciPy, some disagreement near the borders may occur.
 
     For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
     conditions are implemented correctly only for modes 'mirror', 'reflect'
-    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
-    innacuracy near the boundary of the array.
+    and 'grid-wrap'.
 
     .. seealso:: :func:`scipy.ndimage.zoom`
     """
@@ -725,8 +722,9 @@ def shift(
             should contain one value for each axis.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. Must be between 0
-            and 5.
+        order (int): The order of the spline interpolation. If it is not given,
+            order 1 is used. It is different from :mod:`scipy.ndimage` and can
+            change in the future. The order has to be in the range 0-5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
@@ -743,14 +741,13 @@ def shift(
     Notes
     -----
     This implementation handles boundary modes 'wrap' and 'reflect' correctly,
-    while SciPy does not (at least as of release 1.4.0). So, if comparing to
-    SciPy, some disagreement near the borders may occur unless
-    ``mode == 'mirror'``.
+    while SciPy prior to release 1.6.0 does not. So, if comparing to older
+    SciPy, some disagreement near the borders may occur.
 
     For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
     conditions are implemented correctly only for modes 'mirror', 'reflect'
-    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
-    innacuracy near the boundary of the array.
+    and 'grid-wrap'.
+
 
     .. seealso:: :func:`scipy.ndimage.shift`
     """
@@ -842,8 +839,9 @@ def zoom(
             contain one value for each axis.
         output (cupy.ndarray or ~cupy.dtype): The array in which to place the
             output, or the dtype of the returned array.
-        order (int): The order of the spline interpolation. Must be between 0
-            and 5.
+        order (int): The order of the spline interpolation. If it is not given,
+            order 1 is used. It is different from :mod:`scipy.ndimage` and can
+            change in the future. The order has to be in the range 0-5.
         mode (str): Points outside the boundaries of the input are filled
             according to the given mode (``'constant'``, ``'nearest'``,
             ``'mirror'`` or ``'opencv'``). Default is ``'constant'``.
@@ -876,14 +874,12 @@ def zoom(
     Notes
     -----
     This implementation handles boundary modes 'wrap' and 'reflect' correctly,
-    while SciPy does not (at least as of release 1.4.0). So, if comparing to
-    SciPy, some disagreement near the borders may occur unless
-    ``mode == 'mirror'``.
+    while SciPy prior to release 1.6.0 does not. So, if comparing to older
+    SciPy, some disagreement near the borders may occur.
 
     For ``order > 1`` with ``prefilter == True``, the spline prefilter boundary
     conditions are implemented correctly only for modes 'mirror', 'reflect'
-    and 'wrap'. For the other modes ('constant' and 'nearest'), there is some
-    innacuracy near the boundary of the array.
+    and 'grid-wrap'.
 
     .. seealso:: :func:`scipy.ndimage.zoom`
     """
