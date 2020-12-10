@@ -166,14 +166,15 @@ thus not available in `cupyimg` either.
 
 **cupyimg.numpy**:
 
-- apply_along_axis
+- apply_along_axis  (upstream PR: [4008](https://github.com/cupy/cupy/pull/4008))
 - convolve  (upstream PR: [3371](https://github.com/cupy/cupy/pull/3371))
 - correlate  (upstream PR: [3525](https://github.com/cupy/cupy/pull/3525))
-- gradient  (upstream PR: [3371](https://github.com/cupy/cupy/pull/3963))
+- gradient  (upstream PR: [3963](https://github.com/cupy/cupy/pull/3963))
 - histogram  (upstream PR: [3124](https://github.com/cupy/cupy/pull/3124))
 - histogram2d  (upstream PR: [3947](https://github.com/cupy/cupy/pull/3947))
 - histogramdd  (upstream PR: [3947](https://github.com/cupy/cupy/pull/3947))
 - ndim (upstream PR: [3060](https://github.com/cupy/cupy/pull/3060))
+- quantile  (upstream PR: [4370](https://github.com/cupy/cupy/pull/4370))
 - ravel_multi_index (upstream PR: [3104](https://github.com/cupy/cupy/pull/3104))
 
 **cupyimg.scipy.interpolate**:
@@ -208,7 +209,7 @@ thus not available in `cupyimg` either.
 
 **cupyimg.scipy.ndimage.fourier**:
 
-- fourier_ellipsoid
+- fourier_ellipsoid (upstream PR: [PR 4361](https://github.com/cupy/cupy/pull/4361))
 - fourier_gaussian (upstream PR: [PR 3654](https://github.com/cupy/cupy/pull/3654))
 - fourier_shift (upstream PR: [PR 3654](https://github.com/cupy/cupy/pull/3654))
 - fourier_uniform (upstream PR: [PR 3654](https://github.com/cupy/cupy/pull/3654))
@@ -219,24 +220,36 @@ thus not available in `cupyimg` either.
 - map_coordinates  (upstream PR: [3166](https://github.com/cupy/cupy/pull/3166))
 - rotate  (upstream PR: [3166](https://github.com/cupy/cupy/pull/3166))
 - shift  (upstream PR: [3166](https://github.com/cupy/cupy/pull/3166))
+- spline_filter  (upstream PR: [4145](https://github.com/cupy/cupy/pull/4145))
+- spline_filter1d  (upstream PR: [4145](https://github.com/cupy/cupy/pull/4145))
 - zoom  (upstream PR: [3166](https://github.com/cupy/cupy/pull/3166))
+
+other upstream enhancements for interpolation (SciPy 1.6 boundary modes and
+spline order 2-5):
+    [PR 4083](https://github.com/cupy/cupy/pull/4083)
+    [PR 4314](https://github.com/cupy/cupy/pull/4314)
+    [PR 4400](https://github.com/cupy/cupy/pull/4400)
+    [PR 4401](https://github.com/cupy/cupy/pull/4401)
+    [PR 4402](https://github.com/cupy/cupy/pull/4402)
+
 
 **cupyimg.scipy.ndimage.measurements**:
 
-- center_of_mass
-- extrema
-- histogram
+- center_of_mass (upstream PR: [4311](https://github.com/cupy/cupy/pull/4311))
+- extrema (upstream PR: [PR 3979](https://github.com/cupy/cupy/pull/3979))
+- histogram (upstream PR: [4311](https://github.com/cupy/cupy/pull/4311))
 - label (upstream PR: [PR 3210](https://github.com/cupy/cupy/pull/3210))
-- labeled_comprehension
-- maximum
-- maximum_position
+- labeled_comprehension (upstream PR: [4311](https://github.com/cupy/cupy/pull/4311))
+- maximum (upstream PR: [PR 3979](https://github.com/cupy/cupy/pull/3979))
+- maximum_position (upstream PR: [PR 3979](https://github.com/cupy/cupy/pull/3979))
 - mean (upstream PR: [PR 3259](https://github.com/cupy/cupy/pull/3259), [PR 3419](https://github.com/cupy/cupy/pull/3419))
-- median
-- minimum
-- minimum_position
+- median (upstream PR: [PR 3979](https://github.com/cupy/cupy/pull/3979))
+- minimum (upstream PR: [PR 3979](https://github.com/cupy/cupy/pull/3979))
+- minimum_position (upstream PR: [PR 3979](https://github.com/cupy/cupy/pull/3979))
 - standard_deviation (upstream PR: [PR 3259](https://github.com/cupy/cupy/pull/3259), [PR 3419](https://github.com/cupy/cupy/pull/3419))
 - sum (upstream PR: [PR 3259](https://github.com/cupy/cupy/pull/3259), [PR 3419](https://github.com/cupy/cupy/pull/3419), [PR 3425](https://github.com/cupy/cupy/pull/3425))
 - variance (upstream PR: [PR 3259](https://github.com/cupy/cupy/pull/3259), [PR 3419](https://github.com/cupy/cupy/pull/3419))
+related:   (upstream PR: [4151](https://github.com/cupy/cupy/pull/4151))
 
 **cupyimg.scipy.ndimage.morphology**:
 
@@ -257,6 +270,7 @@ thus not available in `cupyimg` either.
 - morphological_gradient (upstream PR: [3946](https://github.com/cupy/cupy/pull/3946))
 - morphological_laplace (upstream PR: [3946](https://github.com/cupy/cupy/pull/3946))
 - white_tophat (upstream PR: [3946](https://github.com/cupy/cupy/pull/3946))
+related: [4058](https://github.com/cupy/cupy/pull/4058), [4059](https://github.com/cupy/cupy/pull/4059)
 
 **cupyimg.scipy.signal**:
 
@@ -284,7 +298,7 @@ thus not available in `cupyimg` either.
 
 **cupyimg.scipy.stats**:
 
-- entropy
+- entropy  (upstream PR: [4369](https://github.com/cupy/cupy/pull/4369))
 
 **skimage.color**:
 
