@@ -98,36 +98,20 @@ def convert_colorspace(arr, fromspace, tospace):
     >>> img = data.astronaut()
     >>> img_hsv = convert_colorspace(img, 'RGB', 'HSV')
     """
-    fromdict = {
-        "rgb": lambda im: im,
-        "hsv": hsv2rgb,
-        "rgb cie": rgbcie2rgb,
-        "xyz": xyz2rgb,
-        "yuv": yuv2rgb,
-        "yiq": yiq2rgb,
-        "ypbpr": ypbpr2rgb,
-        "ycbcr": ycbcr2rgb,
-        "ydbdr": ydbdr2rgb,
-    }
-    todict = {
-        "rgb": lambda im: im,
-        "hsv": rgb2hsv,
-        "rgb cie": rgb2rgbcie,
-        "xyz": rgb2xyz,
-        "yuv": rgb2yuv,
-        "yiq": rgb2yiq,
-        "ypbpr": rgb2ypbpr,
-        "ycbcr": rgb2ycbcr,
-        "ydbdr": rgb2ydbdr,
-    }
+    fromdict = {'rgb': lambda im: im, 'hsv': hsv2rgb, 'rgb cie': rgbcie2rgb,
+                'xyz': xyz2rgb, 'yuv': yuv2rgb, 'yiq': yiq2rgb,
+                'ypbpr': ypbpr2rgb, 'ycbcr': ycbcr2rgb, 'ydbdr': ydbdr2rgb}
+    todict = {'rgb': lambda im: im, 'hsv': rgb2hsv, 'rgb cie': rgb2rgbcie,
+              'xyz': rgb2xyz, 'yuv': rgb2yuv, 'yiq': rgb2yiq,
+              'ypbpr': rgb2ypbpr, 'ycbcr': rgb2ycbcr, 'ydbdr': rgb2ydbdr}
 
     fromspace = fromspace.lower()
     tospace = tospace.lower()
     if fromspace not in fromdict:
-        msg = "`fromspace` has to be one of {}".format(fromdict.keys())
+        msg = '`fromspace` has to be one of {}'.format(fromdict.keys())
         raise ValueError(msg)
     if tospace not in todict:
-        msg = "`tospace` has to be one of {}".format(todict.keys())
+        msg = '`tospace` has to be one of {}'.format(todict.keys())
         raise ValueError(msg)
 
     return todict[tospace](fromdict[fromspace](arr))
@@ -140,9 +124,8 @@ def _prepare_colorarray(arr, force_copy=False):
     arr = cp.asarray(arr)
 
     if arr.shape[-1] != 3:
-        raise ValueError(
-            "Input array must have a shape == (..., 3)), " f"got {arr.shape}"
-        )
+        raise ValueError("Input array must have a shape == (..., 3)), "
+                         f"got {arr.shape}")
 
     return dtype.img_as_float(arr, force_copy=force_copy)
 
@@ -182,33 +165,27 @@ def rgba2rgb(rgba, background=(1, 1, 1)):
     arr = cp.asarray(rgba)
 
     if arr.shape[-1] != 4:
-        msg = (
-            "the input array must have shape == (..., 4)), " f"got {arr.shape}"
-        )
+        msg = ("the input array must have shape == (..., 4)), "
+               f"got {arr.shape}")
         raise ValueError(msg)
 
     arr = dtype.img_as_float(arr)
 
-    background = cp.asarray(background, dtype=arr.dtype)
-    background = cp.ravel(background)
+    background = cp.asarray(background, dtype=arr.dtype).ravel()
     if len(background) != 3:
-        raise ValueError(
-            "background must be an array-like containing 3 RGB "
-            f"values. Got {len(background)} items"
-        )
-    if any([(b < 0 or b > 1) for b in background]):
-        raise ValueError(
-            "background RGB values must be floats between " "0 and 1."
-        )
+        raise ValueError('background must be an array-like containing 3 RGB '
+                         f'values. Got {len(background)} items')
+    if any((b < 0 or b > 1) for b in background):
+        raise ValueError('background RGB values must be floats between '
+                         '0 and 1.')
 
     background = background[cp.newaxis, ...]
     alpha = arr[..., -1, cp.newaxis]
     channels = arr[cp.newaxis, ..., :-1]
 
-    out = cp.squeeze(
-        cp.clip((1 - alpha) * background + alpha * channels, a_min=0, a_max=1),
-        axis=0,
-    )
+    out = cp.squeeze(cp.clip((1 - alpha) * background + alpha * channels,
+                             a_min=0, a_max=1),
+                     axis=0)
     return out
 
 
@@ -257,26 +234,20 @@ def rgb2hsv(rgb):
     out_v = arr.max(-1)
 
     # -- S channel
-    try:
-        delta = arr.ptp(-1)
-    except AttributeError:
-        # only pre-release CuPy has .ptp() so fall back to max/min
-        delta = arr.max(-1) - arr.min(-1)
+    delta = arr.ptp(-1)
     # Ignore warning for zero divided by zero
-    old_settings = np.seterr(invalid="ignore")
+    old_settings = np.seterr(invalid='ignore')
     out_s = delta / out_v
-    out_s[delta == 0.0] = 0.0
+    out_s[delta == 0.] = 0.
 
+    # Backend: CuPy doesn't support indexing like this, so had to refactor
+    #          out[idx, 0] = (arr[idx, 1] - arr[idx, 2]) / delta[idx]
     # -- H channel
     # red is max
     idx = arr[..., 0] == out_v
-    if False:
-        # TODO: grlee77: CuPy doesn't support indexing like this
-        out[idx, 0] = (arr[idx, 1] - arr[idx, 2]) / delta[idx]
-    else:
-        tmp = out[..., 0]
-        tmp[idx] = (arr[..., 1][idx] - arr[..., 2][idx]) / delta[idx]
-        out[..., 0] = tmp
+    tmp = out[..., 0]
+    tmp[idx] = (arr[..., 1][idx] - arr[..., 2][idx]) / delta[idx]
+    out[..., 0] = tmp
 
     # green is max
     idx = arr[..., 1] == out_v
@@ -289,8 +260,8 @@ def rgb2hsv(rgb):
     tmp = out[..., 0]
     tmp[idx] = 4.0 + (arr[..., 0][idx] - arr[..., 1][idx]) / delta[idx]
     out[..., 0] = tmp
-    out_h = (out[..., 0] / 6.0) % 1.0
-    out_h[delta == 0.0] = 0.0
+    out_h = (out[..., 0] / 6.) % 1.
+    out_h[delta == 0.] = 0.
 
     np.seterr(**old_settings)
 
@@ -353,19 +324,12 @@ def hsv2rgb(hsv):
 
     hi = cp.stack([hi, hi, hi], axis=-1).astype(np.uint8) % 6
     out = cp.choose(
-        hi,
-        cp.stack(
-            [
-                cp.stack((v, t, p), axis=-1),
-                cp.stack((q, v, p), axis=-1),
-                cp.stack((p, v, t), axis=-1),
-                cp.stack((p, q, v), axis=-1),
-                cp.stack((t, p, v), axis=-1),
-                cp.stack((v, p, q), axis=-1),
-            ],
-            axis=0,
-        ),
-    )
+        hi, cp.stack([cp.stack((v, t, p), axis=-1),
+                      cp.stack((q, v, p), axis=-1),
+                      cp.stack((p, v, t), axis=-1),
+                      cp.stack((p, q, v), axis=-1),
+                      cp.stack((t, p, v), axis=-1),
+                      cp.stack((v, p, q), axis=-1)]))
 
     return out
 
@@ -374,31 +338,25 @@ def hsv2rgb(hsv):
 # Primaries for the coordinate systems
 # ---------------------------------------------------------------
 cie_primaries = np.array([700, 546.1, 435.8])
-sb_primaries = np.array([1.0 / 155, 1.0 / 190, 1.0 / 225]) * 1e5
+sb_primaries = np.array([1. / 155, 1. / 190, 1. / 225]) * 1e5
 
 # ---------------------------------------------------------------
 # Matrices that define conversion between different color spaces
 # ---------------------------------------------------------------
 
 # From sRGB specification
-xyz_from_rgb = np.array(
-    [
-        [0.412453, 0.357580, 0.180423],
-        [0.212671, 0.715160, 0.072169],
-        [0.019334, 0.119193, 0.950227],
-    ]
-)
+# fmt: off
+xyz_from_rgb = np.array([[0.412453, 0.357580, 0.180423],
+                         [0.212671, 0.715160, 0.072169],
+                         [0.019334, 0.119193, 0.950227]])
 
 rgb_from_xyz = linalg.inv(xyz_from_rgb)
 
 # From https://en.wikipedia.org/wiki/CIE_1931_color_space
 # Note: Travis's code did not have the divide by 0.17697
-xyz_from_rgbcie = (
-    np.array(
-        [[0.49, 0.31, 0.20], [0.17697, 0.81240, 0.01063], [0.00, 0.01, 0.99]]
-    )
-    / 0.17697
-)
+xyz_from_rgbcie = np.array([[0.49, 0.31, 0.20],
+                            [0.17697, 0.81240, 0.01063],
+                            [0.00, 0.01, 0.99]]) / 0.17697
 
 rgbcie_from_xyz = linalg.inv(xyz_from_rgbcie)
 
@@ -407,68 +365,46 @@ rgbcie_from_rgb = rgbcie_from_xyz @ xyz_from_rgb
 rgb_from_rgbcie = rgb_from_xyz @ xyz_from_rgbcie
 
 
-gray_from_rgb = np.array([[0.2125, 0.7154, 0.0721], [0, 0, 0], [0, 0, 0]])
+gray_from_rgb = np.array([[0.2125, 0.7154, 0.0721],
+                          [0, 0, 0],
+                          [0, 0, 0]])
 
-yuv_from_rgb = np.array(
-    [
-        [0.299, 0.587, 0.114],
-        [-0.14714119, -0.28886916, 0.43601035],
-        [0.61497538, -0.51496512, -0.10001026],
-    ]
-)
+yuv_from_rgb = np.array([[ 0.299     ,  0.587     ,  0.114      ],
+                         [-0.14714119, -0.28886916,  0.43601035 ],
+                         [ 0.61497538, -0.51496512, -0.10001026 ]])
 
 rgb_from_yuv = linalg.inv(yuv_from_rgb)
 
-yiq_from_rgb = np.array(
-    [
-        [0.299, 0.587, 0.114],
-        [0.59590059, -0.27455667, -0.32134392],
-        [0.21153661, -0.52273617, 0.31119955],
-    ]
-)
+yiq_from_rgb = np.array([[0.299     ,  0.587     ,  0.114     ],
+                         [0.59590059, -0.27455667, -0.32134392],
+                         [0.21153661, -0.52273617,  0.31119955]])
 
 rgb_from_yiq = linalg.inv(yiq_from_rgb)
 
-# fmt: off
-ypbpr_from_rgb = np.array(
-    [
-        [0.299, 0.587, 0.114],
-        [-0.168736, -0.331264, 0.5],
-        [0.5, -0.418688, -0.081312],
-    ]
-)
+
+ypbpr_from_rgb = np.array([[ 0.299   , 0.587   , 0.114   ],
+                           [-0.168736,-0.331264, 0.5     ],
+                           [ 0.5     ,-0.418688,-0.081312]])
 # fmt: on
 
 rgb_from_ypbpr = linalg.inv(ypbpr_from_rgb)
 
-# fmt: off
-ycbcr_from_rgb = np.array(
-    [
-        [65.481, 128.553, 24.966],
-        [-37.797, -74.203, 112.0],
-        [112.0, -93.786, -18.214],
-    ]
-)
-# fmt: on
+ycbcr_from_rgb = np.array([[    65.481,   128.553,    24.966],
+                           [   -37.797,   -74.203,   112.0  ],
+                           [   112.0  ,   -93.786,   -18.214]])
 
 rgb_from_ycbcr = linalg.inv(ycbcr_from_rgb)
 
-# fmt: off
-ydbdr_from_rgb = np.array(
-    [
-        [0.299, 0.587, 0.114],
-        [-0.45, -0.883, 1.333],
-        [-1.333, 1.116, 0.217]
-    ]
-)
-# fmt: on
+ydbdr_from_rgb = np.array([[    0.299,   0.587,    0.114],
+                           [   -0.45 ,  -0.883,    1.333],
+                           [   -1.333,   1.116,    0.217]])
 
 rgb_from_ydbdr = linalg.inv(ydbdr_from_rgb)
 
 
 # CIE LAB constants for Observer=2A, Illuminant=D65
 # NOTE: this is actually the XYZ values for the illuminant above.
-lab_ref_white = np.array([0.95047, 1.0, 1.08883])
+lab_ref_white = np.array([0.95047, 1., 1.08883])
 
 # XYZ coordinates of the illuminants, scaled to [0, 1]. For each illuminant I
 # we have:
@@ -493,29 +429,19 @@ lab_ref_white = np.array([0.95047, 1.0, 1.08883])
 #    ----------
 #    .. [1] https://en.wikipedia.org/wiki/Standard_illuminant
 
-illuminants = {
-    "A": {
-        "2": (1.098466069456375, 1, 0.3558228003436005),
-        "10": (1.111420406956693, 1, 0.3519978321919493),
-    },
-    "D50": {
-        "2": (0.9642119944211994, 1, 0.8251882845188288),
-        "10": (0.9672062750333777, 1, 0.8142801513128616),
-    },
-    "D55": {
-        "2": (0.956797052643698, 1, 0.9214805860173273),
-        "10": (0.9579665682254781, 1, 0.9092525159847462),
-    },
-    "D65": {
-        "2": (0.95047, 1.0, 1.08883),  # This was: `lab_ref_white`
-        "10": (0.94809667673716, 1, 1.0730513595166162),
-    },
-    "D75": {
-        "2": (0.9497220898840717, 1, 1.226393520724154),
-        "10": (0.9441713925645873, 1, 1.2064272211720228),
-    },
-    "E": {"2": (1.0, 1.0, 1.0), "10": (1.0, 1.0, 1.0)},
-}
+illuminants = \
+    {"A": {'2': (1.098466069456375, 1, 0.3558228003436005),
+           '10': (1.111420406956693, 1, 0.3519978321919493)},
+     "D50": {'2': (0.9642119944211994, 1, 0.8251882845188288),
+             '10': (0.9672062750333777, 1, 0.8142801513128616)},
+     "D55": {'2': (0.956797052643698, 1, 0.9214805860173273),
+             '10': (0.9579665682254781, 1, 0.9092525159847462)},
+     "D65": {'2': (0.95047, 1., 1.08883),   # This was: `lab_ref_white`
+             '10': (0.94809667673716, 1, 1.0730513595166162)},
+     "D75": {'2': (0.9497220898840717, 1, 1.226393520724154),
+             '10': (0.9441713925645873, 1, 1.2064272211720228)},
+     "E": {'2': (1.0, 1.0, 1.0),
+           '10': (1.0, 1.0, 1.0)}}
 
 
 def get_xyz_coords(illuminant, observer, dtype=float):
@@ -550,13 +476,8 @@ def get_xyz_coords(illuminant, observer, dtype=float):
     try:
         return cp.asarray(illuminants[illuminant][observer], dtype=dtype)
     except KeyError:
-        raise ValueError(
-            "Unknown illuminant/observer combination\
-        ('{0}', '{1}')".format(
-                illuminant, observer
-            )
-        )
-
+        raise ValueError("Unknown illuminant/observer combination\
+        (\'{0}\', \'{1}\')".format(illuminant, observer))
 
 # Haematoxylin-Eosin-DAB colorspace
 # From original Ruifrok's paper: A. C. Ruifrok and D. A. Johnston,
@@ -565,14 +486,9 @@ def get_xyz_coords(illuminant, observer, dtype=float):
 # Academy of Cytology [and] American Society of Cytology, vol. 23, no. 4,
 # pp. 291-9, Aug. 2001.
 # fmt: off
-rgb_from_hed = np.array(
-    [
-        [0.65, 0.70, 0.29],
-        [0.07, 0.99, 0.11],
-        [0.27, 0.57, 0.78],
-    ]
-)
-# fmt: on
+rgb_from_hed = np.array([[0.65, 0.70, 0.29],
+                         [0.07, 0.99, 0.11],
+                         [0.27, 0.57, 0.78]])
 hed_from_rgb = linalg.inv(rgb_from_hed)
 
 # Following matrices are adapted form the Java code written by G.Landini.
@@ -580,116 +496,73 @@ hed_from_rgb = linalg.inv(rgb_from_hed)
 # https://web.archive.org/web/20160624145052/http://www.mecourse.com/landinig/software/cdeconv/cdeconv.html
 
 # Hematoxylin + DAB
-# fmt: off
-rgb_from_hdx = np.array(
-    [
-        [0.650, 0.704, 0.286],
-        [0.268, 0.570, 0.776],
-        [0.0, 0.0, 0.0],
-    ]
-)
-# fmt: on
+rgb_from_hdx = np.array([[0.650, 0.704, 0.286],
+                         [0.268, 0.570, 0.776],
+                         [0.0, 0.0, 0.0]])
 rgb_from_hdx[2, :] = np.cross(rgb_from_hdx[0, :], rgb_from_hdx[1, :])
 hdx_from_rgb = linalg.inv(rgb_from_hdx)
 
 # Feulgen + Light Green
-rgb_from_fgx = np.array(
-    [
-        [0.46420921, 0.83008335, 0.30827187],
-        [0.94705542, 0.25373821, 0.19650764],
-        [0.0, 0.0, 0.0],
-    ]
-)
+rgb_from_fgx = np.array([[0.46420921, 0.83008335, 0.30827187],
+                         [0.94705542, 0.25373821, 0.19650764],
+                         [0.0, 0.0, 0.0]])
 rgb_from_fgx[2, :] = np.cross(rgb_from_fgx[0, :], rgb_from_fgx[1, :])
 fgx_from_rgb = linalg.inv(rgb_from_fgx)
 
 # Giemsa: Methyl Blue + Eosin
-rgb_from_bex = np.array(
-    [
-        [0.834750233, 0.513556283, 0.196330403],
-        [0.092789, 0.954111, 0.283111],
-        [0.0, 0.0, 0.0],
-    ]
-)
+rgb_from_bex = np.array([[0.834750233, 0.513556283, 0.196330403],
+                         [0.092789, 0.954111, 0.283111],
+                         [0.0, 0.0, 0.0]])
 rgb_from_bex[2, :] = np.cross(rgb_from_bex[0, :], rgb_from_bex[1, :])
 bex_from_rgb = linalg.inv(rgb_from_bex)
 
 # FastRed + FastBlue +  DAB
-rgb_from_rbd = np.array(
-    [
-        [0.21393921, 0.85112669, 0.47794022],
-        [0.74890292, 0.60624161, 0.26731082],
-        [0.268, 0.570, 0.776],
-    ]
-)
+rgb_from_rbd = np.array([[0.21393921, 0.85112669, 0.47794022],
+                         [0.74890292, 0.60624161, 0.26731082],
+                         [0.268, 0.570, 0.776]])
 rbd_from_rgb = linalg.inv(rgb_from_rbd)
 
 # Methyl Green + DAB
-# fmt: off
-rgb_from_gdx = np.array(
-    [
-        [0.98003, 0.144316, 0.133146],
-        [0.268, 0.570, 0.776],
-        [0.0, 0.0, 0.0]
-    ]
-)
+rgb_from_gdx = np.array([[0.98003, 0.144316, 0.133146],
+                         [0.268, 0.570, 0.776],
+                         [0.0, 0.0, 0.0]])
 rgb_from_gdx[2, :] = np.cross(rgb_from_gdx[0, :], rgb_from_gdx[1, :])
 gdx_from_rgb = linalg.inv(rgb_from_gdx)
 
 # Hematoxylin + AEC
-rgb_from_hax = np.array(
-    [
-        [0.650, 0.704, 0.286],
-        [0.2743, 0.6796, 0.6803],
-        [0.0, 0.0, 0.0]
-    ]
-)
+rgb_from_hax = np.array([[0.650, 0.704, 0.286],
+                         [0.2743, 0.6796, 0.6803],
+                         [0.0, 0.0, 0.0]])
 rgb_from_hax[2, :] = np.cross(rgb_from_hax[0, :], rgb_from_hax[1, :])
 hax_from_rgb = linalg.inv(rgb_from_hax)
 
 # Blue matrix Anilline Blue + Red matrix Azocarmine + Orange matrix Orange-G
-rgb_from_bro = np.array(
-    [
-        [0.853033, 0.508733, 0.112656],
-        [0.09289875, 0.8662008, 0.49098468],
-        [0.10732849, 0.36765403, 0.9237484],
-    ]
-)
+rgb_from_bro = np.array([[0.853033, 0.508733, 0.112656],
+                         [0.09289875, 0.8662008, 0.49098468],
+                         [0.10732849, 0.36765403, 0.9237484]])
 bro_from_rgb = linalg.inv(rgb_from_bro)
 
 # Methyl Blue + Ponceau Fuchsin
-rgb_from_bpx = np.asarray(
-    [
-        [0.7995107, 0.5913521, 0.10528667],
-        [0.09997159, 0.73738605, 0.6680326],
-        [0.0, 0.0, 0.0],
-    ]
-)
+rgb_from_bpx = np.array([[0.7995107, 0.5913521, 0.10528667],
+                         [0.09997159, 0.73738605, 0.6680326],
+                         [0.0, 0.0, 0.0]])
 rgb_from_bpx[2, :] = np.cross(rgb_from_bpx[0, :], rgb_from_bpx[1, :])
 bpx_from_rgb = linalg.inv(rgb_from_bpx)
 
 # Alcian Blue + Hematoxylin
-rgb_from_ahx = np.asarray(
-    [
-        [0.874622, 0.457711, 0.158256],
-        [0.552556, 0.7544, 0.353744],
-        [0.0, 0.0, 0.0],
-    ]
-)
+rgb_from_ahx = np.array([[0.874622, 0.457711, 0.158256],
+                         [0.552556, 0.7544, 0.353744],
+                         [0.0, 0.0, 0.0]])
 rgb_from_ahx[2, :] = np.cross(rgb_from_ahx[0, :], rgb_from_ahx[1, :])
 ahx_from_rgb = linalg.inv(rgb_from_ahx)
 
 # Hematoxylin + PAS
-rgb_from_hpx = np.asarray(
-    [
-        [0.644211, 0.716556, 0.266844],
-        [0.175411, 0.972178, 0.154589],
-        [0.0, 0.0, 0.0],
-    ]
-)
+rgb_from_hpx = np.array([[0.644211, 0.716556, 0.266844],
+                         [0.175411, 0.972178, 0.154589],
+                         [0.0, 0.0, 0.0]])
 rgb_from_hpx[2, :] = np.cross(rgb_from_hpx[0, :], rgb_from_hpx[1, :])
 hpx_from_rgb = linalg.inv(rgb_from_hpx)
-# fmt: on
+#fmt on
 
 # -------------------------------------------------------------
 # The conversion functions that make use of the matrices above
@@ -910,26 +783,19 @@ def rgb2gray(rgb):
     """
 
     if rgb.ndim == 2:
-        warn(
-            "The behavior of rgb2gray will change in scikit-image 0.19. "
-            "Currently, rgb2gray allows 2D grayscale image to be passed "
-            "as inputs and leaves them unmodified as outputs. "
-            "Starting from version 0.19, 2D arrays will "
-            "be treated as 1D images with 3 channels.",
-            FutureWarning,
-            stacklevel=2,
-        )
+        warn('The behavior of rgb2gray will change in scikit-image 0.19. '
+             'Currently, rgb2gray allows 2D grayscale image to be passed '
+             'as inputs and leaves them unmodified as outputs. '
+             'Starting from version 0.19, 2D arrays will '
+             'be treated as 1D images with 3 channels.',
+             FutureWarning, stacklevel=2)
         return cp.ascontiguousarray(rgb)
 
     if rgb.shape[-1] > 3:
-        warn(
-            "Non RGB image conversion is now deprecated. For RGBA images, "
-            "please use rgb2gray(rgba2rgb(rgb)) instead. In version 0.19, "
-            "a ValueError will be raised if input image last dimension "
-            "length is not 3.",
-            FutureWarning,
-            stacklevel=2,
-        )
+        warn('Non RGB image conversion is now deprecated. For RGBA images, '
+             'please use rgb2gray(rgba2rgb(rgb)) instead. In version 0.19, '
+             'a ValueError will be raised if input image last dimension '
+             'length is not 3.', FutureWarning, stacklevel=2)
         rgb = rgb[..., :3]
 
     rgb = _prepare_colorarray(rgb)
@@ -939,12 +805,8 @@ def rgb2gray(rgb):
 
 @functools.wraps(rgb2gray)
 def rgb2grey(rgb):
-    warn(
-        "rgb2grey is deprecated. It will be removed in version 0.19."
-        "Please use rgb2gray instead.",
-        FutureWarning,
-        stacklevel=2,
-    )
+    warn('rgb2grey is deprecated. It will be removed in version 0.19.'
+         'Please use rgb2gray instead.', FutureWarning, stacklevel=2)
     return rgb2gray(rgb)
 
 
@@ -975,12 +837,8 @@ def gray2rgba(image, alpha=None):
         alpha = alpha_max
 
     if not cp.can_cast(alpha, arr.dtype):
-        warn(
-            "alpha can't be safely cast to image dtype {}".format(
-                arr.dtype.name
-            ),
-            stacklevel=2,
-        )
+        warn("alpha can't be safely cast to image dtype {}"
+             .format(arr.dtype.name), stacklevel=2)
 
     rgba = cp.empty(arr.shape + (4,), dtype=arr.dtype)
     rgba[..., :3] = arr[..., np.newaxis]
@@ -1012,13 +870,9 @@ def gray2rgb(image, alpha=None):
     """
 
     if alpha is not None:
-        warn(
-            "alpha argument is deprecated and will be removed in "
-            "version 0.19. Please use the gray2rgba function instead"
-            "to obtain an RGBA image.",
-            FutureWarning,
-            stacklevel=2,
-        )
+        warn("alpha argument is deprecated and will be removed in "
+             "version 0.19. Please use the gray2rgba function instead"
+             "to obtain an RGBA image.", FutureWarning, stacklevel=2)
     is_rgb = False
     is_alpha = False
     dims = cp.squeeze(image).ndim
@@ -1031,23 +885,18 @@ def gray2rgb(image, alpha=None):
             is_rgb = True
 
     if is_rgb:
-        warn(
-            "Pass-through of possibly RGB images in gray2rgb is deprecated. "
-            "In version 0.19, input arrays will always be considered "
-            "grayscale, even if the last dimension has length 3 or 4. "
-            "To prevent this warning and ensure compatibility with future "
-            "versions, detect RGB images outside of this function.",
-            FutureWarning,
-            stacklevel=2,
-        )
+        warn('Pass-through of possibly RGB images in gray2rgb is deprecated. '
+             'In version 0.19, input arrays will always be considered '
+             'grayscale, even if the last dimension has length 3 or 4. '
+             'To prevent this warning and ensure compatibility with future '
+             'versions, detect RGB images outside of this function.',
+             FutureWarning, stacklevel=2)
         if alpha is False:
             image = image[..., :3]
 
         elif alpha is True and is_alpha is False:
-            alpha_layer = (
-                cp.ones_like(image[..., 0, np.newaxis])
-                * dtype_limits(image, clip_negative=False)[1]
-            )
+            alpha_layer = (cp.ones_like(image[..., 0, cp.newaxis]) *
+                           dtype_limits(image, clip_negative=False)[1])
             image = cp.concatenate((image, alpha_layer), axis=2)
 
         return image
@@ -1056,10 +905,8 @@ def gray2rgb(image, alpha=None):
         image = image[..., np.newaxis]
 
         if alpha:
-            alpha_layer = (
-                cp.ones_like(image)
-                * dtype_limits(image, clip_negative=False)[1]
-            )
+            alpha_layer = (cp.ones_like(image)
+                           * dtype_limits(image, clip_negative=False)[1])
             return cp.concatenate(3 * (image,) + (alpha_layer,), axis=-1)
         else:
             return cp.concatenate(3 * (image,), axis=-1)
@@ -1067,12 +914,8 @@ def gray2rgb(image, alpha=None):
 
 @functools.wraps(gray2rgb)
 def grey2rgb(image):
-    warn(
-        "grey2rgb is deprecated. It will be removed in version 0.19."
-        "Please use gray2rgb instead.",
-        FutureWarning,
-        stacklevel=2,
-    )
+    warn('grey2rgb is deprecated. It will be removed in version 0.19.'
+         'Please use gray2rgb instead.', FutureWarning, stacklevel=2)
     return gray2rgb(image)
 
 
@@ -1130,12 +973,12 @@ def xyz2lab(xyz, illuminant="D65", observer="2"):
     # Nonlinear distortion and linear transformation
     mask = arr > 0.008856
     arr[mask] = cp.cbrt(arr[mask])
-    arr[~mask] = 7.787 * arr[~mask] + 16.0 / 116.0
+    arr[~mask] = 7.787 * arr[~mask] + 16. / 116.
 
     x, y, z = arr[..., 0], arr[..., 1], arr[..., 2]
 
     # Vector scaling
-    L = (116.0 * y) - 16.0
+    L = (116. * y) - 16.
     a = 500.0 * (x - y)
     b = 200.0 * (y - z)
 
@@ -1183,23 +1026,21 @@ def lab2xyz(lab, illuminant="D65", observer="2"):
     arr = _prepare_colorarray(lab).copy()
 
     L, a, b = arr[..., 0], arr[..., 1], arr[..., 2]
-    y = (L + 16.0) / 116.0
-    x = (a / 500.0) + y
-    z = y - (b / 200.0)
+    y = (L + 16.) / 116.
+    x = (a / 500.) + y
+    z = y - (b / 200.)
 
     if cp.any(z < 0):
         invalid = cp.nonzero(z < 0)
-        warn(
-            "Color data out of range: Z < 0 in %s pixels" % invalid[0].size,
-            stacklevel=2,
-        )
+        warn('Color data out of range: Z < 0 in %s pixels' % invalid[0].size,
+             stacklevel=2)
         z[invalid] = 0
 
     out = cp.stack([x, y, z], axis=-1)
 
     mask = out > 0.2068966
-    out[mask] = cp.power(out[mask], 3.0)
-    out[~mask] = (out[~mask] - 16.0 / 116.0) / 7.787
+    out[mask] = cp.power(out[mask], 3.)
+    out[~mask] = (out[~mask] - 16.0 / 116.) / 7.787
 
     # rescale to the reference white (illuminant)
     xyz_ref_white = get_xyz_coords(illuminant, observer, arr.dtype)
@@ -1208,7 +1049,8 @@ def lab2xyz(lab, illuminant="D65", observer="2"):
 
 
 def rgb2lab(rgb, illuminant="D65", observer="2"):
-    """RGB to lab color space conversion.
+    """Conversion from the sRGB color space (IEC 61966-2-1:1999)
+    to the CIE Lab colorspace under the given illuminant and observer.
 
     Parameters
     ----------
@@ -1231,6 +1073,10 @@ def rgb2lab(rgb, illuminant="D65", observer="2"):
 
     Notes
     -----
+    RGB is a device-dependent color space so, if you use this function, be
+    sure that the image you are analyzing has been mapped to the sRGB color
+    space.
+
     This function uses rgb2xyz and xyz2lab.
     By default Observer= 2A, Illuminant= D65. CIE XYZ tristimulus values
     x_ref=95.047, y_ref=100., z_ref=108.883. See function `get_xyz_coords` for
@@ -1333,13 +1179,13 @@ def xyz2luv(xyz, illuminant="D65", observer="2"):
     # extract channels
     x, y, z = arr[..., 0], arr[..., 1], arr[..., 2]
 
-    eps = np.finfo(np.float).eps
+    eps = np.finfo(float).eps
 
     # compute y_r and L
     xyz_ref_white = cp.asarray(get_xyz_coords(illuminant, observer, arr.dtype))
     L = y / xyz_ref_white[1]
     mask = L > 0.008856
-    L[mask] = 116.0 * cp.cbrt(L[mask]) - 16.0
+    L[mask] = 116. * cp.cbrt(L[mask]) - 16.
     L[~mask] = 903.3 * L[~mask]
 
     tmp = cp.asarray([1, 15, 3], dtype=arr.dtype)
@@ -1348,14 +1194,14 @@ def xyz2luv(xyz, illuminant="D65", observer="2"):
 
     # u' and v' helper functions
     def fu(X, Y, Z):
-        return (4.0 * X) / (X + 15.0 * Y + 3.0 * Z + eps)
+        return (4. * X) / (X + 15. * Y + 3. * Z + eps)
 
     def fv(X, Y, Z):
-        return (9.0 * Y) / (X + 15.0 * Y + 3.0 * Z + eps)
+        return (9. * Y) / (X + 15. * Y + 3. * Z + eps)
 
     # compute u and v using helper functions
-    u = 13.0 * L * (fu(x, y, z) - u0)
-    v = 13.0 * L * (fv(x, y, z) - v0)
+    u = 13. * L * (fu(x, y, z) - u0)
+    v = 13. * L * (fv(x, y, z) - v0)
 
     out = cp.stack([L, u, v], axis=-1)
 
@@ -1405,12 +1251,12 @@ def luv2xyz(luv, illuminant="D65", observer="2"):
 
     L, u, v = arr[..., 0], arr[..., 1], arr[..., 2]
 
-    eps = np.finfo(np.float).eps
+    eps = np.finfo(float).eps
 
     # compute y
     y = L.copy()
     mask = y > 7.999625
-    y[mask] = cp.power((y[mask] + 16.0) / 116.0, 3.0)
+    y[mask] = cp.power((y[mask] + 16.) / 116., 3.)
     y[~mask] = y[~mask] / 903.3
     xyz_ref_white = get_xyz_coords(illuminant, observer, arr.dtype)
     y *= xyz_ref_white[1]
@@ -1421,13 +1267,13 @@ def luv2xyz(luv, illuminant="D65", observer="2"):
     v0 = 9 * xyz_ref_white[1] / (uv_weights @ xyz_ref_white)
 
     # compute intermediate values
-    a = u0 + u / (13.0 * L + eps)
-    b = v0 + v / (13.0 * L + eps)
+    a = u0 + u / (13. * L + eps)
+    b = v0 + v / (13. * L + eps)
     c = 3 * y * (5 * b - 3)
 
     # compute x and z
     z = ((a - 4) * c - 15 * a * b * y) / (12 * b)
-    x = -(c / b + 3.0 * z)
+    x = -(c / b + 3. * z)
 
     return cp.concatenate([q[..., np.newaxis] for q in [x, y, z]], axis=-1)
 
@@ -1620,7 +1466,7 @@ def separate_stains(rgb, conv_matrix):
     cp.maximum(rgb, 1e-6, out=rgb)  # avoiding log artifacts
     log_adjust = np.log(1e-6)  # used to compensate the sum above
 
-    conv_matrix = cp.asarray(conv_matrix)
+    conv_matrix = cp.asarray(conv_matrix, dtype=rgb.dtype)
     stains = (cp.log(rgb) / log_adjust) @ conv_matrix
     return stains
 
@@ -1680,7 +1526,7 @@ def combine_stains(stains, conv_matrix):
     >>> ihc_rgb = combine_stains(ihc_hdx, rgb_from_hdx)
     """
     stains = _prepare_colorarray(stains)
-    conv_matrix = cp.asarray(conv_matrix)
+    conv_matrix = cp.asarray(conv_matrix, dtype=stains.dtype)
 
     # log_adjust here is used to compensate the sum within separate_stains()
     log_adjust = -np.log(1e-6)
@@ -1737,7 +1583,7 @@ def _cart2polar_2pi(x, y):
     NON-STANDARD RANGE! Maps to ``(0, 2*pi)`` rather than usual ``(-pi, +pi)``
     """
     r, t = cp.hypot(x, y), cp.arctan2(y, x)
-    t += cp.where(t < 0.0, 2 * np.pi, 0)
+    t += cp.where(t < 0., 2 * np.pi, 0)
     return r, t
 
 
@@ -1788,7 +1634,7 @@ def _prepare_lab_array(arr, force_copy=True):
     arr = cp.asarray(arr)
     shape = arr.shape
     if shape[-1] < 3:
-        raise ValueError("Input array has less than 3 color channels")
+        raise ValueError('Input array has less than 3 color channels')
     return dtype.img_as_float(arr, force_copy=force_copy)
 
 

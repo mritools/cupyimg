@@ -1,7 +1,3 @@
-"""
-TODO: replacement of .flat in this file not yet done correctly. need to fix it
-"""
-
 import itertools
 
 import cupy as cp
@@ -13,26 +9,15 @@ from . import rgb_colors
 from .colorconv import rgb2gray, gray2rgb
 
 
-__all__ = ["color_dict", "label2rgb", "DEFAULT_COLORS"]
+__all__ = ['color_dict', 'label2rgb', 'DEFAULT_COLORS']
 
 
-DEFAULT_COLORS = (
-    "red",
-    "blue",
-    "yellow",
-    "magenta",
-    "green",
-    "indigo",
-    "darkorange",
-    "cyan",
-    "pink",
-    "yellowgreen",
-)
+DEFAULT_COLORS = ('red', 'blue', 'yellow', 'magenta', 'green',
+                  'indigo', 'darkorange', 'cyan', 'pink', 'yellowgreen')
 
 
-color_dict = {
-    k: v for k, v in rgb_colors.__dict__.items() if isinstance(v, tuple)
-}
+color_dict = {k: v for k, v in rgb_colors.__dict__.items()
+              if isinstance(v, tuple)}
 
 
 def _rgb_vector(color):
@@ -67,7 +52,6 @@ def _match_label_with_color(label, colors, bg_label, bg_color):
     unique_labels, mapped_labels = cp.unique(label, return_inverse=True)
 
     # get rank of bg_label
-    # for CuPy use .ravel() instead of .flat
     bg_label_rank_list = mapped_labels[label.ravel() == bg_label]
 
     # The rank of each label is the index of the color it is matched to in
@@ -89,16 +73,8 @@ def _match_label_with_color(label, colors, bg_label, bg_color):
 
 
 @change_default_value("bg_label", new_value=0, changed_version="0.19")
-def label2rgb(
-    label,
-    image=None,
-    colors=None,
-    alpha=0.3,
-    bg_label=-1,
-    bg_color=(0, 0, 0),
-    image_alpha=1,
-    kind="overlay",
-):
+def label2rgb(label, image=None, colors=None, alpha=0.3,
+              bg_label=-1, bg_color=(0, 0, 0), image_alpha=1, kind='overlay'):
     """Return an RGB image where color-coded labels are painted over the image.
 
     Parameters
@@ -134,25 +110,17 @@ def label2rgb(
         The result of blending a cycling colormap (`colors`) for each distinct
         value in `label` with the image, at a certain alpha value.
     """
-    if kind == "overlay":
-        return _label2rgb_overlay(
-            label, image, colors, alpha, bg_label, bg_color, image_alpha
-        )
-    elif kind == "avg":
+    if kind == 'overlay':
+        return _label2rgb_overlay(label, image, colors, alpha, bg_label,
+                                  bg_color, image_alpha)
+    elif kind == 'avg':
         return _label2rgb_avg(label, image, bg_label, bg_color)
     else:
         raise ValueError("`kind` must be either 'overlay' or 'avg'.")
 
 
-def _label2rgb_overlay(
-    label,
-    image=None,
-    colors=None,
-    alpha=0.3,
-    bg_label=-1,
-    bg_color=None,
-    image_alpha=1,
-):
+def _label2rgb_overlay(label, image=None, colors=None, alpha=0.3,
+                       bg_label=-1, bg_color=None, image_alpha=1):
     """Return an RGB image where color-coded labels are painted over the image.
 
     Parameters
@@ -211,29 +179,22 @@ def _label2rgb_overlay(
         bg_label -= offset
 
     new_type = np.min_scalar_type(int(label.max()))
-    if new_type == np.bool:
+    if new_type == bool:
         new_type = np.uint8
     label = label.astype(new_type)
 
-    mapped_labels_flat, color_cycle = _match_label_with_color(
-        label, colors, bg_label, bg_color
-    )
+    mapped_labels_flat, color_cycle = _match_label_with_color(label, colors,
+                                                              bg_label, bg_color)
 
     if len(mapped_labels_flat) == 0:
         return image
 
-    dense_labels = range(max(mapped_labels_flat).get() + 1)
+    dense_labels = range(int(max(mapped_labels_flat)) + 1)
 
-    label_to_color = cp.stack(
-        [c for i, c in zip(dense_labels, color_cycle)], axis=0
-    )
+    label_to_color = cp.stack([c for i, c in zip(dense_labels, color_cycle)])
 
-    # TODO: grlee77: check the logic of this refactoring.
-    #                (CuPy did not support the .flat attribute)
     mapped_labels = mapped_labels_flat.reshape(label.shape)
     label = mapped_labels
-
-    # mapped_labels.flat = mapped_labels_flat
     result = label_to_color[mapped_labels] * alpha + image * (1 - alpha)
 
     # Remove background label if its color was not specified.
@@ -265,7 +226,7 @@ def _label2rgb_avg(label_field, image, bg_label=0, bg_color=(0, 0, 0)):
     """
     out = cp.zeros(label_field.shape + (3,))
     labels = cp.unique(label_field)
-    bg = labels == bg_label
+    bg = (labels == bg_label)
     if bg.any():
         labels = labels[labels != bg_label]
         mask = (label_field == bg_label).nonzero()

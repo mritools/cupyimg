@@ -191,7 +191,7 @@ def deltaE_ciede2000(lab1, lab2, kL=1, kC=1, kH=1):
     # (often denoted "prime" in the literature)
     Cbar = 0.5 * (cp.hypot(a1, b1) + cp.hypot(a2, b2))
     c7 = Cbar ** 7
-    G = 0.5 * (1 - cp.sqrt(c7 / (c7 + 25 ** 7.0)))
+    G = 0.5 * (1 - cp.sqrt(c7 / (c7 + 25 ** 7)))
     scale = 1 + G
     C1, h1 = _cart2polar_2pi(a1 * scale, b1)
     C2, h2 = _cart2polar_2pi(a2 * scale, b2)
@@ -223,23 +223,22 @@ def deltaE_ciede2000(lab1, lab2, kL=1, kC=1, kH=1):
     dH = h_diff.copy()
     dH[h_diff > np.pi] -= 2 * np.pi
     dH[h_diff < -np.pi] += 2 * np.pi
-    dH[CC == 0.0] = 0.0  # if r == 0, dtheta == 0
+    dH[CC == 0.] = 0.  # if r == 0, dtheta == 0
     dH_term = 2 * cp.sqrt(CC) * cp.sin(dH / 2)
 
     Hbar = h_sum.copy()
-    mask = cp.logical_and(CC != 0.0, cp.abs(h_diff) > np.pi)
+    mask = cp.logical_and(CC != 0., cp.abs(h_diff) > np.pi)
     Hbar[mask * (h_sum < 2 * np.pi)] += 2 * np.pi
     Hbar[mask * (h_sum >= 2 * np.pi)] -= 2 * np.pi
-    Hbar[CC == 0.0] *= 2
+    Hbar[CC == 0.] *= 2
     Hbar *= 0.5
 
-    T = (
-        1
-        - 0.17 * cp.cos(Hbar - np.deg2rad(30))
-        + 0.24 * cp.cos(2 * Hbar)
-        + 0.32 * cp.cos(3 * Hbar + np.deg2rad(6))
-        - 0.20 * cp.cos(4 * Hbar - np.deg2rad(63))
-    )
+    T = (1 -
+         0.17 * cp.cos(Hbar - np.deg2rad(30)) +
+         0.24 * cp.cos(2 * Hbar) +
+         0.32 * cp.cos(3 * Hbar + np.deg2rad(6)) -
+         0.20 * cp.cos(4 * Hbar - np.deg2rad(63))
+         )
     SH = 1 + 0.015 * Cbar * T
 
     H_term = dH_term / (kH * SH)
@@ -309,16 +308,15 @@ def deltaE_cmc(lab1, lab2, kL=1, kC=1):
     dL = L1 - L2
     dH2 = get_dH2(lab1, lab2)
 
-    T = cp.where(
-        cp.logical_and(cp.rad2deg(h1) >= 164, cp.rad2deg(h1) <= 345),
-        0.56 + 0.2 * cp.abs(cp.cos(h1 + np.deg2rad(168))),
-        0.36 + 0.4 * cp.abs(cp.cos(h1 + np.deg2rad(35))),
-    )
+    T = cp.where(cp.logical_and(cp.rad2deg(h1) >= 164, cp.rad2deg(h1) <= 345),
+                 0.56 + 0.2 * cp.abs(np.cos(h1 + cp.deg2rad(168))),
+                 0.36 + 0.4 * cp.abs(np.cos(h1 + cp.deg2rad(35)))
+                 )
     c1_4 = C1 ** 4
     F = cp.sqrt(c1_4 / (c1_4 + 1900))
 
-    SL = cp.where(L1 < 16, 0.511, 0.040975 * L1 / (1.0 + 0.01765 * L1))
-    SC = 0.638 + 0.0638 * C1 / (1.0 + 0.0131 * C1)
+    SL = cp.where(L1 < 16, 0.511, 0.040975 * L1 / (1. + 0.01765 * L1))
+    SC = 0.638 + 0.0638 * C1 / (1. + 0.0131 * C1)
     SH = SC * (F * T + 1 - F)
 
     dE2 = (dL / (kL * SL)) ** 2

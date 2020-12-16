@@ -1,5 +1,4 @@
 """Test for correctness of color distance functions"""
-from os.path import abspath, dirname, join as pjoin
 
 import cupy as cp
 import numpy as np
@@ -9,6 +8,7 @@ from cupy.testing import (
     assert_array_almost_equal,
     assert_array_equal,
 )
+from skimage._shared.testing import fetch
 
 from cupyimg.skimage.color.delta_e import (
     deltaE_cie76,
@@ -17,26 +17,19 @@ from cupyimg.skimage.color.delta_e import (
     deltaE_cmc,
 )
 
-try:
-    from skimage._shared.testing import fetch
-
-    have_fetch = True
-except ImportError:
-    have_fetch = False
-
 
 def test_ciede2000_dE():
     data = load_ciede2000_data()
     N = len(data)
     lab1 = np.zeros((N, 3))
-    lab1[:, 0] = data["L1"]
-    lab1[:, 1] = data["a1"]
-    lab1[:, 2] = data["b1"]
+    lab1[:, 0] = data['L1']
+    lab1[:, 1] = data['a1']
+    lab1[:, 2] = data['b1']
 
     lab2 = np.zeros((N, 3))
-    lab2[:, 0] = data["L2"]
-    lab2[:, 1] = data["a2"]
-    lab2[:, 2] = data["b2"]
+    lab2[:, 0] = data['L2']
+    lab2[:, 1] = data['a2']
+    lab2[:, 2] = data['b2']
 
     lab1 = cp.asarray(lab1)
     lab2 = cp.asarray(lab2)
@@ -46,41 +39,37 @@ def test_ciede2000_dE():
 
     # TODO: grlee77 had to raise rtol from 1e-4 to 1e-2 for this to pass.
     #       look into why this was necessary
-    assert_allclose(dE2, cp.asarray(data["dE"]), rtol=1.0e-2)
+    assert_allclose(dE2, cp.asarray(data['dE']), rtol=1.0e-2)
 
 
 def load_ciede2000_data():
-    dtype = [
-        ("pair", int),
-        ("1", int),
-        ("L1", float),
-        ("a1", float),
-        ("b1", float),
-        ("a1_prime", float),
-        ("C1_prime", float),
-        ("h1_prime", float),
-        ("hbar_prime", float),
-        ("G", float),
-        ("T", float),
-        ("SL", float),
-        ("SC", float),
-        ("SH", float),
-        ("RT", float),
-        ("dE", float),
-        ("2", int),
-        ("L2", float),
-        ("a2", float),
-        ("b2", float),
-        ("a2_prime", float),
-        ("C2_prime", float),
-        ("h2_prime", float),
-    ]
+    dtype = [('pair', int),
+             ('1', int),
+             ('L1', float),
+             ('a1', float),
+             ('b1', float),
+             ('a1_prime', float),
+             ('C1_prime', float),
+             ('h1_prime', float),
+             ('hbar_prime', float),
+             ('G', float),
+             ('T', float),
+             ('SL', float),
+             ('SC', float),
+             ('SH', float),
+             ('RT', float),
+             ('dE', float),
+             ('2', int),
+             ('L2', float),
+             ('a2', float),
+             ('b2', float),
+             ('a2_prime', float),
+             ('C2_prime', float),
+             ('h2_prime', float),
+             ]
 
     # note: ciede_test_data.txt contains several intermediate quantities
-    if have_fetch:
-        path = fetch("color/tests/ciede2000_test_data.txt")
-    else:
-        path = pjoin(dirname(abspath(__file__)), "ciede2000_test_data.txt")
+    path = fetch('color/tests/ciede2000_test_data.txt')
     return np.loadtxt(path, dtype=dtype)
 
 
@@ -88,14 +77,14 @@ def test_cie76():
     data = load_ciede2000_data()
     N = len(data)
     lab1 = np.zeros((N, 3))
-    lab1[:, 0] = data["L1"]
-    lab1[:, 1] = data["a1"]
-    lab1[:, 2] = data["b1"]
+    lab1[:, 0] = data['L1']
+    lab1[:, 1] = data['a1']
+    lab1[:, 2] = data['b1']
 
     lab2 = np.zeros((N, 3))
-    lab2[:, 0] = data["L2"]
-    lab2[:, 1] = data["a2"]
-    lab2[:, 2] = data["b2"]
+    lab2[:, 0] = data['L2']
+    lab2[:, 1] = data['a2']
+    lab2[:, 2] = data['b2']
 
     lab1 = cp.asarray(lab1)
     lab2 = cp.asarray(lab2)
@@ -119,14 +108,14 @@ def test_ciede94():
     data = load_ciede2000_data()
     N = len(data)
     lab1 = np.zeros((N, 3))
-    lab1[:, 0] = data["L1"]
-    lab1[:, 1] = data["a1"]
-    lab1[:, 2] = data["b1"]
+    lab1[:, 0] = data['L1']
+    lab1[:, 1] = data['a1']
+    lab1[:, 2] = data['b1']
 
     lab2 = np.zeros((N, 3))
-    lab2[:, 0] = data["L2"]
-    lab2[:, 1] = data["a2"]
-    lab2[:, 2] = data["b2"]
+    lab2[:, 0] = data['L2']
+    lab2[:, 1] = data['a2']
+    lab2[:, 2] = data['b2']
 
     lab1 = cp.asarray(lab1)
     lab2 = cp.asarray(lab2)
@@ -150,14 +139,14 @@ def test_cmc():
     data = load_ciede2000_data()
     N = len(data)
     lab1 = np.zeros((N, 3))
-    lab1[:, 0] = data["L1"]
-    lab1[:, 1] = data["a1"]
-    lab1[:, 2] = data["b1"]
+    lab1[:, 0] = data['L1']
+    lab1[:, 1] = data['a1']
+    lab1[:, 2] = data['b1']
 
     lab2 = np.zeros((N, 3))
-    lab2[:, 0] = data["L2"]
-    lab2[:, 1] = data["a2"]
-    lab2[:, 2] = data["b2"]
+    lab2[:, 0] = data['L2']
+    lab2[:, 1] = data['a2']
+    lab2[:, 2] = data['b2']
 
     lab1 = cp.asarray(lab1)
     lab2 = cp.asarray(lab2)
@@ -188,7 +177,7 @@ def test_cmc():
     assert_array_almost_equal(deltaE_cmc(lab1, lab2), expected, decimal=6)
 
     # Single item case:
-    lab1 = lab2 = cp.asarray([0.0, 1.59607713, 0.87755709])
+    lab1 = lab2 = cp.array([0., 1.59607713, 0.87755709])
     assert_array_equal(deltaE_cmc(lab1, lab2), 0)
 
     lab2[0] += cp.finfo(float).eps

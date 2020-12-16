@@ -54,9 +54,8 @@ def test_rgb():
     label = cp.arange(3).reshape(1, -1)
     colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
     # Set alphas just in case the defaults change
-    rgb = label2rgb(
-        label, image=image, colors=colors, alpha=1, image_alpha=1, bg_label=-1
-    )
+    rgb = label2rgb(label, image=image, colors=colors, alpha=1,
+                    image_alpha=1, bg_label=-1)
     assert_array_almost_equal(rgb, [colors])
 
 
@@ -64,7 +63,8 @@ def test_alpha():
     image = cp.random.uniform(size=(3, 3))
     label = cp.random.randint(0, 9, size=(3, 3))
     # If we set `alpha = 0`, then rgb should match image exactly.
-    rgb = label2rgb(label, image=image, alpha=0, image_alpha=1, bg_label=-1)
+    rgb = label2rgb(label, image=image, alpha=0, image_alpha=1,
+                    bg_label=-1)
     assert_array_almost_equal(rgb[..., 0], image)
     assert_array_almost_equal(rgb[..., 1], image)
     assert_array_almost_equal(rgb[..., 2], image)
@@ -82,21 +82,19 @@ def test_image_alpha():
     label = cp.arange(3).reshape(1, -1)
     colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
     # If we set `image_alpha = 0`, then rgb should match label colors exactly.
-    rgb = label2rgb(
-        label, image=image, colors=colors, alpha=1, image_alpha=0, bg_label=-1
-    )
+    rgb = label2rgb(label, image=image, colors=colors, alpha=1,
+                    image_alpha=0, bg_label=-1)
     assert_array_almost_equal(rgb, [colors])
 
 
 def test_color_names():
     image = cp.ones((1, 3))
     label = cp.arange(3).reshape(1, -1)
-    cnames = ["red", "lime", "blue"]
+    cnames = ['red', 'lime', 'blue']
     colors = [(1, 0, 0), (0, 1, 0), (0, 0, 1)]
     # Set alphas just in case the defaults change
-    rgb = label2rgb(
-        label, image=image, colors=cnames, alpha=1, image_alpha=1, bg_label=-1
-    )
+    rgb = label2rgb(label, image=image, colors=cnames, alpha=1,
+                    image_alpha=1, bg_label=-1)
     assert_array_almost_equal(rgb, [colors])
 
 
@@ -105,14 +103,8 @@ def test_bg_and_color_cycle():
     label = cp.arange(10).reshape(1, -1)
     colors = [(1, 0, 0), (0, 0, 1)]
     bg_color = (0, 0, 0)
-    rgb = label2rgb(
-        label,
-        image=image,
-        bg_label=0,
-        bg_color=bg_color,
-        colors=colors,
-        alpha=1,
-    )
+    rgb = label2rgb(label, image=image, bg_label=0, bg_color=bg_color,
+                    colors=colors, alpha=1)
     assert_array_almost_equal(rgb[0, 0], bg_color)
     for pixel, color in zip(rgb[0, 1:], itertools.cycle(colors)):
         assert_array_almost_equal(pixel, color)
@@ -120,22 +112,18 @@ def test_bg_and_color_cycle():
 
 def test_negative_labels():
     labels = cp.array([0, -1, -2, 0])
-    rout = cp.array(
-        [(0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (1.0, 0.0, 0.0), (0.0, 0.0, 0.0)]
-    )
+    rout = cp.array([(0., 0., 0.), (0., 0., 1.), (1., 0., 0.), (0., 0., 0.)])
     assert_array_almost_equal(
-        rout, label2rgb(labels, bg_label=0, alpha=1, image_alpha=1)
-    )
+        rout, label2rgb(labels, bg_label=0, alpha=1, image_alpha=1))
 
 
 def test_nonconsecutive():
     labels = cp.array([0, 2, 4, 0])
     colors = [(1, 0, 0), (0, 0, 1)]
-    rout = cp.array(
-        [(1.0, 0.0, 0.0), (0.0, 0.0, 1.0), (1.0, 0.0, 0.0), (1.0, 0.0, 0.0)]
-    )
-    r = label2rgb(labels, colors=colors, alpha=1, image_alpha=1, bg_label=-1)
-    assert_array_almost_equal(rout, r)
+    rout = cp.array([(1., 0., 0.), (0., 0., 1.), (1., 0., 0.), (1., 0., 0.)])
+    assert_array_almost_equal(
+        rout, label2rgb(labels, colors=colors, alpha=1,
+                        image_alpha=1, bg_label=-1))
 
 
 def test_label_consistency():
@@ -147,9 +135,8 @@ def test_label_consistency():
     rgb_1 = label2rgb(label_1, colors=colors, bg_label=-1)
     rgb_2 = label2rgb(label_2, colors=colors, bg_label=-1)
     for label_id in label_2.ravel():
-        assert_array_almost_equal(
-            rgb_1[label_1 == label_id], rgb_2[label_2 == label_id]
-        )
+        assert_array_almost_equal(rgb_1[label_1 == label_id],
+                                  rgb_2[label_2 == label_id])
 
 
 def test_leave_labels_alone():
@@ -164,54 +151,48 @@ def test_leave_labels_alone():
 # TODO: diagnose test error that occurs only with CUB enabled: CuPy bug?
 def test_avg():
     # label image
-    # ftm: off
-    label_field = cp.asarray(
-        [[1, 1, 1, 2], [1, 2, 2, 2], [3, 3, 4, 4]], dtype=np.uint8
-    )
+    # fmt: off
+    label_field = cp.asarray([[1, 1, 1, 2],
+                              [1, 2, 2, 2],
+                              [3, 3, 4, 4]], dtype=np.uint8)
 
     # color image
-    r = cp.asarray(
-        [[1.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]]
-    )
-    g = cp.asarray(
-        [[0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 1.0, 0.0], [0.0, 0.0, 0.0, 0.0]]
-    )
-    b = cp.asarray(
-        [[0.0, 0.0, 0.0, 1.0], [0.0, 1.0, 1.0, 1.0], [0.0, 0.0, 1.0, 1.0]]
-    )
+    r = cp.asarray([[1., 1., 0., 0.],
+                    [0., 0., 1., 1.],
+                    [0., 0., 0., 0.]])
+    g = cp.asarray([[0., 0., 0., 1.],
+                    [1., 1., 1., 0.],
+                    [0., 0., 0., 0.]])
+    b = cp.asarray([[0., 0., 0., 1.],
+                    [0., 1., 1., 1.],
+                    [0., 0., 1., 1.]])
     image = cp.dstack((r, g, b))
 
     # reference label-colored image
-    rout = cp.asarray(
-        [[0.5, 0.5, 0.5, 0.5], [0.5, 0.5, 0.5, 0.5], [0.0, 0.0, 0.0, 0.0]]
-    )
-    gout = cp.asarray(
-        [
-            [0.25, 0.25, 0.25, 0.75],
-            [0.25, 0.75, 0.75, 0.75],
-            [0.0, 0.0, 0.0, 0.0],
-        ]
-    )
-    bout = cp.asarray(
-        [[0.0, 0.0, 0.0, 1.0], [0.0, 1.0, 1.0, 1.0], [0.0, 0.0, 1.0, 1.0]]
-    )
+    rout = cp.asarray([[0.5, 0.5, 0.5, 0.5],
+                       [0.5, 0.5, 0.5, 0.5],
+                       [0. , 0. , 0. , 0. ]])
+    gout = cp.asarray([[0.25, 0.25, 0.25, 0.75],
+                       [0.25, 0.75, 0.75, 0.75],
+                       [0.  , 0.  , 0.  , 0.  ]])
+    bout = cp.asarray([[0. , 0. , 0. , 1. ],
+                       [0. , 1. , 1. , 1. ],
+                       [0.0, 0.0, 1.0, 1.0]])
     expected_out = cp.dstack((rout, gout, bout))
-    # ftm: on
 
     # test standard averaging
-    out = label2rgb(label_field, image, kind="avg", bg_label=-1)
+    out = label2rgb(label_field, image, kind='avg', bg_label=-1)
     assert_array_equal(out, expected_out)
 
     # test averaging with custom background value
-    out_bg = label2rgb(
-        label_field, image, bg_label=2, bg_color=(0, 0, 0), kind="avg"
-    )
+    out_bg = label2rgb(label_field, image, bg_label=2, bg_color=(0, 0, 0),
+                       kind='avg')
     expected_out_bg = expected_out.copy()
     expected_out_bg[label_field == 2] = 0
     assert_array_equal(out_bg, expected_out_bg)
 
     # test default background color
-    out_bg = label2rgb(label_field, image, bg_label=2, kind="avg")
+    out_bg = label2rgb(label_field, image, bg_label=2, kind='avg')
     assert_array_equal(out_bg, expected_out_bg)
 
 
@@ -229,7 +210,7 @@ def test_bg_color_rgb_string():
     labels[6:9, 6:9] = 2
     img = cp.asarray(img)
     labels = cp.asarray(labels)
-    output = label2rgb(labels, image=img, alpha=0.9, bg_label=0, bg_color="red")
+    output = label2rgb(labels, image=img, alpha=0.9, bg_label=0, bg_color='red')
     assert output[0, 0, 0] > 0.9  # red channel
 
 
@@ -240,4 +221,4 @@ def test_avg_with_2d_image():
     labels[6:9, 6:9] = 2
     img = cp.asarray(img)
     labels = cp.asarray(labels)
-    assert_no_warnings(label2rgb, labels, image=img, bg_label=0, kind="avg")
+    assert_no_warnings(label2rgb, labels, image=img, bg_label=0, kind='avg')

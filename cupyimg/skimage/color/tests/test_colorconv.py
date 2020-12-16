@@ -9,7 +9,6 @@ Authors
 """
 
 import colorsys
-import os.path
 
 import cupy as cp
 import numpy as np
@@ -18,8 +17,9 @@ from cupy.testing import assert_array_almost_equal, assert_array_equal
 from numpy.testing import assert_equal
 
 from skimage._shared.testing import TestCase
+from skimage._shared.testing import fetch
+from skimage import data
 from skimage._shared._warnings import expected_warnings
-from skimage.io import imread
 
 from cupyimg.skimage.util import img_as_float, img_as_ubyte, img_as_float32
 from cupyimg.skimage.color import (
@@ -60,71 +60,43 @@ from cupyimg.skimage.color import (
     gray2rgba,
 )
 
-try:
-    from skimage._shared.testing import fetch
-
-    have_fetch = True
-except ImportError:
-    have_fetch = False
-
-if not have_fetch:
-    from skimage import data_dir
-else:
-    from skimage import data
-
 
 class TestColorconv(TestCase):
 
-    if have_fetch:
-        img_rgb = cp.asarray(data.colorwheel())
-        img_grayscale = cp.asarray(data.camera())
-    else:
-        img_rgb = cp.asarray(imread(os.path.join(data_dir, "color.png")))
-        img_grayscale = cp.asarray(imread(os.path.join(data_dir, "camera.png")))
+    img_rgb = cp.asarray(data.colorwheel())
+    img_grayscale = cp.asarray(data.camera())
     # ftm: off
-    img_rgba = cp.asarray(
-        [[[0, 0.5, 1, 0], [0, 0.5, 1, 1], [0, 0.5, 1, 0.5]]]
-    ).astype(np.float)
+    img_rgba = cp.array([[[0, 0.5, 1, 0],
+                          [0, 0.5, 1, 1],
+                          [0, 0.5, 1, 0.5]]]).astype(float)
 
-    colbars = cp.asarray(
-        [
-            [1, 1, 0, 0, 1, 1, 0, 0],
-            [1, 1, 1, 1, 0, 0, 0, 0],
-            [1, 0, 1, 0, 1, 0, 1, 0],
-        ]
-    ).astype(np.float)
+    colbars = cp.array([[1, 1, 0, 0, 1, 1, 0, 0],
+                        [1, 1, 1, 1, 0, 0, 0, 0],
+                        [1, 0, 1, 0, 1, 0, 1, 0]]).astype(float)
+
     colbars_array = cp.swapaxes(colbars.reshape(3, 4, 2), 0, 2)
     colbars_point75 = colbars * 0.75
     colbars_point75_array = cp.swapaxes(colbars_point75.reshape(3, 4, 2), 0, 2)
 
-    xyz_array = cp.asarray(
-        [
-            [[0.4124, 0.21260, 0.01930]],  # red
-            [[0, 0, 0]],  # black
-            [[0.9505, 1.0, 1.089]],  # white
-            [[0.1805, 0.0722, 0.9505]],  # blue
-            [[0.07719, 0.15438, 0.02573]],  # green
-        ]
-    )
-    lab_array = cp.asarray(
-        [
-            [[53.233, 80.109, 67.220]],  # red
-            [[0.0, 0.0, 0.0]],  # black
-            [[100.0, 0.005, -0.010]],  # white
-            [[32.303, 79.197, -107.864]],  # blue
-            [[46.229, -51.7, 49.898]],  # green
-        ]
-    )
+    xyz_array = cp.asarray([[[0.4124, 0.21260, 0.01930]],    # red
+                            [[0, 0, 0]],    # black
+                            [[.9505, 1., 1.089]],    # white
+                            [[.1805, .0722, .9505]],    # blue
+                            [[.07719, .15438, .02573]],    # green
+                            ])
+    lab_array = cp.asarray([[[53.233, 80.109, 67.220]],    # red
+                            [[0., 0., 0.]],    # black
+                            [[100.0, 0.005, -0.010]],    # white
+                            [[32.303, 79.197, -107.864]],    # blue
+                            [[46.229, -51.7, 49.898]],    # green
+                            ])
 
-    luv_array = cp.asarray(
-        [
-            [[53.233, 175.053, 37.751]],  # red
-            [[0.0, 0.0, 0.0]],  # black
-            [[100.0, 0.001, -0.017]],  # white
-            [[32.303, -9.400, -130.358]],  # blue
-            [[46.228, -43.774, 56.589]],  # green
-        ]
-    )
+    luv_array = cp.asarray([[[53.233, 175.053, 37.751]],   # red
+                            [[0., 0., 0.]],   # black
+                            [[100., 0.001, -0.017]],   # white
+                            [[32.303, -9.400, -130.358]],   # blue
+                            [[46.228, -43.774, 56.589]],   # green
+                            ])
     # ftm: on
 
     # RGBA to RGB
@@ -132,9 +104,10 @@ class TestColorconv(TestCase):
         rgba = self.img_rgba
         rgb = rgba2rgb(rgba)
         # ftm: off
-        expected = cp.asarray(
-            [[[1, 1, 1], [0, 0.5, 1], [0.5, 0.75, 1]]]
-        ).astype(np.float)
+        expected = cp.asarray([[[1, 1, 1],
+                                [0, 0.5, 1],
+                                [0.5, 0.75, 1]]]).astype(float)
+
         # ftm: on
         self.assertEqual(rgb.shape, expected.shape)
         assert_array_almost_equal(rgb, expected)
@@ -157,12 +130,9 @@ class TestColorconv(TestCase):
         rgb = img_as_float(self.img_rgb)[::16, ::16]
         hsv = rgb2hsv(rgb).reshape(-1, 3)
         # ground truth from colorsys
-        gt = np.array(
-            [
-                colorsys.rgb_to_hsv(pt[0], pt[1], pt[2])
-                for pt in rgb.reshape(-1, 3).get()
-            ]
-        )
+        gt = np.asarray([colorsys.rgb_to_hsv(pt[0], pt[1], pt[2])
+                         for pt in rgb.reshape(-1, 3)]
+                        )
         assert_array_almost_equal(hsv, gt)
 
     def test_rgb2hsv_error_grayscale(self):
@@ -210,22 +180,14 @@ class TestColorconv(TestCase):
     # RGB to XYZ
     def test_rgb2xyz_conversion(self):
         # ftm: off
-        gt = cp.asarray(
-            [
-                [
-                    [0.950456, 1.0, 1.088754],
-                    [0.538003, 0.787329, 1.06942],
-                    [0.592876, 0.28484, 0.969561],
-                    [0.180423, 0.072169, 0.950227],
-                ],
-                [
-                    [0.770033, 0.927831, 0.138527],
-                    [0.35758, 0.71516, 0.119193],
-                    [0.412453, 0.212671, 0.019334],
-                    [0.0, 0.0, 0.0],
-                ],
-            ]
-        )
+        gt = cp.asarray([[[0.950456, 1.      , 1.088754],
+                          [0.538003, 0.787329, 1.06942 ],
+                          [0.592876, 0.28484 , 0.969561],
+                          [0.180423, 0.072169, 0.950227]],
+                         [[0.770033, 0.927831, 0.138527],
+                          [0.35758 , 0.71516 , 0.119193],
+                          [0.412453, 0.212671, 0.019334],
+                          [0.      , 0.      , 0.      ]]])
         # ftm: on
         assert_array_almost_equal(rgb2xyz(self.colbars_array), gt)
 
@@ -236,20 +198,19 @@ class TestColorconv(TestCase):
 
     def test_rgb2xyz_dtype(self):
         img = self.colbars_array
-        img32 = img.astype("float32")
+        img32 = img.astype('float32')
 
         assert rgb2xyz(img).dtype == img.dtype
         assert rgb2xyz(img32).dtype == img32.dtype
 
     # XYZ to RGB
     def test_xyz2rgb_conversion(self):
-        assert_array_almost_equal(
-            xyz2rgb(rgb2xyz(self.colbars_array)), self.colbars_array
-        )
+        assert_array_almost_equal(xyz2rgb(rgb2xyz(self.colbars_array)),
+                                  self.colbars_array)
 
     def test_xyz2rgb_dtype(self):
         img = rgb2xyz(self.colbars_array)
-        img32 = img.astype("float32")
+        img32 = img.astype('float32')
 
         assert xyz2rgb(img).dtype == img.dtype
         assert xyz2rgb(img32).dtype == img32.dtype
@@ -273,11 +234,9 @@ class TestColorconv(TestCase):
     # RGB<->HDX roundtrip with ubyte image
     def test_hdx_rgb_roundtrip(self):
         from cupyimg.skimage.color.colorconv import hdx_from_rgb, rgb_from_hdx
-
         img_rgb = self.img_rgb
-        conv = combine_stains(
-            separate_stains(img_rgb, hdx_from_rgb), rgb_from_hdx
-        )
+        conv = combine_stains(separate_stains(img_rgb, hdx_from_rgb),
+                              rgb_from_hdx)
         assert_array_equal(img_as_ubyte(conv), img_rgb)
 
     # RGB<->HDX roundtrip with float image
@@ -285,36 +244,27 @@ class TestColorconv(TestCase):
         from cupyimg.skimage.color.colorconv import hdx_from_rgb, rgb_from_hdx
 
         img_rgb = img_as_float(self.img_rgb)
-        conv = combine_stains(
-            separate_stains(img_rgb, hdx_from_rgb), rgb_from_hdx
-        )
+        conv = combine_stains(separate_stains(img_rgb, hdx_from_rgb),
+                              rgb_from_hdx)
         assert_array_almost_equal(conv, img_rgb)
 
     # RGB to RGB CIE
     def test_rgb2rgbcie_conversion(self):
         # ftm: off
-        gt = cp.asarray(
-            [
-                [
-                    [0.1488856, 0.18288098, 0.19277574],
-                    [0.01163224, 0.16649536, 0.18948516],
-                    [0.12259182, 0.03308008, 0.17298223],
-                    [-0.01466154, 0.01669446, 0.16969164],
-                ],
-                [
-                    [0.16354714, 0.16618652, 0.0230841],
-                    [0.02629378, 0.1498009, 0.01979351],
-                    [0.13725336, 0.01638562, 0.00329059],
-                    [0.0, 0.0, 0.0],
-                ],
-            ]
-        )
+        gt = cp.asarray([[[ 0.1488856 ,  0.18288098,  0.19277574],
+                          [ 0.01163224,  0.16649536,  0.18948516],
+                          [ 0.12259182,  0.03308008,  0.17298223],
+                          [-0.01466154,  0.01669446,  0.16969164]],
+                         [[ 0.16354714,  0.16618652,  0.0230841 ],
+                          [ 0.02629378,  0.1498009 ,  0.01979351],
+                          [ 0.13725336,  0.01638562,  0.00329059],
+                          [ 0.        ,  0.        ,  0.        ]]])
         # ftm: on
         assert_array_almost_equal(rgb2rgbcie(self.colbars_array), gt)
 
     def test_rgb2rgbcie_dtype(self):
-        img = self.colbars_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.colbars_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert rgb2rgbcie(img).dtype == img.dtype
         assert rgb2rgbcie(img32).dtype == img32.dtype
@@ -322,61 +272,47 @@ class TestColorconv(TestCase):
     # RGB CIE to RGB
     def test_rgbcie2rgb_conversion(self):
         # only roundtrip test, we checked rgb2rgbcie above already
-        assert_array_almost_equal(
-            rgbcie2rgb(rgb2rgbcie(self.colbars_array)), self.colbars_array
-        )
+        assert_array_almost_equal(rgbcie2rgb(rgb2rgbcie(self.colbars_array)),
+                                  self.colbars_array)
 
     def test_rgbcie2rgb_dtype(self):
-        img = rgb2rgbcie(self.colbars_array).astype("float64")
-        img32 = img.astype("float32")
+        img = rgb2rgbcie(self.colbars_array).astype('float64')
+        img32 = img.astype('float32')
 
         assert rgbcie2rgb(img).dtype == img.dtype
         assert rgbcie2rgb(img32).dtype == img32.dtype
 
     def test_convert_colorspace(self):
-        colspaces = ["HSV", "RGB CIE", "XYZ", "YCbCr", "YPbPr", "YDbDr"]
+        colspaces = ['HSV', 'RGB CIE', 'XYZ', 'YCbCr', 'YPbPr', 'YDbDr']
         colfuncs_from = [
-            hsv2rgb,
-            rgbcie2rgb,
-            xyz2rgb,
-            ycbcr2rgb,
-            ypbpr2rgb,
-            ydbdr2rgb,
+            hsv2rgb, rgbcie2rgb, xyz2rgb,
+            ycbcr2rgb, ypbpr2rgb, ydbdr2rgb
         ]
         colfuncs_to = [
-            rgb2hsv,
-            rgb2rgbcie,
-            rgb2xyz,
-            rgb2ycbcr,
-            rgb2ypbpr,
-            rgb2ydbdr,
+            rgb2hsv, rgb2rgbcie, rgb2xyz,
+            rgb2ycbcr, rgb2ypbpr, rgb2ydbdr
         ]
 
         assert_array_almost_equal(
-            convert_colorspace(self.colbars_array, "RGB", "RGB"),
-            self.colbars_array,
-        )
+            convert_colorspace(self.colbars_array, 'RGB', 'RGB'),
+            self.colbars_array)
 
         for i, space in enumerate(colspaces):
             # print(f"space={space}")
             gt = colfuncs_from[i](self.colbars_array)
             assert_array_almost_equal(
-                convert_colorspace(self.colbars_array, space, "RGB"), gt
-            )
+                convert_colorspace(self.colbars_array, space, 'RGB'), gt)
             gt = colfuncs_to[i](self.colbars_array)
             assert_array_almost_equal(
-                convert_colorspace(self.colbars_array, "RGB", space), gt
-            )
+                convert_colorspace(self.colbars_array, 'RGB', space), gt)
 
-        self.assertRaises(
-            ValueError, convert_colorspace, self.colbars_array, "nokey", "XYZ"
-        )
-        self.assertRaises(
-            ValueError, convert_colorspace, self.colbars_array, "RGB", "nokey"
-        )
+        self.assertRaises(ValueError, convert_colorspace,
+                          self.colbars_array, 'nokey', 'XYZ')
+        self.assertRaises(ValueError, convert_colorspace,
+                          self.colbars_array, 'RGB', 'nokey')
 
     def test_rgb2gray(self):
-        x = cp.asarray([1, 1, 1]).reshape((1, 1, 3)).astype(np.float)
+        x = cp.asarray([1, 1, 1]).reshape((1, 1, 3)).astype(float)
         g = rgb2gray(x)
         assert_array_almost_equal(g, 1)
 
@@ -389,16 +325,16 @@ class TestColorconv(TestCase):
 
     def test_rgb2gray_alpha(self):
         x = cp.random.rand(10, 10, 4)
-        with expected_warnings(["Non RGB image conversion"]):
+        with expected_warnings(['Non RGB image conversion']):
             assert rgb2gray(x).ndim == 2
 
     def test_rgb2gray_on_gray(self):
-        with expected_warnings(["The behavior of rgb2gray will change"]):
+        with expected_warnings(['The behavior of rgb2gray will change']):
             rgb2gray(cp.random.rand(5, 5))
 
     def test_rgb2gray_dtype(self):
-        img = cp.random.rand(10, 10, 3).astype("float64")
-        img32 = img.astype("float32")
+        img = cp.random.rand(10, 10, 3).astype('float64')
+        img32 = img.astype('float32')
 
         assert rgb2gray(img).dtype == img.dtype
         assert rgb2gray(img32).dtype == img32.dtype
@@ -407,78 +343,47 @@ class TestColorconv(TestCase):
     # http://www.easyrgb.com/index.php?X=CALC
     # Note: easyrgb website displays xyz*100
     def test_xyz2lab(self):
-        assert_array_almost_equal(
-            xyz2lab(self.xyz_array), self.lab_array, decimal=3
-        )
+        assert_array_almost_equal(xyz2lab(self.xyz_array),
+                                  self.lab_array, decimal=3)
 
         # Test the conversion with the rest of the illuminants.
         for I in ["d50", "d55", "d65", "d75"]:
             for obs in ["2", "10"]:
-                if have_fetch:
-                    fname = "color/tests/data/lab_array_{0}_{1}.npy".format(
-                        I, obs
-                    )
-                    lab_array_I_obs = np.load(fetch(fname))
-                else:
-                    fname = "lab_array_{0}_{1}.npy".format(I, obs)
-                    lab_array_I_obs = np.load(
-                        os.path.join(os.path.dirname(__file__), "data", fname)
-                    )
-                assert_array_almost_equal(
-                    lab_array_I_obs, xyz2lab(self.xyz_array, I, obs), decimal=2
-                )
-        for I in ["a", "e"]:
-            if have_fetch:
-                fname = "color/tests/data/lab_array_{0}_2.npy".format(I)
+                fname = "color/tests/data/lab_array_{0}_{1}.npy".format(I, obs)
                 lab_array_I_obs = np.load(fetch(fname))
-            else:
-                fname = "lab_array_{0}_2.npy".format(I)
-                lab_array_I_obs = np.load(
-                    os.path.join(os.path.dirname(__file__), "data", fname)
-                )
-            assert_array_almost_equal(
-                lab_array_I_obs, xyz2lab(self.xyz_array, I, "2"), decimal=2
-            )
+                assert_array_almost_equal(lab_array_I_obs,
+                                          xyz2lab(self.xyz_array, I, obs),
+                                          decimal=2)
+        for I in ["a", "e"]:
+            fname = "color/tests/data/lab_array_{0}_2.npy".format(I)
+            lab_array_I_obs = np.load(fetch(fname))
+            assert_array_almost_equal(lab_array_I_obs,
+                                      xyz2lab(self.xyz_array, I, "2"),
+                                      decimal=2)
 
     def test_xyz2lab_dtype(self):
-        img = self.xyz_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.xyz_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert xyz2lab(img).dtype == img.dtype
         assert xyz2lab(img32).dtype == img32.dtype
 
     def test_lab2xyz(self):
-        assert_array_almost_equal(
-            lab2xyz(self.lab_array), self.xyz_array, decimal=3
-        )
+        assert_array_almost_equal(lab2xyz(self.lab_array),
+                                  self.xyz_array, decimal=3)
 
         # Test the conversion with the rest of the illuminants.
         for I in ["d50", "d55", "d65", "d75"]:
             for obs in ["2", "10"]:
-                if have_fetch:
-                    fname = "color/tests/data/lab_array_{0}_{1}.npy".format(
-                        I, obs
-                    )
-                    lab_array_I_obs = np.load(fetch(fname))
-                else:
-                    fname = "lab_array_{0}_{1}.npy".format(I, obs)
-                    lab_array_I_obs = np.load(
-                        os.path.join(os.path.dirname(__file__), "data", fname)
-                    )
-                assert_array_almost_equal(
-                    lab2xyz(lab_array_I_obs, I, obs), self.xyz_array, decimal=3
-                )
+                fname = "color/tests/data/lab_array_{0}_{1}.npy".format(I, obs)
+                lab_array_I_obs = np.load(fetch(fname))
+                assert_array_almost_equal(lab2xyz(lab_array_I_obs, I, obs),
+                                          self.xyz_array, decimal=3)
         for I in ["a", "e"]:
-            fname = "lab_array_{0}_2.npy".format(I, obs)
-            if have_fetch:
-                lab_array_I_obs = np.load(fetch("color/tests/data/" + fname))
-            else:
-                lab_array_I_obs = np.load(
-                    os.path.join(os.path.dirname(__file__), "data", fname)
-                )
-            assert_array_almost_equal(
-                lab2xyz(lab_array_I_obs, I, "2"), self.xyz_array, decimal=3
-            )
+            fname = "lab_array_{0}_2.npy".format(I)
+            lab_array_I_obs = np.load(fetch('color/tests/data/' + fname))
+            assert_array_almost_equal(lab2xyz(lab_array_I_obs, I, "2"),
+                                      self.xyz_array, decimal=3)
 
         # And we include a call to test the exception handling in the code.
         try:
@@ -492,8 +397,8 @@ class TestColorconv(TestCase):
             pass
 
     def test_lab2xyz_dtype(self):
-        img = self.lab_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.lab_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert lab2xyz(img).dtype == img.dtype
         assert lab2xyz(img32).dtype == img32.dtype
@@ -506,38 +411,34 @@ class TestColorconv(TestCase):
         """
         # Obtained with D65 white point, sRGB model and gamma
         # ftm: off
-        gt_for_colbars = cp.asarray(
-            [
-                [100, 0, 0],
-                [97.1393, -21.5537, 94.4780],
-                [91.1132, -48.0875, -14.1312],
-                [87.7347, -86.1827, 83.1793],
-                [60.3242, 98.2343, -60.8249],
-                [53.2408, 80.0925, 67.2032],
-                [32.2970, 79.1875, -107.8602],
-                [0, 0, 0],
-            ]
-        ).T
+        gt_for_colbars = cp.asarray([
+            [100,0,0],
+            [97.1393, -21.5537, 94.4780],
+            [91.1132, -48.0875, -14.1312],
+            [87.7347, -86.1827, 83.1793],
+            [60.3242, 98.2343, -60.8249],
+            [53.2408, 80.0925, 67.2032],
+            [32.2970, 79.1875, -107.8602],
+            [0,0,0]]).T
+
         # ftm: on
         gt_array = cp.swapaxes(gt_for_colbars.reshape(3, 4, 2), 0, 2)
-        assert_array_almost_equal(
-            rgb2lab(self.colbars_array), gt_array, decimal=2
-        )
+        assert_array_almost_equal(rgb2lab(self.colbars_array), gt_array, decimal=2)
 
     def test_lab_rgb_roundtrip(self):
         img_rgb = img_as_float(self.img_rgb)
         assert_array_almost_equal(lab2rgb(rgb2lab(img_rgb)), img_rgb)
 
     def test_rgb2lab_dtype(self):
-        img = self.colbars_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.colbars_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert rgb2lab(img).dtype == img.dtype
         assert rgb2lab(img32).dtype == img32.dtype
 
     def test_lab2rgb_dtype(self):
-        img = self.lab_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.lab_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert lab2rgb(img).dtype == img.dtype
         assert lab2rgb(img32).dtype == img32.dtype
@@ -546,83 +447,51 @@ class TestColorconv(TestCase):
     # http://www.easyrgb.com/index.php?X=CALC
     # Note: easyrgb website displays xyz*100
     def test_xyz2luv(self):
-        assert_array_almost_equal(
-            xyz2luv(self.xyz_array), self.luv_array, decimal=3
-        )
+        assert_array_almost_equal(xyz2luv(self.xyz_array),
+                                  self.luv_array, decimal=3)
 
         # Test the conversion with the rest of the illuminants.
         for I in ["d50", "d55", "d65", "d75"]:
             for obs in ["2", "10"]:
-                if have_fetch:
-                    fname = "color/tests/data/luv_array_{0}_{1}.npy".format(
-                        I, obs
-                    )
-                    luv_array_I_obs = np.load(fetch(fname))
-                else:
-                    fname = "luv_array_{0}_{1}.npy".format(I, obs)
-                    luv_array_I_obs = np.load(
-                        os.path.join(os.path.dirname(__file__), "data", fname)
-                    )
-                assert_array_almost_equal(
-                    luv_array_I_obs, xyz2luv(self.xyz_array, I, obs), decimal=2
-                )
-        for I in ["a", "e"]:
-            if have_fetch:
-                fname = "color/tests/data/luv_array_{0}_2.npy".format(I)
+                fname = "color/tests/data/luv_array_{0}_{1}.npy".format(I, obs)
                 luv_array_I_obs = np.load(fetch(fname))
-            else:
-                fname = "luv_array_{0}_2.npy".format(I)
-                luv_array_I_obs = np.load(
-                    os.path.join(os.path.dirname(__file__), "data", fname)
-                )
-            assert_array_almost_equal(
-                luv_array_I_obs, xyz2luv(self.xyz_array, I, "2"), decimal=2
-            )
+                assert_array_almost_equal(luv_array_I_obs,
+                                          xyz2luv(self.xyz_array, I, obs),
+                                          decimal=2)
+        for I in ["a", "e"]:
+            fname = "color/tests/data/luv_array_{0}_2.npy".format(I)
+            luv_array_I_obs = np.load(fetch(fname))
+            assert_array_almost_equal(luv_array_I_obs,
+                                      xyz2luv(self.xyz_array, I, "2"),
+                                      decimal=2)
 
     def test_xyz2luv_dtype(self):
-        img = self.xyz_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.xyz_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert xyz2luv(img).dtype == img.dtype
         assert xyz2luv(img32).dtype == img32.dtype
 
     def test_luv2xyz(self):
-        assert_array_almost_equal(
-            luv2xyz(self.luv_array), self.xyz_array, decimal=3
-        )
+        assert_array_almost_equal(luv2xyz(self.luv_array),
+                                  self.xyz_array, decimal=3)
 
         # Test the conversion with the rest of the illuminants.
         for I in ["d50", "d55", "d65", "d75"]:
             for obs in ["2", "10"]:
-                if have_fetch:
-                    fname = "color/tests/data/luv_array_{0}_{1}.npy".format(
-                        I, obs
-                    )
-                    luv_array_I_obs = np.load(fetch(fname))
-                else:
-                    fname = "luv_array_{0}_{1}.npy".format(I, obs)
-                    luv_array_I_obs = np.load(
-                        os.path.join(os.path.dirname(__file__), "data", fname)
-                    )
-                assert_array_almost_equal(
-                    luv2xyz(luv_array_I_obs, I, obs), self.xyz_array, decimal=3
-                )
-        for I in ["a", "e"]:
-            if have_fetch:
-                fname = "color/tests/data/luv_array_{0}_2.npy".format(I, obs)
+                fname = "color/tests/data/luv_array_{0}_{1}.npy".format(I, obs)
                 luv_array_I_obs = np.load(fetch(fname))
-            else:
-                fname = "luv_array_{0}_2.npy".format(I, obs)
-                luv_array_I_obs = np.load(
-                    os.path.join(os.path.dirname(__file__), "data", fname)
-                )
-            assert_array_almost_equal(
-                luv2xyz(luv_array_I_obs, I, "2"), self.xyz_array, decimal=3
-            )
+                assert_array_almost_equal(luv2xyz(luv_array_I_obs, I, obs),
+                                          self.xyz_array, decimal=3)
+        for I in ["a", "e"]:
+            fname = "color/tests/data/luv_array_{0}_2.npy".format(I)
+            luv_array_I_obs = np.load(fetch(fname))
+            assert_array_almost_equal(luv2xyz(luv_array_I_obs, I, "2"),
+                                      self.xyz_array, decimal=3)
 
     def test_luv2xyz_dtype(self):
-        img = self.luv_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.luv_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert luv2xyz(img).dtype == img.dtype
         assert luv2xyz(img32).dtype == img32.dtype
@@ -635,34 +504,31 @@ class TestColorconv(TestCase):
         """
         # Obtained with D65 white point, sRGB model and gamma
         # ftm: off
-        gt_for_colbars = cp.asarray(
-            [
-                [100, 0, 0],
-                [97.1393, 7.7056, 106.7866],
-                [91.1132, -70.4773, -15.2042],
-                [87.7347, -83.0776, 107.3985],
-                [60.3242, 84.0714, -108.6834],
-                [53.2408, 175.0151, 37.7564],
-                [32.2970, -9.4054, -130.3423],
-                [0, 0, 0],
-            ]
-        ).T
+        gt_for_colbars = cp.asarray([
+            [100, 0, 0],
+            [97.1393, 7.7056, 106.7866],
+            [91.1132, -70.4773, -15.2042],
+            [87.7347, -83.0776, 107.3985],
+            [60.3242, 84.0714, -108.6834],
+            [53.2408, 175.0151, 37.7564],
+            [32.2970, -9.4054, -130.3423],
+            [0, 0, 0]]).T
+
         # ftm: on
         gt_array = cp.swapaxes(gt_for_colbars.reshape(3, 4, 2), 0, 2)
-        assert_array_almost_equal(
-            rgb2luv(self.colbars_array), gt_array, decimal=2
-        )
+        assert_array_almost_equal(rgb2luv(self.colbars_array),
+                                  gt_array, decimal=2)
 
     def test_rgb2luv_dtype(self):
-        img = self.colbars_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.colbars_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert rgb2luv(img).dtype == img.dtype
         assert rgb2luv(img32).dtype == img32.dtype
 
     def test_luv2rgb_dtype(self):
-        img = self.luv_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.luv_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert luv2rgb(img).dtype == img.dtype
         assert luv2rgb(img32).dtype == img32.dtype
@@ -678,9 +544,11 @@ class TestColorconv(TestCase):
         lab_array[2] = [90, -4, -47]
         lab_array = cp.asarray(lab_array)
         # ftm: off
-        rgb_array = cp.asarray(
-            [[[0.501, 0.481, 0]], [[0, 0.482, 1.0]], [[0.578, 0.914, 1.0]]]
-        )
+        rgb_array = cp.asarray([[[0.501, 0.481, 0]],
+                                [[0, 0.482, 1.]],
+                                [[0.578, 0.914, 1.]],
+                                ])
+
         # ftm: on
         assert_array_almost_equal(lab2rgb(lab_array), rgb_array, decimal=3)
 
@@ -690,7 +558,7 @@ class TestColorconv(TestCase):
         lab = cp.dstack((L, a, b))
         for value in [0, 10, 20]:
             lab[:, :, 0] = value
-            with expected_warnings(["Color data out of range"]):
+            with expected_warnings(['Color data out of range']):
                 lab2xyz(lab)
 
     def test_lab_lch_roundtrip(self):
@@ -764,15 +632,15 @@ class TestColorconv(TestCase):
         assert_array_almost_equal(ydbdr2rgb(rgb2ydbdr(img_rgb)), img_rgb)
 
     def test_rgb2yuv_dtype(self):
-        img = self.colbars_array.astype("float64")
-        img32 = img.astype("float32")
+        img = self.colbars_array.astype('float64')
+        img32 = img.astype('float32')
 
         assert rgb2yuv(img).dtype == img.dtype
         assert rgb2yuv(img32).dtype == img32.dtype
 
     def test_yuv2rgb_dtype(self):
-        img = rgb2yuv(self.colbars_array).astype("float64")
-        img32 = img.astype("float32")
+        img = rgb2yuv(self.colbars_array).astype('float64')
+        img32 = img.astype('float32')
 
         assert yuv2rgb(img).dtype == img.dtype
         assert yuv2rgb(img32).dtype == img32.dtype
@@ -780,20 +648,20 @@ class TestColorconv(TestCase):
     def test_rgb2yiq_conversion(self):
         rgb = img_as_float(self.img_rgb)[::16, ::16]
         yiq = rgb2yiq(rgb).reshape(-1, 3)
-        gt = cp.asarray(
-            [
-                colorsys.rgb_to_yiq(pt[0], pt[1], pt[2])
-                for pt in rgb.reshape(-1, 3).get()
-            ]
-        )
+        gt = np.asarray([colorsys.rgb_to_yiq(pt[0], pt[1], pt[2])
+                         for pt in rgb.reshape(-1, 3)]
+                        )
         assert_array_almost_equal(yiq, gt, decimal=2)
 
 
 def test_gray2rgb():
     x = cp.asarray([0, 0.5, 1])
     w = gray2rgb(x)
-    expected_output = cp.asarray([[0, 0, 0], [0.5, 0.5, 0.5], [1, 1, 1]])
-
+    #fmt off
+    expected_output = cp.asarray([[ 0, 0, 0 ],
+                                  [ 0.5, 0.5, 0.5, ],
+                                  [ 1, 1, 1 ]])
+    #fmt on
     assert_array_equal(w, expected_output)
 
     x = x.reshape((3, 1))
@@ -814,47 +682,38 @@ def test_gray2rgb():
 
 def test_gray2rgb_rgb():
     x = cp.random.rand(5, 5, 4)
-    with expected_warnings(["Pass-through of possibly RGB images"]):
+    with expected_warnings(['Pass-through of possibly RGB images']):
         y = gray2rgb(x)
     assert_array_equal(x, y)
 
 
 def test_gray2rgb_alpha():
     x = cp.random.random((5, 5, 4))
-    with expected_warnings(["Pass-through of possibly RGB images"]):
+    with expected_warnings(['Pass-through of possibly RGB images']):
         assert_equal(gray2rgb(x, alpha=None).shape, (5, 5, 4))
-    with expected_warnings(
-        ["Pass-through of possibly RGB images", "alpha argument is deprecated"]
-    ):
+    with expected_warnings(['Pass-through of possibly RGB images',
+                            'alpha argument is deprecated']):
         assert_equal(gray2rgb(x, alpha=False).shape, (5, 5, 3))
-    with expected_warnings(
-        ["Pass-through of possibly RGB images", "alpha argument is deprecated"]
-    ):
+    with expected_warnings(['Pass-through of possibly RGB images',
+                            'alpha argument is deprecated']):
         assert_equal(gray2rgb(x, alpha=True).shape, (5, 5, 4))
 
     x = cp.random.random((5, 5, 3))
-    with expected_warnings(["Pass-through of possibly RGB images"]):
+    with expected_warnings(['Pass-through of possibly RGB images']):
         assert_equal(gray2rgb(x, alpha=None).shape, (5, 5, 3))
-    with expected_warnings(
-        ["Pass-through of possibly RGB images", "alpha argument is deprecated"]
-    ):
+    with expected_warnings(['Pass-through of possibly RGB images',
+                            'alpha argument is deprecated']):
         assert_equal(gray2rgb(x, alpha=False).shape, (5, 5, 3))
-    with expected_warnings(
-        ["Pass-through of possibly RGB images", "alpha argument is deprecated"]
-    ):
+    with expected_warnings(['Pass-through of possibly RGB images',
+                            'alpha argument is deprecated']):
         assert_equal(gray2rgb(x, alpha=True).shape, (5, 5, 4))
 
-    with expected_warnings(["alpha argument is deprecated"]):
-        assert_array_equal(
-            gray2rgb(cp.asarray([[1, 2], [3, 4.0]]), alpha=True)[0, 0, 3], 1
-        )
-    with expected_warnings(["alpha argument is deprecated"]):
-        assert_array_equal(
-            gray2rgb(cp.asarray([[1, 2], [3, 4]], dtype=np.uint8), alpha=True)[
-                0, 0, 3
-            ],
-            255,
-        )
+    with expected_warnings(['alpha argument is deprecated']):
+        assert_array_equal(gray2rgb(cp.asarray([[1, 2], [3, 4.]]),
+                           alpha=True)[0, 0, 3], 1)
+    with expected_warnings(['alpha argument is deprecated']):
+        assert_array_equal(gray2rgb(cp.asarray([[1, 2], [3, 4]], dtype=np.uint8),
+                           alpha=True)[0, 0, 3], 255)
 
 
 @pytest.mark.parametrize("shape", [(5, 5), (5, 5, 4), (5, 4, 5, 4)])
@@ -879,7 +738,7 @@ def test_gray2rgba(shape):
 
 def test_gray2rgba_dtype():
     img_f64 = cp.random.random((5, 5))
-    img_f32 = img_f64.astype("float32")
+    img_f32 = img_f64.astype('float32')
     img_u8 = img_as_ubyte(img_f64)
     img_int = img_u8.astype(int)
 
@@ -929,17 +788,16 @@ def test_gray2rgba_alpha():
 
 
 @pytest.mark.parametrize("func", [rgb2gray, gray2rgb, gray2rgba])
-@pytest.mark.parametrize(
-    "shape", ([(3,), (2, 3), (4, 5, 3), (5, 4, 5, 3), (4, 5, 4, 5, 3)])
-)
+@pytest.mark.parametrize("shape", ([(3, ), (2, 3), (4, 5, 3), (5, 4, 5, 3),
+                                    (4, 5, 4, 5, 3)]))
 def test_nD_gray_conversion(func, shape):
     img = cp.random.rand(*shape)
 
     msg_list = []
     if img.ndim == 3 and func == gray2rgb:
-        msg_list.append("Pass-through of possibly RGB images in gray2rgb")
+        msg_list.append('Pass-through of possibly RGB images in gray2rgb')
     elif img.ndim == 2 and func == rgb2gray:
-        msg_list.append("The behavior of rgb2gray will change")
+        msg_list.append('The behavior of rgb2gray will change')
 
     with expected_warnings(msg_list):
         out = func(img)
@@ -949,42 +807,22 @@ def test_nD_gray_conversion(func, shape):
     assert out.shape[:common_ndim] == shape[:common_ndim]
 
 
-@pytest.mark.parametrize(
-    "func",
-    [
-        rgb2hsv,
-        hsv2rgb,
-        rgb2xyz,
-        xyz2rgb,
-        rgb2hed,
-        hed2rgb,
-        rgb2rgbcie,
-        rgbcie2rgb,
-        xyz2lab,
-        lab2xyz,
-        lab2rgb,
-        rgb2lab,
-        xyz2luv,
-        luv2xyz,
-        luv2rgb,
-        rgb2luv,
-        lab2lch,
-        lch2lab,
-        rgb2yuv,
-        yuv2rgb,
-        rgb2yiq,
-        yiq2rgb,
-        rgb2ypbpr,
-        ypbpr2rgb,
-        rgb2ycbcr,
-        ycbcr2rgb,
-        rgb2ydbdr,
-        ydbdr2rgb,
-    ],
-)
-@pytest.mark.parametrize(
-    "shape", ([(3,), (2, 3), (4, 5, 3), (5, 4, 5, 3), (4, 5, 4, 5, 3)])
-)
+@pytest.mark.parametrize("func", [rgb2hsv, hsv2rgb,
+                                  rgb2xyz, xyz2rgb,
+                                  rgb2hed, hed2rgb,
+                                  rgb2rgbcie, rgbcie2rgb,
+                                  xyz2lab, lab2xyz,
+                                  lab2rgb, rgb2lab,
+                                  xyz2luv, luv2xyz,
+                                  luv2rgb, rgb2luv,
+                                  lab2lch, lch2lab,
+                                  rgb2yuv, yuv2rgb,
+                                  rgb2yiq, yiq2rgb,
+                                  rgb2ypbpr, ypbpr2rgb,
+                                  rgb2ycbcr, ycbcr2rgb,
+                                  rgb2ydbdr, ydbdr2rgb])
+@pytest.mark.parametrize("shape", ([(3, ), (2, 3), (4, 5, 3), (5, 4, 5, 3),
+                                    (4, 5, 4, 5, 3)]))
 def test_nD_color_conversion(func, shape):
     img = cp.random.rand(*shape)
     out = func(img)
@@ -992,9 +830,8 @@ def test_nD_color_conversion(func, shape):
     assert out.shape == img.shape
 
 
-@pytest.mark.parametrize(
-    "shape", ([(4,), (2, 4), (4, 5, 4), (5, 4, 5, 4), (4, 5, 4, 5, 4)])
-)
+@pytest.mark.parametrize("shape", ([(4, ), (2, 4), (4, 5, 4), (5, 4, 5, 4),
+                                    (4, 5, 4, 5, 4)]))
 def test_rgba2rgb_nD(shape):
     img = cp.random.rand(*shape)
     out = rgba2rgb(img)
