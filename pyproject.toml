@@ -9,17 +9,3 @@ requires = [
     "numpy==1.16.0; python_version=='3.7' and platform_system=='AIX'",
     "numpy==1.17.3; python_version>='3.8' and platform_system=='AIX'",
 ]
-
-[tool.black]
-line-length = 80
-target-version = ['py36']
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | _build
-  | build
-  | dist
-  | doc
-)/
-'''
