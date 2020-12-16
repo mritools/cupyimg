@@ -1,35 +1,22 @@
 import cupy as cp
 import numpy as np
 
-from cupyimg import numpy as cnp
-
 from ..color import rgb2gray, rgba2rgb
 from ..util.dtype import dtype_range, dtype_limits
 from .._shared.utils import warn
 
 
-__all__ = [
-    "histogram",
-    "cumulative_distribution",
-    "equalize_hist",
-    "rescale_intensity",
-    "adjust_gamma",
-    "adjust_log",
-    "adjust_sigmoid",
-]
+__all__ = ['histogram', 'cumulative_distribution', 'equalize_hist',
+           'rescale_intensity', 'adjust_gamma', 'adjust_log', 'adjust_sigmoid']
 
 
 DTYPE_RANGE = dtype_range.copy()
 DTYPE_RANGE.update((d.__name__, limits) for d, limits in dtype_range.items())
-DTYPE_RANGE.update(
-    {
-        "uint10": (0, 2 ** 10 - 1),
-        "uint12": (0, 2 ** 12 - 1),
-        "uint14": (0, 2 ** 14 - 1),
-        "bool": dtype_range[np.bool_],
-        "float": dtype_range[np.float64],
-    }
-)
+DTYPE_RANGE.update({'uint10': (0, 2 ** 10 - 1),
+                    'uint12': (0, 2 ** 12 - 1),
+                    'uint14': (0, 2 ** 14 - 1),
+                    'bool': dtype_range[bool],
+                    'float': dtype_range[np.float64]})
 
 
 def _offset_array(arr, low_boundary, high_boundary):
@@ -38,9 +25,8 @@ def _offset_array(arr, low_boundary, high_boundary):
         offset = low_boundary
         dyn_range = high_boundary - low_boundary
         # get smallest dtype that can hold both minimum and offset maximum
-        offset_dtype = np.promote_types(
-            np.min_scalar_type(dyn_range), np.min_scalar_type(low_boundary)
-        )
+        offset_dtype = np.promote_types(np.min_scalar_type(dyn_range),
+                                        np.min_scalar_type(low_boundary))
         if arr.dtype != offset_dtype:
             # prevent overflow errors when offsetting
             arr = arr.astype(offset_dtype)
@@ -73,27 +59,23 @@ def _bincount_histogram(image, source_range):
     bin_centers : array
         The values at the center of the bins.
     """
-    if source_range not in ["image", "dtype"]:
-        raise ValueError(
-            "Incorrect value for `source_range` argument: {}".format(
-                source_range
-            )
-        )
-    if source_range == "image":
+    if source_range not in ['image', 'dtype']:
+        raise ValueError('Incorrect value for `source_range` argument: {}'.format(source_range))
+    if source_range == 'image':
         image_min = int(image.min().astype(np.int64))
         image_max = int(image.max().astype(np.int64))
-    elif source_range == "dtype":
+    elif source_range == 'dtype':
         image_min, image_max = dtype_limits(image, clip_negative=False)
     image, offset = _offset_array(image, image_min, image_max)
     hist = cp.bincount(image.ravel(), minlength=image_max - image_min + 1)
     bin_centers = cp.arange(image_min, image_max + 1)
-    if source_range == "image":
+    if source_range == 'image':
         idx = max(image_min, 0)
         hist = hist[idx:]
     return hist, bin_centers
 
 
-def histogram(image, nbins=256, source_range="image", normalize=False):
+def histogram(image, nbins=256, source_range='image', normalize=False):
     """Return histogram of image.
 
     Unlike `numpy.histogram`, this function returns the centers of bins and
@@ -141,30 +123,23 @@ def histogram(image, nbins=256, source_range="image", normalize=False):
     """
     sh = image.shape
     if len(sh) == 3 and sh[-1] < 4:
-        warn(
-            "This might be a color image. The histogram will be "
-            "computed on the flattened image. You can instead "
-            "apply this function to each color channel."
-        )
+        warn("This might be a color image. The histogram will be "
+             "computed on the flattened image. You can instead "
+             "apply this function to each color channel.")
 
     image = image.flatten()
     # For integer types, histogramming with bincount is more efficient.
     if np.issubdtype(image.dtype, np.integer):
         hist, bin_centers = _bincount_histogram(image, source_range)
     else:
-        if source_range == "image":
+        if source_range == 'image':
             hist_range = None
-        elif source_range == "dtype":
+        elif source_range == 'dtype':
             hist_range = dtype_limits(image, clip_negative=False)
         else:
-            ValueError("Wrong value for the `source_range` argument")
-        try:
-            # use upstream version if range argument is available
-            hist, bin_edges = cp.histogram(image, bins=nbins, range=hist_range)
-        except TypeError:
-            # fall back to the version in this library
-            hist, bin_edges = cnp.histogram(image, bins=nbins, range=hist_range)
-        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
+            ValueError('Wrong value for the `source_range` argument')
+        hist, bin_edges = cp.histogram(image, bins=nbins, range=hist_range)
+        bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.
 
     if normalize:
         hist = hist / cp.sum(hist)
@@ -243,17 +218,11 @@ def equalize_hist(image, nbins=256, mask=None):
 
     """
     if mask is not None:
-        mask = cp.array(mask, dtype=bool)
+        mask = mask.astype(bool, copy=False)
         cdf, bin_centers = cumulative_distribution(image[mask], nbins)
     else:
         cdf, bin_centers = cumulative_distribution(image, nbins)
-    if False:
-        out = cp.interp(image.flat, bin_centers, cdf)
-    else:
-        # TODO: grlee77: no cp.interp, so have to transfer
-        out = cp.asarray(
-            np.interp(image.get().flat, bin_centers.get(), cdf.get())
-        )
+    out = cp.interp(image.ravel(), bin_centers, cdf)
     return out.reshape(image.shape)
 
 
@@ -285,10 +254,10 @@ def intensity_range(image, range_values="image", clip_negative=False):
         If True, clip the negative range (i.e. return 0 for min intensity)
         even if the image dtype allows negative values.
     """
-    if range_values == "dtype":
+    if range_values == 'dtype':
         range_values = image.dtype.type
 
-    if range_values == "image":
+    if range_values == 'image':
         i_min = np.min(image)
         i_max = np.max(image)
     elif range_values in DTYPE_RANGE:
@@ -325,7 +294,7 @@ def _output_dtype(dtype_or_range):
     """
     if type(dtype_or_range) in [list, tuple, np.ndarray]:
         # pair of values: always return float.
-        return np.float_
+        return float
     if type(dtype_or_range) == type:
         # already a type: return it
         return dtype_or_range
@@ -339,8 +308,8 @@ def _output_dtype(dtype_or_range):
             return np.uint16
     else:
         raise ValueError(
-            "Incorrect value for out_range, should be a valid image data "
-            f"type or a pair of values, got {dtype_or_range}."
+            'Incorrect value for out_range, should be a valid image data '
+            f'type or a pair of values, got {dtype_or_range}.'
         )
 
 
@@ -436,22 +405,21 @@ def rescale_intensity(image, in_range="image", out_range="dtype"):
     >>> rescale_intensity(image, out_range=(0, 127)).astype(np.int32)
     array([127, 127, 127], dtype=int32)
     """
-    if out_range in ["dtype", "image"]:
+    if out_range in ['dtype', 'image']:
         out_dtype = _output_dtype(image.dtype.type)
     else:
         out_dtype = _output_dtype(out_range)
 
     imin, imax = map(float, intensity_range(image, in_range))
-    omin, omax = map(
-        float, intensity_range(image, out_range, clip_negative=(imin >= 0))
-    )
+    omin, omax = map(float, intensity_range(image, out_range,
+                                            clip_negative=(imin >= 0)))
 
     if np.any(np.isnan([imin, imax, omin, omax])):
         warn(
             "One or more intensity levels are NaN. Rescaling will broadcast "
             "NaN to the full image. Provide intensity levels yourself to "
             "avoid this. E.g. with np.nanmin(image), np.nanmax(image).",
-            stacklevel=2,
+            stacklevel=2
         )
 
     image = cp.clip(image, imin, imax)
@@ -465,12 +433,10 @@ def rescale_intensity(image, in_range="image", out_range="dtype"):
 
 def _assert_non_negative(image):
 
-    if cp.any(image < 0):
-        raise ValueError(
-            "Image Correction methods work correctly only on "
-            "images with non-negative values. Use "
-            "skimage.exposure.rescale_intensity."
-        )
+    if cp.any(image < 0):  # synchronize!
+        raise ValueError('Image Correction methods work correctly only on '
+                         'images with non-negative values. Use '
+                         'skimage.exposure.rescale_intensity.')
 
 
 def _adjust_gamma_u8(image, gamma, gain):
@@ -535,10 +501,12 @@ def adjust_gamma(image, gamma=1, gain=1):
         out = _adjust_gamma_u8(image, gamma, gain)
     else:
         _assert_non_negative(image)
-        scale = float(
-            dtype_limits(image, True)[1] - dtype_limits(image, True)[0]
-        )
+
+        scale = float(dtype_limits(image, True)[1]
+                      - dtype_limits(image, True)[0])
+
         out = (((image / scale) ** gamma) * scale * gain).astype(dtype)
+
     return out
 
 
@@ -579,7 +547,7 @@ def adjust_log(image, gain=1, inv=False):
 
     if inv:
         out = (2 ** (image / scale) - 1) * scale * gain
-        return out.astype(dtype=dtype, copy=False)
+        return out.astype(dtype, copy=False)
 
     out = cp.log2(1 + image / scale) * scale * gain
     return out.astype(dtype, copy=False)
@@ -634,13 +602,8 @@ def adjust_sigmoid(image, cutoff=0.5, gain=10, inv=False):
     return out.astype(dtype, copy=False)
 
 
-def is_low_contrast(
-    image,
-    fraction_threshold=0.05,
-    lower_percentile=1,
-    upper_percentile=99,
-    method="linear",
-):
+def is_low_contrast(image, fraction_threshold=0.05, lower_percentile=1,
+                    upper_percentile=99, method='linear'):
     """Determine if an image is low contrast.
 
     Parameters
@@ -680,7 +643,6 @@ def is_low_contrast(
     >>> is_low_contrast(image, upper_percentile=100)
     False
     """
-    image = cp.asarray(image)
     if image.ndim == 3:
         if image.shape[2] == 4:
             image = rgba2rgb(image)

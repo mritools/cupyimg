@@ -1,5 +1,4 @@
 import cupy as cp
-import numpy as np
 
 
 def _match_cumulative_cdf(source, template):
@@ -7,25 +6,16 @@ def _match_cumulative_cdf(source, template):
     Return modified source array so that the cumulative density function of
     its values matches the cumulative density function of the template.
     """
-    src_values, src_unique_indices, src_counts = cp.unique(
-        source.ravel(), return_inverse=True, return_counts=True
-    )
+    src_values, src_unique_indices, src_counts = cp.unique(source.ravel(),
+                                                           return_inverse=True,
+                                                           return_counts=True)
     tmpl_values, tmpl_counts = cp.unique(template.ravel(), return_counts=True)
 
     # calculate normalized quantiles for each array
     src_quantiles = cp.cumsum(src_counts) / source.size
     tmpl_quantiles = cp.cumsum(tmpl_counts) / template.size
 
-    # TODO: grlee77: cp.interp does not exist, so have to transfer to CPU
-    if not hasattr(cp, "interp"):
-        src_quantiles = src_quantiles.get()
-        tmpl_quantiles = tmpl_quantiles.get()
-        tmpl_values = tmpl_values.get()
-        interp_a_values = cp.asarray(
-            np.interp(src_quantiles, tmpl_quantiles, tmpl_values)
-        )
-    else:
-        interp_a_values = cp.interp(src_quantiles, tmpl_quantiles, tmpl_values)
+    interp_a_values = cp.interp(src_quantiles, tmpl_quantiles, tmpl_values)
     return interp_a_values[src_unique_indices].reshape(source.shape)
 
 
@@ -61,22 +51,18 @@ def match_histograms(image, reference, *, multichannel=False):
 
     """
     if image.ndim != reference.ndim:
-        raise ValueError(
-            "Image and reference must have the same number " "of channels."
-        )
+        raise ValueError('Image and reference must have the same number '
+                         'of channels.')
 
     if multichannel:
         if image.shape[-1] != reference.shape[-1]:
-            raise ValueError(
-                "Number of channels in the input image and "
-                "reference image must match!"
-            )
+            raise ValueError('Number of channels in the input image and '
+                             'reference image must match!')
 
         matched = cp.empty(image.shape, dtype=image.dtype)
         for channel in range(image.shape[-1]):
-            matched_channel = _match_cumulative_cdf(
-                image[..., channel], reference[..., channel]
-            )
+            matched_channel = _match_cumulative_cdf(image[..., channel],
+                                                    reference[..., channel])
             matched[..., channel] = matched_channel
     else:
         matched = _match_cumulative_cdf(image, reference)

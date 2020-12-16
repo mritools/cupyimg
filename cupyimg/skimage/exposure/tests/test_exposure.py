@@ -96,7 +96,7 @@ def test_peak_float_out_of_range_dtype():
     im = cp.asarray([10, 100], dtype=np.float16)
     nbins = 10
     frequencies, bin_centers = exposure.histogram(
-        im, nbins=nbins, source_range="dtype"
+        im, nbins=nbins, source_range='dtype'
     )
     assert_almost_equal(cp.min(bin_centers).get(), -0.9, 3)
     assert_almost_equal(cp.max(bin_centers).get(), 0.9, 3)
@@ -105,16 +105,16 @@ def test_peak_float_out_of_range_dtype():
 
 def test_normalize():
     im = cp.asarray([0, 255, 255], dtype=np.uint8)
-    frequencies, bin_centers = exposure.histogram(
-        im, source_range="dtype", normalize=False
-    )
+    frequencies, bin_centers = exposure.histogram(im, source_range='dtype',
+                                                  normalize=False)
+
     expected = cp.zeros(256)
     expected[0] = 1
     expected[-1] = 2
     assert_array_equal(frequencies, expected)
-    frequencies, bin_centers = exposure.histogram(
-        im, source_range="dtype", normalize=True
-    )
+    frequencies, bin_centers = exposure.histogram(im, source_range='dtype',
+                                                  normalize=True)
+
     expected /= 3.0
     assert_array_equal(frequencies, expected)
 
@@ -124,8 +124,7 @@ def test_normalize():
 
 np.random.seed(0)
 
-test_img_int = data.camera()
-test_img_int = cp.asarray(test_img_int)
+test_img_int = cp.asarray(data.camera())
 # squeeze image intensities to lower image contrast
 test_img = util.img_as_float(test_img_int)
 test_img = exposure.rescale_intensity(test_img / 5.0 + 100)
@@ -171,7 +170,7 @@ def test_equalize_masked():
 def check_cdf_slope(cdf):
     """Slope of cdf which should equal 1 for an equalized histogram."""
     norm_intensity = np.linspace(0, 1, len(cdf))
-    slope, intercept = np.polyfit(norm_intensity, cdf.get(), 1)
+    slope, intercept = np.polyfit(norm_intensity, cp.asnumpy(cdf), 1)
     assert 0.9 < slope < 1.1
 
 
@@ -179,20 +178,22 @@ def check_cdf_slope(cdf):
 # ====================
 
 
-@pytest.mark.parametrize(
-    "test_input,expected",
-    [("image", [0, 1]), ("dtype", [0, 255]), ((10, 20), [10, 20])],
-)
+@pytest.mark.parametrize("test_input,expected", [
+    ('image', [0, 1]),
+    ('dtype', [0, 255]),
+    ((10, 20), [10, 20])
+])
 def test_intensity_range_uint8(test_input, expected):
     image = cp.asarray([0, 1], dtype=np.uint8)
     out = intensity_range(image, range_values=test_input)
     assert_array_equal(out, expected)
 
 
-@pytest.mark.parametrize(
-    "test_input,expected",
-    [("image", [0.1, 0.2]), ("dtype", [-1, 1]), ((0.3, 0.4), [0.3, 0.4])],
-)
+@pytest.mark.parametrize("test_input,expected", [
+    ('image', [0.1, 0.2]),
+    ('dtype', [-1, 1]),
+    ((0.3, 0.4), [0.3, 0.4])
+])
 def test_intensity_range_float(test_input, expected):
     image = cp.asarray([0.1, 0.2], dtype=np.float64)
     out = intensity_range(image, range_values=test_input)
@@ -208,10 +209,10 @@ def test_intensity_range_clipped_float():
 # Test rescale intensity
 # ======================
 
-uint10_max = 2 ** 10 - 1
-uint12_max = 2 ** 12 - 1
-uint14_max = 2 ** 14 - 1
-uint16_max = 2 ** 16 - 1
+uint10_max = 2**10 - 1
+uint12_max = 2**12 - 1
+uint14_max = 2**14 - 1
+uint16_max = 2**16 - 1
 
 
 def test_rescale_stretch():
@@ -248,31 +249,31 @@ def test_rescale_out_range():
     """
     image = cp.asarray([-10, 0, 10], dtype=np.int8)
     out = exposure.rescale_intensity(image, out_range=(0, 127))
-    assert out.dtype == np.float_
+    assert out.dtype == float
     assert_array_almost_equal(out, [0, 63.5, 127])
 
 
 def test_rescale_named_in_range():
     image = cp.asarray([0, uint10_max, uint10_max + 100], dtype=np.uint16)
-    out = exposure.rescale_intensity(image, in_range="uint10")
+    out = exposure.rescale_intensity(image, in_range='uint10')
     assert_array_almost_equal(out, [0, uint16_max, uint16_max])
 
 
 def test_rescale_named_out_range():
     image = cp.asarray([0, uint16_max], dtype=np.uint16)
-    out = exposure.rescale_intensity(image, out_range="uint10")
+    out = exposure.rescale_intensity(image, out_range='uint10')
     assert_array_almost_equal(out, [0, uint10_max])
 
 
 def test_rescale_uint12_limits():
     image = cp.asarray([0, uint16_max], dtype=np.uint16)
-    out = exposure.rescale_intensity(image, out_range="uint12")
+    out = exposure.rescale_intensity(image, out_range='uint12')
     assert_array_almost_equal(out, [0, uint12_max])
 
 
 def test_rescale_uint14_limits():
     image = cp.asarray([0, uint16_max], dtype=np.uint16)
-    out = exposure.rescale_intensity(image, out_range="uint14")
+    out = exposure.rescale_intensity(image, out_range='uint14')
     assert_array_almost_equal(out, [0, uint14_max])
 
 
@@ -297,7 +298,8 @@ def test_rescale_same_values():
 
 
 @pytest.mark.parametrize(
-    "in_range,out_range", [("image", "dtype"), ("dtype", "image")]
+    "in_range,out_range", [("image", "dtype"),
+                           ("dtype", "image")]
 )
 def test_rescale_nan_warning(in_range, out_range):
     image = cp.arange(12, dtype=float).reshape(3, 4)
@@ -313,14 +315,13 @@ def test_rescale_nan_warning(in_range, out_range):
 
 
 @pytest.mark.parametrize(
-    "out_range, out_dtype",
-    [
-        ("uint8", np.uint8),
-        ("uint10", np.uint16),
-        ("uint12", np.uint16),
-        ("uint16", np.uint16),
-        ("float", np.float_),
-    ],
+    "out_range, out_dtype", [
+        ('uint8', np.uint8),
+        ('uint10', np.uint16),
+        ('uint12', np.uint16),
+        ('uint16', np.uint16),
+        ('float', float),
+    ]
 )
 def test_rescale_output_dtype(out_range, out_dtype):
     image = cp.asarray([-128, 0, 127], dtype=np.int8)
@@ -339,7 +340,7 @@ def test_rescale_float_output():
     image = cp.asarray([-128, 0, 127], dtype=np.int8)
     output_image = exposure.rescale_intensity(image, out_range=(0, 255))
     cp.testing.assert_array_equal(output_image, [0, 128, 255])
-    assert output_image.dtype == np.float_
+    assert output_image.dtype == float
 
 
 def test_rescale_raises_on_incorrect_out_range():
@@ -357,19 +358,19 @@ def test_adapthist_grayscale():
     img = util.img_as_float(data.astronaut())
     img = rgb2gray(img)
     img = cp.dstack((img, img, img))
-    adapted = exposure.equalize_adapthist(
-        img, kernel_size=(57, 51), clip_limit=0.01, nbins=128
-    )
+    adapted = exposure.equalize_adapthist(img, kernel_size=(57, 51),
+                                          clip_limit=0.01, nbins=128)
     assert img.shape == adapted.shape
-    assert_almost_equal(peak_snr(img, adapted).get(), 100.140, 3)
-    assert_almost_equal(norm_brightness_err(img, adapted).get(), 0.0529, 3)
+    assert_almost_equal(float(peak_snr(img, adapted)), 100.140, 3)
+    assert_almost_equal(float(norm_brightness_err(img, adapted)), 0.0529, 3)
 
 
 def test_adapthist_color():
-    """Test an RGB color uint16 image"""
+    """Test an RGB color uint16 image
+    """
     img = util.img_as_uint(data.astronaut())
     with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+        warnings.simplefilter('always')
         hist, bin_centers = exposure.histogram(img)
         assert len(w) > 0
     adapted = exposure.equalize_adapthist(img, clip_limit=0.01)
@@ -378,8 +379,8 @@ def test_adapthist_color():
     assert adapted.max() == 1.0
     assert img.shape == adapted.shape
     full_scale = exposure.rescale_intensity(img)
-    assert_almost_equal(peak_snr(full_scale, adapted).get(), 109.393, 1)
-    assert_almost_equal(norm_brightness_err(full_scale, adapted).get(), 0.02, 2)
+    assert_almost_equal(float(peak_snr(full_scale, adapted)), 109.393, 1)
+    assert_almost_equal(float(norm_brightness_err(full_scale, adapted)), 0.02, 2)
     return data, adapted
 
 
@@ -393,9 +394,9 @@ def test_adapthist_alpha():
     img = img[:, :, :3]
     full_scale = exposure.rescale_intensity(img)
     assert img.shape == adapted.shape
-    assert_almost_equal(peak_snr(full_scale, adapted).get(), 109.393, 2)
+    assert_almost_equal(float(peak_snr(full_scale, adapted)), 109.393, 2)
     assert_almost_equal(
-        norm_brightness_err(full_scale, adapted).get(), 0.0248, 3
+        float(norm_brightness_err(full_scale, adapted)), 0.0248, 3
     )
 
 
@@ -413,12 +414,12 @@ def test_adapthist_grayscale_Nd():
     img3d = cp.stack([img2d] * (img.shape[0] // a), axis=0)
 
     # apply CLAHE
-    adapted2d = exposure.equalize_adapthist(
-        img2d, kernel_size=5, clip_limit=0.05
-    )
-    adapted3d = exposure.equalize_adapthist(
-        img3d, kernel_size=5, clip_limit=0.05
-    )
+    adapted2d = exposure.equalize_adapthist(img2d,
+                                            kernel_size=5,
+                                            clip_limit=0.05)
+    adapted3d = exposure.equalize_adapthist(img3d,
+                                            kernel_size=5,
+                                            clip_limit=0.05)
 
     # check that dimensions of input and output match
     assert img2d.shape == adapted2d.shape
@@ -426,13 +427,13 @@ def test_adapthist_grayscale_Nd():
 
     # check that the result from the stack of 2d images is similar
     # to the underlying 2d image
-    assert (
-        cp.mean(cp.abs(adapted2d - adapted3d[adapted3d.shape[0] // 2])) < 0.02
-    )
+    assert cp.mean(cp.abs(adapted2d
+                          - adapted3d[adapted3d.shape[0] // 2])) < 0.02
 
 
 def test_adapthist_constant():
-    """Test constant image, float and uint"""
+    """Test constant image, float and uint
+    """
     img = cp.zeros((8, 8))
     img += 2
     img = img.astype(np.uint16)
@@ -447,7 +448,8 @@ def test_adapthist_constant():
 
 
 def test_adapthist_borders():
-    """Test border processing"""
+    """Test border processing
+    """
     img = rgb2gray(cp.asarray(util.img_as_float(data.astronaut())))
 
     # maximize difference between orig and processed img
@@ -459,15 +461,11 @@ def test_adapthist_borders():
     for kernel_size in range(51, 71, 2):
         adapted = exposure.equalize_adapthist(img, kernel_size, clip_limit=0.5)
         # Check last columns are processed
-        assert (
-            norm_brightness_err(adapted[:, border_index], img[:, border_index])
-            > 0.1
-        )
+        assert norm_brightness_err(adapted[:, border_index],
+                                   img[:, border_index]) > 0.1
         # Check last rows are processed
-        assert (
-            norm_brightness_err(adapted[border_index, :], img[border_index, :])
-            > 0.1
-        )
+        assert norm_brightness_err(adapted[border_index, :],
+                                   img[border_index, :]) > 0.1
 
 
 def test_adapthist_clip_limit():
@@ -766,10 +764,11 @@ def test_is_low_contrast():
 # =======================
 
 
-# TODO: dask support?
+# TODO: this Dask-based test case does not work (segfault!)
+#@pytest.mark.xfail(True, reason="dask case not currently supported")
 @pytest.mark.skip("dask case not currently supported")
 def test_dask_histogram():
-    pytest.importorskip("dask", reason="dask python library is not installed")
+    pytest.importorskip('dask', reason="dask python library is not installed")
     import dask.array as da
 
     dask_array = da.from_array(cp.asarray([[0, 1], [1, 2]]), chunks=(1, 2))

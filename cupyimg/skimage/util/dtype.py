@@ -39,13 +39,14 @@ _integer_types = (
 _integer_ranges = {
     t: (cp.iinfo(t).min, cp.iinfo(t).max) for t in _integer_types
 }
-dtype_range = {
-    cp.bool_: (False, True),
-    cp.bool8: (False, True),
-    cp.float16: (-1, 1),
-    cp.float32: (-1, 1),
-    cp.float64: (-1, 1),
-}
+dtype_range = {bool: (False, True),
+               cp.bool_: (False, True),
+               cp.bool8: (False, True),
+               float: (-1, 1),
+               cp.float_: (-1, 1),
+               cp.float16: (-1, 1),
+               cp.float32: (-1, 1),
+               cp.float64: (-1, 1)}
 dtype_range.update(_integer_ranges)
 
 _supported_types = list(dtype_range.keys())

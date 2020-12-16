@@ -26,14 +26,14 @@ from ..util import img_as_float, img_as_uint
 from ..color.adapt_rgb import adapt_rgb, hsv_value
 from ..exposure import rescale_intensity
 from cupyimg._misc import _prod
-from cupyimg import numpy as cnp
 
 
 NR_OF_GRAY = 2 ** 14  # number of grayscale levels to use in CLAHE algorithm
 
 
 @adapt_rgb(hsv_value)
-def equalize_adapthist(image, kernel_size=None, clip_limit=0.01, nbins=256):
+def equalize_adapthist(image, kernel_size=None,
+                       clip_limit=0.01, nbins=256):
     """Contrast Limited Adaptive Histogram Equalization (CLAHE).
 
     An algorithm for local contrast enhancement, that uses histograms computed
@@ -89,13 +89,12 @@ def equalize_adapthist(image, kernel_size=None, clip_limit=0.01, nbins=256):
     ).astype(cp.uint16)
 
     if kernel_size is None:
-        kernel_size = tuple(
-            [image.shape[dim] // 8 for dim in range(image.ndim)]
-        )
+        kernel_size = tuple(image.shape[dim] // 8
+                            for dim in range(image.ndim))
     elif isinstance(kernel_size, numbers.Number):
         kernel_size = (kernel_size,) * image.ndim
     elif len(kernel_size) != image.ndim:
-        ValueError("Incorrect value of `kernel_size`: {}".format(kernel_size))
+        ValueError('Incorrect value of `kernel_size`: {}'.format(kernel_size))
 
     kernel_size = [int(k) for k in kernel_size]
 
@@ -137,27 +136,19 @@ def _clahe(image, kernel_size, clip_limit, nbins):
     # - is preceded by half a kernel size
     pad_start_per_dim = [k // 2 for k in kernel_size]
 
-    pad_end_per_dim = [
-        (k - s % k) % k + math.ceil(k / 2.0)
-        for k, s in zip(kernel_size, image.shape)
-    ]
+    pad_end_per_dim = [(k - s % k) % k + math.ceil(k / 2.)
+                       for k, s in zip(kernel_size, image.shape)]
 
-    image = cp.pad(
-        image,
-        [(p_i, p_f) for p_i, p_f in zip(pad_start_per_dim, pad_end_per_dim)],
-        mode="reflect",
-    )
+    image = cp.pad(image, [[p_i, p_f] for p_i, p_f in
+                           zip(pad_start_per_dim, pad_end_per_dim)],
+                   mode='reflect')
 
+    # determine gray value bins
     bin_size = 1 + NR_OF_GRAY // nbins
-    if True:
-        lut = cp.arange(NR_OF_GRAY)
-        lut //= bin_size
+    lut = cp.arange(NR_OF_GRAY)
+    lut //= bin_size
 
-        image = lut[image]
-    else:
-        lut = np.arange(NR_OF_GRAY)
-        lut //= bin_size
-        image = cp.asarray(lut[image.get()])
+    image = lut[image]
 
     # calculate graylevel mappings for each contextual region
     # rearrange image into flattened contextual regions
@@ -165,46 +156,44 @@ def _clahe(image, kernel_size, clip_limit, nbins):
     hist_blocks_shape = functools.reduce(
         operator.add, [(s, k) for s, k in zip(ns_hist, kernel_size)]
     )
-    hist_blocks_axis_order = tuple(range(0, ndim * 2, 2)) + tuple(
-        range(1, ndim * 2, 2)
-    )
+    hist_blocks_axis_order = (tuple(range(0, ndim * 2, 2)) +
+                              tuple(range(1, ndim * 2, 2)))
     hist_slices = [
         slice(k // 2, k // 2 + n * k) for k, n in zip(kernel_size, ns_hist)
     ]
     hist_blocks = image[tuple(hist_slices)].reshape(hist_blocks_shape)
     hist_blocks = hist_blocks.transpose(hist_blocks_axis_order)
     hist_block_assembled_shape = hist_blocks.shape
-    hist_blocks = hist_blocks.reshape((_prod(ns_hist), -1))
+    hist_blocks = hist_blocks.reshape((math.prod(ns_hist), -1))
 
     # Calculate actual clip limit
     if clip_limit > 0.0:
-        clim = int(max(clip_limit * _prod(kernel_size), 1))
+        clim = int(max(clip_limit * math.prod(kernel_size), 1))
     else:
         # largest possible value, i.e., do not clip (AHE)
         clim = np.product(kernel_size)
 
-    if True:
-        # faster to loop over the arrays on the host
-        hist_blocks = cp.asnumpy(hist_blocks)
-        hist = np.apply_along_axis(
-            np.bincount, -1, hist_blocks, minlength=nbins
-        )
-        hist = np.apply_along_axis(
-            clip_histogram, -1, hist, clip_limit=clim, xp=np
-        )
-        hist = cp.asarray(hist)
+    # Note: for 4096, 4096 input and default args, shapes are:
+    #    hist_blocks.shape = (64, 262144)
+    #    hist.shape = (64, 256)
+    hist = cp.apply_along_axis(cp.bincount, -1, hist_blocks, minlength=nbins)
+    if isinstance(hist_blocks, cp.ndarray):
+        # CuPy Backend:
+        #    faster to loop over the arrays on the host
+        #    (hist is small and clip_histogram has too much overhead)
+        # TODO: implement clip_histogram kernel to avoid synchronization?
+        hist = cp.asarray(np.apply_along_axis(  # synchronize!
+            clip_histogram, -1, cp.asnumpy(hist), clip_limit=clim
+        ))
     else:
-        hist = cnp.apply_along_axis(
-            cp.bincount, -1, hist_blocks, minlength=nbins
-        )
-        hist = cnp.apply_along_axis(clip_histogram, -1, hist, clip_limit=clim)
-    hist = map_histogram(hist, 0, NR_OF_GRAY - 1, _prod(kernel_size))
+        hist = cp.apply_along_axis(clip_histogram, -1, hist, clip_limit=clim)
+    hist = map_histogram(hist, 0, NR_OF_GRAY - 1, math.prod(kernel_size))
     hist = hist.reshape(hist_block_assembled_shape[:ndim] + (-1,))
 
     # duplicate leading mappings in each dim
-    map_array = cp.pad(
-        hist, [(1, 1) for _ in range(ndim)] + [(0, 0)], mode="edge"
-    )
+    map_array = cp.pad(hist,
+                       [(1, 1) for _ in range(ndim)] + [(0, 0)],
+                       mode='edge')
 
     # Perform multilinear interpolation of graylevel mappings
     # using the convention described here:
@@ -221,12 +210,11 @@ def _clahe(image, kernel_size, clip_limit, nbins):
     blocks = image.reshape(blocks_shape)
     blocks = blocks.transpose(blocks_axis_order)
     blocks_flattened_shape = blocks.shape
-    blocks = blocks.reshape((_prod(ns_proc), _prod(blocks.shape[ndim:])))
+    blocks = blocks.reshape((_prod(ns_proc), math.prod(blocks.shape[ndim:])))
 
     # calculate interpolation coefficients
-    coeffs = cp.meshgrid(
-        *tuple([cp.arange(k) / k for k in kernel_size[::-1]]), indexing="ij"
-    )
+    coeffs = cp.meshgrid(*tuple([cp.arange(k) / k
+                                 for k in kernel_size[::-1]]), indexing='ij')
     coeffs = [cp.transpose(c).flatten() for c in coeffs]
     inv_coeffs = [1 - c for c in coeffs]
 
@@ -234,12 +222,12 @@ def _clahe(image, kernel_size, clip_limit, nbins):
     # regions in each direction
     result = cp.zeros(blocks.shape, dtype=cp.float32)
     for iedge, edge in enumerate(itertools.product(*((range(2),) * ndim))):
-        edge_maps = map_array[
-            tuple([slice(e, e + n) for e, n in zip(edge, ns_proc)])
-        ]
-        edge_maps = edge_maps.reshape((_prod(ns_proc), -1))
+
+        edge_maps = map_array[tuple(slice(e, e + n)
+                                    for e, n in zip(edge, ns_proc))]
+        edge_maps = edge_maps.reshape((math.prod(ns_proc), -1))
+
         # apply map
-        # edge_mapped = cp.asarray(np.take_along_axis(edge_maps.get(), blocks.get(), axis=-1))
         edge_mapped = cp.take_along_axis(edge_maps, blocks, axis=-1)
 
         # interpolate
@@ -262,21 +250,16 @@ def _clahe(image, kernel_size, clip_limit, nbins):
     result = result.reshape(image.shape)
 
     # undo padding
-    unpad_slices = tuple(
-        [
-            slice(p_i, s - p_f)
-            for p_i, p_f, s in zip(
-                pad_start_per_dim, pad_end_per_dim, image.shape
-            )
-        ]
-    )
+    unpad_slices = tuple([slice(p_i, s - p_f) for p_i, p_f, s in
+                          zip(pad_start_per_dim, pad_end_per_dim,
+                              image.shape)])
     result = result[unpad_slices]
 
     return result
 
 
 # TODO: refactor this clip_histogram bottleneck.
-def clip_histogram(hist, clip_limit, xp=cp):
+def clip_histogram(hist, clip_limit):
     """Perform clipping of the histogram and redistribution of bins.
 
     The histogram is clipped and the number of excess pixels is counted.
@@ -303,6 +286,7 @@ def clip_histogram(hist, clip_limit, xp=cp):
 
     # Second part: clip histogram and redistribute excess pixels in each bin
     bin_incr = n_excess // hist.size  # average binincrement
+    xp = cp.get_array_module(hist)
     upper = clip_limit - bin_incr  # Bins larger than upper set to cliplimit
 
     low_mask = hist < upper
@@ -330,7 +314,7 @@ def clip_histogram(hist, clip_limit, xp=cp):
     return hist
 
 
-def map_histogram(hist, min_val, max_val, n_pixels, xp=cp):
+def map_histogram(hist, min_val, max_val, n_pixels):
     """Calculate the equalized lookup table (mapping).
 
     It does so by cumulating the input histogram.
@@ -352,6 +336,7 @@ def map_histogram(hist, min_val, max_val, n_pixels, xp=cp):
     out : ndarray
        Mapped intensity LUT.
     """
+    xp = cp.get_array_module(hist)
     out = xp.cumsum(hist, axis=-1).astype(float)
     out *= (max_val - min_val) / n_pixels
     out += min_val
