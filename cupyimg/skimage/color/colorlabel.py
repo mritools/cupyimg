@@ -34,7 +34,7 @@ def _rgb_vector(color):
     if isinstance(color, str):
         color = color_dict[color]
     # Slice to handle RGBA colors.
-    return cp.array(color[:3])
+    return np.asarray(color[:3])  # CuPy Backend: leave this array on the host
 
 
 def _match_label_with_color(label, colors, bg_label, bg_color):
@@ -49,7 +49,7 @@ def _match_label_with_color(label, colors, bg_label, bg_color):
     bg_color = _rgb_vector(bg_color)
 
     # map labels to their ranks among all labels from small to large
-    unique_labels, mapped_labels = cp.unique(label, return_inverse=True)
+    unique_labels, mapped_labels = np.unique(label, return_inverse=True)
 
     # get rank of bg_label
     bg_label_rank_list = mapped_labels[label.ravel() == bg_label]
@@ -68,7 +68,6 @@ def _match_label_with_color(label, colors, bg_label, bg_color):
     # Modify labels and color cycle so background color is used only once.
     color_cycle = itertools.cycle(colors)
     color_cycle = itertools.chain([bg_color], color_cycle)
-
     return mapped_labels, color_cycle
 
 
@@ -173,7 +172,7 @@ def _label2rgb_overlay(label, image=None, colors=None, alpha=0.3,
 
     # Ensure that all labels are non-negative so we can index into
     # `label_to_color` correctly.
-    offset = min(label.min(), bg_label)
+    offset = min(int(label.min()), bg_label)
     if offset != 0:
         label = label - offset  # Make sure you don't modify the input array.
         bg_label -= offset
@@ -189,9 +188,12 @@ def _label2rgb_overlay(label, image=None, colors=None, alpha=0.3,
     if len(mapped_labels_flat) == 0:
         return image
 
-    dense_labels = range(int(max(mapped_labels_flat)) + 1)
+    dense_labels = range(int(mapped_labels_flat.max()) + 1)
 
-    label_to_color = cp.stack([c for i, c in zip(dense_labels, color_cycle)])
+    # CuPy Backend: small color_cycle arrays are left on the CPU
+    label_to_color = np.stack([c for i, c in zip(dense_labels, color_cycle)])
+    # CuPy Backend: transfer to GPU after concatenation of small host arrays
+    label_to_color = cp.asarray(label_to_color)
 
     mapped_labels = mapped_labels_flat.reshape(label.shape)
     label = mapped_labels
