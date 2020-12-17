@@ -17,7 +17,7 @@ def test_template():
     target = 0.1 * (np.tri(size) + np.tri(size)[::-1])
     target_positions = [(50, 50), (200, 200)]
     for x, y in target_positions:
-        image[x : x + size, y : y + size] = target
+        image[x:x + size, y:y + size] = target
     np.random.seed(1)
     image += 0.1 * np.random.uniform(size=(400, 400))
     image = cp.asarray(image)
@@ -70,8 +70,8 @@ def test_normalization():
     max_result = np.unravel_index(iflat_max, result.shape)
 
     # shift result by 1 because of template border
-    assert np.all((np.asarray(min_result) + 1) == (ineg, jneg))
-    assert np.all((np.asarray(max_result) + 1) == (ipos, jpos))
+    assert np.all((np.array(min_result) + 1) == (ineg, jneg))
+    assert np.all((np.array(max_result) + 1) == (ipos, jpos))
 
     assert np.allclose(result.ravel()[iflat_min], -1)
     assert np.allclose(result.ravel()[iflat_max], 1)
@@ -114,13 +114,12 @@ def test_pad_input():
     image = 0.5 * cp.ones((9, 19))
     mid = slice(2, 7)
     image[mid, :3] -= template[:, -3:]  # half min template centered at 0
-    image[mid, 4:9] += template  # full max template centered at 6
-    image[mid, -9:-4] -= template  # full min template centered at 12
+    image[mid, 4:9] += template         # full max template centered at 6
+    image[mid, -9:-4] -= template       # full min template centered at 12
     image[mid, -3:] += template[:, :3]  # half max template centered at 18
 
-    result = match_template(
-        image, template, pad_input=True, constant_values=float(image.mean())
-    )
+    result = match_template(image, template, pad_input=True,
+                            constant_values=float(image.mean()))
 
     # get the max and min results.
     sorted_result = cp.argsort(result.ravel())

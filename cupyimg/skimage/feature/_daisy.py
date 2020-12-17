@@ -7,18 +7,8 @@ from .. import img_as_float
 from .._shared.utils import check_nD
 
 
-def daisy(
-    image,
-    step=4,
-    radius=15,
-    rings=3,
-    histograms=8,
-    orientations=8,
-    normalization="l1",
-    sigmas=None,
-    ring_radii=None,
-    visualize=False,
-):
+def daisy(image, step=4, radius=15, rings=3, histograms=8, orientations=8,
+          normalization='l1', sigmas=None, ring_radii=None, visualize=False):
     """Extract DAISY feature descriptors densely for the given image.
 
     DAISY is a feature descriptor similar to SIFT formulated in a way that
@@ -110,12 +100,9 @@ def daisy(
     image = img_as_float(image)
 
     # Validate parameters.
-    if (
-        sigmas is not None
-        and ring_radii is not None
-        and len(sigmas) - 1 != len(ring_radii)
-    ):
-        raise ValueError("`len(sigmas)-1 != len(ring_radii)`")
+    if sigmas is not None and ring_radii is not None \
+            and len(sigmas) - 1 != len(ring_radii):
+        raise ValueError('`len(sigmas)-1 != len(ring_radii)`')
     if ring_radii is not None:
         rings = len(ring_radii)
         radius = ring_radii[-1]
@@ -125,8 +112,8 @@ def daisy(
         sigmas = [radius * (i + 1) / float(2 * rings) for i in range(rings)]
     if ring_radii is None:
         ring_radii = [radius * (i + 1) / float(rings) for i in range(rings)]
-    if normalization not in ["l1", "l2", "daisy", "off"]:
-        raise ValueError("Invalid normalization method.")
+    if normalization not in ['l1', 'l2', 'daisy', 'off']:
+        raise ValueError('Invalid normalization method.')
 
     # Compute image derivatives.
     dx = cp.zeros(image.shape)
@@ -135,14 +122,15 @@ def daisy(
     dy[:-1, :] = cp.diff(image, n=1, axis=0)
 
     # Compute gradient orientation and magnitude and their contribution
-    # to the histograms.
-    grad_mag = cp.sqrt(dx * dx + dy * dy)
+    # to the histograms
+    grad_mag = dx * dx
+    grad_mag += dy * dy
+    cp.sqrt(grad_mag, out=grad_mag)
     grad_ori = cp.arctan2(dy, dx)
     pi = cp.pi
     orientation_kappa = orientations / pi
-    orientation_angles = [
-        2 * o * pi / orientations - pi for o in range(orientations)
-    ]
+    orientation_angles = [2 * o * pi / orientations - pi
+                          for o in range(orientations)]
     hist = cp.empty((orientations,) + image.shape, dtype=float)
     for i, o in enumerate(orientation_angles):
         # Weigh bin contribution by the circular normal distribution
@@ -155,46 +143,43 @@ def daisy(
     hist_smooth = cp.empty((rings + 1,) + hist.shape, dtype=float)
     for i in range(rings + 1):
         for j in range(orientations):
-            hist_smooth[i, j, :, :] = gaussian_filter(
-                hist[j, :, :], sigma=sigmas[i]
-            )
+            hist_smooth[i, j, :, :] = gaussian_filter(hist[j, :, :],
+                                                      sigma=sigmas[i])
 
     # Assemble descriptor grid.
     theta = [2 * pi * j / histograms for j in range(histograms)]
     desc_dims = (rings * histograms + 1) * orientations
-    descs = cp.empty(
-        (desc_dims, image.shape[0] - 2 * radius, image.shape[1] - 2 * radius)
-    )
-    descs[:orientations, :, :] = hist_smooth[
-        0, :, radius:-radius, radius:-radius
-    ]
+    descs = cp.empty((desc_dims, image.shape[0] - 2 * radius,
+                      image.shape[1] - 2 * radius))
+    descs[:orientations, :, :] = hist_smooth[0, :, radius:-radius,
+                                             radius:-radius]
     idx = orientations
-    # ring_radii = ring_radii.get()
-    # theta = theta.get()
     for i in range(rings):
         for j in range(histograms):
             y_min = radius + int(round(ring_radii[i] * math.sin(theta[j])))
             y_max = descs.shape[1] + y_min
             x_min = radius + int(round(ring_radii[i] * math.cos(theta[j])))
             x_max = descs.shape[2] + x_min
-            descs[idx : idx + orientations, :, :] = hist_smooth[
-                i + 1, :, y_min:y_max, x_min:x_max
-            ]
+            descs[idx:idx + orientations, :, :] = hist_smooth[i + 1, :,
+                                                              y_min:y_max,
+                                                              x_min:x_max]
             idx += orientations
     descs = descs[:, ::step, ::step]
     descs = descs.swapaxes(0, 1).swapaxes(1, 2)
 
     # Normalize descriptors.
-    if normalization != "off":
+    if normalization != 'off':
         descs += 1e-10
-        if normalization == "l1":
+        if normalization == 'l1':
             descs /= cp.sum(descs, axis=2)[:, :, cp.newaxis]
-        elif normalization == "l2":
+        elif normalization == 'l2':
             descs /= cp.sqrt(cp.sum(descs * descs, axis=2))[:, :, cp.newaxis]
-        elif normalization == "daisy":
+        elif normalization == 'daisy':
             for i in range(0, desc_dims, orientations):
-                dtmp = descs[:, :, i : i + orientations]
-                norms = cp.sqrt(cp.sum(dtmp * dtmp, axis=2))
+                norms = descs[:, :, i : i + orientations]
+                norms = norms * norms
+                norms = norms.sum(axis=2)
+                cp.sqrt(norms, out=norms)
                 descs[:, :, i : i + orientations] /= norms[:, :, cp.newaxis]
 
     if visualize:
@@ -209,19 +194,16 @@ def daisy(
                 color = [1, 0, 0]
                 desc_y = i * step + radius
                 desc_x = j * step + radius
-                rows, cols, val = draw.circle_perimeter_aa(
-                    desc_y, desc_x, int(sigmas[0])
-                )
+                rows, cols, val = draw.circle_perimeter_aa(desc_y, desc_x, int(sigmas[0]))
                 draw.set_color(descs_img, (rows, cols), color, alpha=val)
-                max_bin = cp.max(descs[i, j, :])
+                max_bin = float(cp.max(descs[i, j, :]))
                 for o_num, o in enumerate(orientation_angles):
                     # Draw center histogram bins
                     bin_size = descs[i, j, o_num] / max_bin
                     dy = sigmas[0] * bin_size * math.sin(o)
                     dx = sigmas[0] * bin_size * math.cos(o)
-                    rows, cols, val = draw.line_aa(
-                        desc_y, desc_x, int(desc_y + dy), int(desc_x + dx)
-                    )
+                    rows, cols, val = draw.line_aa(desc_y, desc_x, int(desc_y + dy),
+                                                   int(desc_x + dx))
                     draw.set_color(descs_img, (rows, cols), color, alpha=val)
                 for r_num, r in enumerate(ring_radii):
                     color_offset = float(1 + r_num) / rings
@@ -230,34 +212,21 @@ def daisy(
                         # Draw ring histogram sigmas
                         hist_y = desc_y + int(round(r * math.sin(t)))
                         hist_x = desc_x + int(round(r * math.cos(t)))
-                        rows, cols, val = draw.circle_perimeter_aa(
-                            hist_y, hist_x, int(sigmas[r_num + 1])
-                        )
-                        draw.set_color(
-                            descs_img, (rows, cols), color, alpha=val
-                        )
+                        rows, cols, val = draw.circle_perimeter_aa(hist_y, hist_x,
+                                                                   int(sigmas[r_num + 1]))
+                        draw.set_color(descs_img, (rows, cols), color, alpha=val)
                         for o_num, o in enumerate(orientation_angles):
                             # Draw histogram bins
-                            bin_size = descs[
-                                i,
-                                j,
-                                orientations
-                                + r_num * histograms * orientations
-                                + t_num * orientations
-                                + o_num,
-                            ]
+                            bin_size = descs[i, j, orientations + r_num *
+                                             histograms * orientations +
+                                             t_num * orientations + o_num]
                             bin_size /= max_bin
                             dy = sigmas[r_num + 1] * bin_size * math.sin(o)
                             dx = sigmas[r_num + 1] * bin_size * math.cos(o)
-                            rows, cols, val = draw.line_aa(
-                                hist_y,
-                                hist_x,
-                                int(hist_y + dy),
-                                int(hist_x + dx),
-                            )
-                            draw.set_color(
-                                descs_img, (rows, cols), color, alpha=val
-                            )
+                            rows, cols, val = draw.line_aa(hist_y, hist_x,
+                                                           int(hist_y + dy),
+                                                           int(hist_x + dx))
+                            draw.set_color(descs_img, (rows, cols), color, alpha=val)
         return descs, descs_img
     else:
         return descs

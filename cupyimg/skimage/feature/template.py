@@ -9,15 +9,12 @@ from .._shared.utils import check_nD
 def _window_sum_2d(image, window_shape):
 
     window_sum = cp.cumsum(image, axis=0)
-    window_sum = (
-        window_sum[window_shape[0] : -1] - window_sum[: -window_shape[0] - 1]
-    )
+    window_sum = (window_sum[window_shape[0]:-1]
+                  - window_sum[:-window_shape[0] - 1])
 
     window_sum = cp.cumsum(window_sum, axis=1)
-    window_sum = (
-        window_sum[:, window_shape[1] : -1]
-        - window_sum[:, : -window_shape[1] - 1]
-    )
+    window_sum = (window_sum[:, window_shape[1]:-1]
+                  - window_sum[:, :-window_shape[1] - 1])
 
     return window_sum
 
@@ -27,17 +24,14 @@ def _window_sum_3d(image, window_shape):
     window_sum = _window_sum_2d(image, window_shape)
 
     window_sum = cp.cumsum(window_sum, axis=2)
-    window_sum = (
-        window_sum[:, :, window_shape[2] : -1]
-        - window_sum[:, :, : -window_shape[2] - 1]
-    )
+    window_sum = (window_sum[:, :, window_shape[2]:-1]
+                  - window_sum[:, :, :-window_shape[2] - 1])
 
     return window_sum
 
 
-def match_template(
-    image, template, pad_input=False, mode="constant", constant_values=0
-):
+def match_template(image, template, pad_input=False, mode='constant',
+                   constant_values=0):
     """Match a template to a 2-D or 3-D image using normalized correlation.
 
     The output is an array with values between -1.0 and 1.0. The value at a
@@ -125,10 +119,8 @@ def match_template(
     check_nD(image, (2, 3))
 
     if image.ndim < template.ndim:
-        raise ValueError(
-            "Dimensionality of template must be less than or "
-            "equal to the dimensionality of image."
-        )
+        raise ValueError("Dimensionality of template must be less than or "
+                         "equal to the dimensionality of image.")
     if any(si < st for si, st in zip(image.shape, template.shape)):
         raise ValueError("Image must be larger than template.")
 
@@ -139,13 +131,9 @@ def match_template(
     template = cp.asarray(template, dtype=float_dtype)
 
     pad_width = tuple((width, width) for width in template.shape)
-    if mode == "constant":
-        image = cp.pad(
-            image,
-            pad_width=pad_width,
-            mode=mode,
-            constant_values=constant_values,
-        )
+    if mode == 'constant':
+        image = cp.pad(image, pad_width=pad_width, mode=mode,
+                       constant_values=constant_values)
     else:
         image = cp.pad(image, pad_width=pad_width, mode=mode)
 
@@ -165,13 +153,11 @@ def match_template(
     template_ssd = cp.sum(template_ssd)
 
     if image.ndim == 2:
-        xcorr = fftconvolve(image, template[::-1, ::-1], mode="valid")[
-            1:-1, 1:-1
-        ]
+        xcorr = fftconvolve(image, template[::-1, ::-1],
+                            mode="valid")[1:-1, 1:-1]
     elif image.ndim == 3:
-        xcorr = fftconvolve(image, template[::-1, ::-1, ::-1], mode="valid")[
-            1:-1, 1:-1, 1:-1
-        ]
+        xcorr = fftconvolve(image, template[::-1, ::-1, ::-1],
+                            mode="valid")[1:-1, 1:-1, 1:-1]
 
     numerator = xcorr - image_window_sum * template_mean
 
@@ -180,9 +166,7 @@ def match_template(
     cp.divide(image_window_sum, template_volume, out=image_window_sum)
     denominator -= image_window_sum
     denominator *= template_ssd
-    cp.maximum(
-        denominator, 0, out=denominator
-    )  # sqrt of negative number not allowed
+    cp.maximum(denominator, 0, out=denominator)  # sqrt of negative number not allowed
     cp.sqrt(denominator, out=denominator)
 
     response = cp.zeros_like(xcorr, dtype=np.float64)

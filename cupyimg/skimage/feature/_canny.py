@@ -51,14 +51,8 @@ def smooth_with_function_and_mask(image, function, mask):
     return output_image
 
 
-def canny(
-    image,
-    sigma=1.0,
-    low_threshold=None,
-    high_threshold=None,
-    mask=None,
-    use_quantiles=False,
-):
+def canny(image, sigma=1., low_threshold=None, high_threshold=None, mask=None,
+          use_quantiles=False):
     """Edge filter an image using the Canny algorithm.
 
     Parameters
@@ -185,7 +179,7 @@ def canny(
         mask = cp.ones(image.shape, dtype=bool)
 
     def fsmooth(x):
-        return img_as_float(gaussian(x, sigma, mode="constant"))
+        return img_as_float(gaussian(x, sigma, mode='constant'))
 
     smoothed = smooth_with_function_and_mask(image, fsmooth, mask)
     jsobel = ndi.sobel(smoothed, axis=1)
@@ -295,9 +289,7 @@ def canny(
     if count == 0:
         return low_mask
 
-    sums = cp.asarray(
-        ndi.sum(high_mask, labels, cp.arange(count, dtype=cp.int32) + 1),
-    )
+    sums = ndi.sum(high_mask, labels, cp.arange(count, dtype=cp.int32) + 1)
     sums = cp.atleast_1d(sums)
     good_label = cp.zeros((count + 1,), bool)
     good_label[1:] = sums > 0

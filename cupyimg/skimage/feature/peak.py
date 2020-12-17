@@ -1,4 +1,4 @@
-import warnings
+from warnings import warn
 
 import cupy as cp
 import numpy as np
@@ -41,9 +41,8 @@ def _get_peak_mask(image, footprint, threshold, mask=None):
     if footprint.size == 1 or image.size == 1:
         return image > threshold
 
-    image_max = ndi.maximum_filter(image, footprint=footprint, mode="constant")
-
-    out = image == image_max
+    image_max = ndi.maximum_filter(image, footprint=footprint,
+                                   mode='constant')
 
     out = image == image_max
 
@@ -61,7 +60,8 @@ def _get_peak_mask(image, footprint, threshold, mask=None):
 
 
 def _exclude_border(label, border_width):
-    """Set label border values to 0."""
+    """Set label border values to 0.
+    """
     # zero out label borders
     for i, width in enumerate(border_width):
         if width == 0:
@@ -85,7 +85,9 @@ def _get_threshold(image, threshold_abs, threshold_rel):
 
 
 def _get_excluded_border_width(image, min_distance, exclude_border):
-    """Return border_width values relative to a min_distance if requested."""
+    """Return border_width values relative to a min_distance if requested.
+
+    """
 
     if isinstance(exclude_border, bool):
         border_width = (min_distance if exclude_border else 0,) * image.ndim
@@ -97,8 +99,7 @@ def _get_excluded_border_width(image, min_distance, exclude_border):
         if len(exclude_border) != image.ndim:
             raise ValueError(
                 "`exclude_border` should have the same length as the "
-                "dimensionality of the image."
-            )
+                "dimensionality of the image.")
         for exclude in exclude_border:
             if not isinstance(exclude, int):
                 raise ValueError(
@@ -106,31 +107,22 @@ def _get_excluded_border_width(image, min_distance, exclude_border):
                     "contain ints."
                 )
             if exclude < 0:
-                raise ValueError("`exclude_border` can not be a negative value")
+                raise ValueError(
+                    "`exclude_border` can not be a negative value")
         border_width = exclude_border
     else:
         raise TypeError(
             "`exclude_border` must be bool, int, or tuple with the same "
-            "length as the dimensionality of the image."
-        )
+            "length as the dimensionality of the image.")
 
     return border_width
 
 
 @remove_arg("indices", changed_version="0.20")
-def peak_local_max(
-    image,
-    min_distance=1,
-    threshold_abs=None,
-    threshold_rel=None,
-    exclude_border=True,
-    indices=True,
-    num_peaks=cp.inf,
-    footprint=None,
-    labels=None,
-    num_peaks_per_label=cp.inf,
-    p_norm=cp.inf,
-):
+def peak_local_max(image, min_distance=1, threshold_abs=None,
+                   threshold_rel=None, exclude_border=True, indices=True,
+                   num_peaks=np.inf, footprint=None, labels=None,
+                   num_peaks_per_label=np.inf, p_norm=np.inf):
     """Find peaks in an image as coordinate list or boolean mask.
 
     Peaks are the local maxima in a region of `2 * min_distance + 1`
@@ -251,16 +243,12 @@ def peak_local_max(
 
     """
     if (footprint is None or footprint.size == 1) and min_distance < 1:
-        warnings.warn(
-            "When min_distance < 1, peak_local_max acts as finding "
-            "image > max(threshold_abs, threshold_rel * max(image)).",
-            RuntimeWarning,
-            stacklevel=2,
-        )
+        warn("When min_distance < 1, peak_local_max acts as finding "
+             "image > max(threshold_abs, threshold_rel * max(image)).",
+             RuntimeWarning, stacklevel=2)
 
-    border_width = _get_excluded_border_width(
-        image, min_distance, exclude_border
-    )
+    border_width = _get_excluded_border_width(image, min_distance,
+                                              exclude_border)
 
     threshold = _get_threshold(image, threshold_abs, threshold_rel)
 
@@ -277,11 +265,12 @@ def peak_local_max(
         mask = _exclude_border(mask, border_width)
 
         # Select highest intensities (num_peaks)
-        coordinates = _get_high_intensity_peaks(
-            image, mask, num_peaks, min_distance, p_norm
-        )
+        coordinates = _get_high_intensity_peaks(image, mask,
+                                                num_peaks,
+                                                min_distance, p_norm)
 
     else:
+        # Backend: casting="safe" not implemented in CuPy
         _labels = _exclude_border(labels.astype(int), border_width)
 
         if np.issubdtype(image.dtype, np.floating):
@@ -315,9 +304,10 @@ def peak_local_max(
 
             mask = _get_peak_mask(img_object, footprint, threshold, label_mask)
 
-            coordinates = _get_high_intensity_peaks(
-                img_object, mask, num_peaks_per_label, min_distance, p_norm
-            )
+            coordinates = _get_high_intensity_peaks(img_object, mask,
+                                                    num_peaks_per_label,
+                                                    min_distance,
+                                                    p_norm)
 
             # transform coordinates in global image indices space
             for idx, s in enumerate(roi):
@@ -331,23 +321,23 @@ def peak_local_max(
             coordinates = cp.empty((0, 2), dtype=int)
 
         if len(coordinates) > num_peaks:
-            out = cp.zeros_like(image, dtype=np.bool)
+            out = cp.zeros_like(image, dtype=bool)
             out[tuple(coordinates.T)] = True
-            coordinates = _get_high_intensity_peaks(
-                image, out, num_peaks, min_distance, p_norm
-            )
+            coordinates = _get_high_intensity_peaks(image, out,
+                                                    num_peaks,
+                                                    min_distance,
+                                                    p_norm)
 
     if indices:
         return coordinates
     else:
-        out = cp.zeros_like(image, dtype=np.bool)
+        out = cp.zeros_like(image, dtype=bool)
         out[tuple(coordinates.T)] = True
         return out
 
 
-def _prominent_peaks(
-    image, min_xdistance=1, min_ydistance=1, threshold=None, num_peaks=cp.inf
-):
+def _prominent_peaks(image, min_xdistance=1, min_ydistance=1,
+                     threshold=None, num_peaks=np.inf):
     """Return peaks with non-maximum suppression.
 
     Identifies most prominent features separated by certain distances.
@@ -378,22 +368,21 @@ def _prominent_peaks(
     rows, cols = img.shape
 
     if threshold is None:
-        threshold = 0.5 * cp.max(img)
+        threshold = 0.5 * np.max(img)
 
     ycoords_size = 2 * min_ydistance + 1
     xcoords_size = 2 * min_xdistance + 1
-    img_max = ndi.maximum_filter1d(
-        img, size=ycoords_size, axis=0, mode="constant", cval=0
-    )
-    img_max = ndi.maximum_filter1d(
-        img_max, size=xcoords_size, axis=1, mode="constant", cval=0
-    )
-    mask = img == img_max
+    img_max = ndi.maximum_filter1d(img, size=ycoords_size, axis=0,
+                                   mode='constant', cval=0)
+    img_max = ndi.maximum_filter1d(img_max, size=xcoords_size, axis=1,
+                                   mode='constant', cval=0)
+    mask = (img == img_max)
     img *= mask
     img_t = img > threshold
 
     label_img = measure.label(img_t)
     props = measure.regionprops(label_img, img_max)
+
     # Sort the list of peaks by intensity, not left-right, so larger peaks
     # in Hough space cannot be arbitrarily suppressed by smaller neighbors
     props = sorted(props, key=lambda x: x.max_intensity)[::-1]
@@ -404,9 +393,8 @@ def _prominent_peaks(
     xcoords_peaks = []
 
     # relative coordinate grid for local neighbourhood suppression
-    ycoords_ext, xcoords_ext = cp.mgrid[
-        -min_ydistance : min_ydistance + 1, -min_xdistance : min_xdistance + 1
-    ]
+    ycoords_ext, xcoords_ext = cp.mgrid[-min_ydistance:min_ydistance + 1,
+                                        -min_xdistance:min_xdistance + 1]
 
     for ycoords_idx, xcoords_idx in coords:
         accum = img_max[ycoords_idx, xcoords_idx]

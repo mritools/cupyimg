@@ -13,7 +13,7 @@ from skimage._shared._warnings import expected_warnings
 from cupyimg.skimage import img_as_float
 from cupyimg.skimage.color import rgb2gray
 
-# from cupyimg.skimage.morphology import octagon
+from cupyimg.skimage.morphology import cube  # , octagon
 
 
 from cupyimg.skimage.feature import (
@@ -42,50 +42,31 @@ def im3d():
     r = 10
     pad = 10
     im3 = draw.ellipsoid(r, r, r)
-    im3 = np.pad(im3, pad, mode="constant").astype(np.uint8)
+    im3 = np.pad(im3, pad, mode='constant').astype(np.uint8)
     return cp.asarray(im3)
 
 
 def test_structure_tensor():
     square = cp.zeros((5, 5))
     square[2, 2] = 1
-    Arr, Arc, Acc = structure_tensor(square, sigma=0.1, order="rc")
-    assert_array_equal(
-        Acc,
-        cp.asarray(
-            [
-                [0, 0, 0, 0, 0],
-                [0, 1, 0, 1, 0],
-                [0, 4, 0, 4, 0],
-                [0, 1, 0, 1, 0],
-                [0, 0, 0, 0, 0],
-            ]
-        ),
-    )
-    assert_array_equal(
-        Arc,
-        cp.asarray(
-            [
-                [0, 0, 0, 0, 0],  # noqa
-                [0, 1, 0, -1, 0],  # noqa
-                [0, 0, 0, -0, 0],  # noqa
-                [0, -1, -0, 1, 0],  # noqa
-                [0, 0, 0, 0, 0],  # noqa
-            ]
-        ),
-    )
-    assert_array_equal(
-        Arr,
-        cp.asarray(
-            [
-                [0, 0, 0, 0, 0],
-                [0, 1, 4, 1, 0],
-                [0, 0, 0, 0, 0],
-                [0, 1, 4, 1, 0],
-                [0, 0, 0, 0, 0],
-            ]
-        ),
-    )
+    Arr, Arc, Acc = structure_tensor(square, sigma=0.1, order='rc')
+    # fmt: off
+    assert_array_equal(Acc, cp.asarray([[0, 0, 0, 0, 0],
+                                        [0, 1, 0, 1, 0],
+                                        [0, 4, 0, 4, 0],
+                                        [0, 1, 0, 1, 0],
+                                        [0, 0, 0, 0, 0]]))
+    assert_array_equal(Arc, cp.asarray([[0, 0, 0, 0, 0],
+                                        [0, 1, 0, -1, 0],
+                                        [0, 0, 0, -0, 0],
+                                        [0, -1, -0, 1, 0],
+                                        [0, 0, 0, 0, 0]]))
+    assert_array_equal(Arr, cp.asarray([[0, 0, 0, 0, 0],
+                                        [0, 1, 4, 1, 0],
+                                        [0, 0, 0, 0, 0],
+                                        [0, 1, 4, 1, 0],
+                                        [0, 0, 0, 0, 0]]))
+    # fmt: on
 
 
 def test_structure_tensor_3d():
@@ -93,49 +74,30 @@ def test_structure_tensor_3d():
     cube[2, 2, 2] = 1
     A_elems = structure_tensor(cube, sigma=0.1)
     assert_equal(len(A_elems), 6)
-    assert_array_equal(
-        A_elems[0][:, 1, :],
-        cp.asarray(
-            [
-                [0, 0, 0, 0, 0],
-                [0, 1, 4, 1, 0],
-                [0, 0, 0, 0, 0],
-                [0, 1, 4, 1, 0],
-                [0, 0, 0, 0, 0],
-            ]
-        ),
-    )
-    assert_array_equal(
-        A_elems[0][1],
-        cp.asarray(
-            [
-                [0, 0, 0, 0, 0],
-                [0, 1, 4, 1, 0],
-                [0, 4, 16, 4, 0],
-                [0, 1, 4, 1, 0],
-                [0, 0, 0, 0, 0],
-            ]
-        ),
-    )
-    assert_array_equal(
-        A_elems[3][2],
-        cp.asarray(
-            [
-                [0, 0, 0, 0, 0],
-                [0, 4, 16, 4, 0],
-                [0, 0, 0, 0, 0],
-                [0, 4, 16, 4, 0],
-                [0, 0, 0, 0, 0],
-            ]
-        ),
-    )
+    # fmt: off
+    assert_array_equal(A_elems[0][:, 1, :], cp.asarray([[0, 0, 0, 0, 0],
+                                                        [0, 1, 4, 1, 0],
+                                                        [0, 0, 0, 0, 0],
+                                                        [0, 1, 4, 1, 0],
+                                                        [0, 0, 0, 0, 0]]))
+    assert_array_equal(A_elems[0][1], cp.asarray([[0, 0, 0, 0, 0],
+                                                  [0, 1, 4, 1, 0],
+                                                  [0, 4, 16, 4, 0],
+                                                  [0, 1, 4, 1, 0],
+                                                  [0, 0, 0, 0, 0]]))
+    assert_array_equal(A_elems[3][2], cp.asarray([[0, 0, 0, 0, 0],
+                                                  [0, 4, 16, 4, 0],
+                                                  [0, 0, 0, 0, 0],
+                                                  [0, 4, 16, 4, 0],
+                                                  [0, 0, 0, 0, 0]]))
+    # fmt: on
 
 
 def test_structure_tensor_3d_rc_only():
     cube = cp.zeros((5, 5, 5))
     with pytest.raises(ValueError):
-        structure_tensor(cube, sigma=0.1, order="xy")
-    A_elems_rc = structure_tensor(cube, sigma=0.1, order="rc")
+        structure_tensor(cube, sigma=0.1, order='xy')
+    A_elems_rc = structure_tensor(cube, sigma=0.1, order='rc')
     A_elems_none = structure_tensor(cube, sigma=0.1)
     for a_rc, a_none in zip(A_elems_rc, A_elems_none):
         assert_array_equal(a_rc, a_none)
@@ -144,10 +106,10 @@ def test_structure_tensor_3d_rc_only():
 def test_structure_tensor_orders():
     square = cp.zeros((5, 5))
     square[2, 2] = 1
-    with expected_warnings(["the default order of the structure"]):
+    with expected_warnings(['the default order of the structure']):
         A_elems_default = structure_tensor(square, sigma=0.1)
-    A_elems_xy = structure_tensor(square, sigma=0.1, order="xy")
-    A_elems_rc = structure_tensor(square, sigma=0.1, order="rc")
+    A_elems_xy = structure_tensor(square, sigma=0.1, order='xy')
+    A_elems_rc = structure_tensor(square, sigma=0.1, order='rc')
     for elem_xy, elem_def in zip(A_elems_xy, A_elems_default):
         assert_array_equal(elem_xy, elem_def)
     for elem_xy, elem_rc in zip(A_elems_xy, A_elems_rc[::-1]):
@@ -159,165 +121,98 @@ def test_hessian_matrix():
     square[2, 2] = 4
     Hrr, Hrc, Hcc = hessian_matrix(square, sigma=0.1, order="rc")
     # fmt: off
-    assert_array_almost_equal(
-        Hrr,
-        cp.asarray(
-            [
-                [0, 0,  0, 0, 0],  # noqa
-                [0, 0,  0, 0, 0],  # noqa
-                [2, 0, -2, 0, 2],  # noqa
-                [0, 0,  0, 0, 0],  # noqa
-                [0, 0,  0, 0, 0],  # noqa
-            ]
-        )
-    )
+    assert_array_almost_equal(Hrr, cp.asarray([[0, 0,  0, 0, 0],    # noqa
+                                               [0, 0,  0, 0, 0],    # noqa
+                                               [2, 0, -2, 0, 2],    # noqa
+                                               [0, 0,  0, 0, 0],    # noqa
+                                               [0, 0,  0, 0, 0]]))  # noqa
 
-    assert_array_almost_equal(
-        Hrc,
-        cp.asarray(
-            [
-                [0,  0, 0,  0, 0],  # noqa
-                [0,  1, 0, -1, 0],  # noqa
-                [0,  0, 0,  0, 0],  # noqa
-                [0, -1, 0,  1, 0],  # noqa
-                [0,  0, 0,  0, 0],  # noqa
-            ]
-        )
-    )
+    assert_array_almost_equal(Hrc, cp.asarray([[0,  0, 0,  0, 0],    # noqa
+                                               [0,  1, 0, -1, 0],    # noqa
+                                               [0,  0, 0,  0, 0],    # noqa
+                                               [0, -1, 0,  1, 0],    # noqa
+                                               [0,  0, 0,  0, 0]]))  # noqa
 
-    assert_array_almost_equal(
-        Hcc,
-        cp.asarray(
-            [
-                [0, 0,  2, 0, 0],  # noqa
-                [0, 0,  0, 0, 0],  # noqa
-                [0, 0, -2, 0, 0],  # noqa
-                [0, 0,  0, 0, 0],  # noqa
-                [0, 0,  2, 0, 0],  # noqa
-            ]
-        )
-    )
+    assert_array_almost_equal(Hcc, cp.asarray([[0, 0,  2, 0, 0],    # noqa
+                                               [0, 0,  0, 0, 0],    # noqa
+                                               [0, 0, -2, 0, 0],    # noqa
+                                               [0, 0,  0, 0, 0],    # noqa
+                                               [0, 0,  2, 0, 0]]))  # noqa
     # fmt: on
 
 
 def test_hessian_matrix_3d():
     cube = cp.zeros((5, 5, 5))
     cube[2, 2, 2] = 4
-    Hs = hessian_matrix(cube, sigma=0.1, order="rc")
+    Hs = hessian_matrix(cube, sigma=0.1, order='rc')
     assert len(Hs) == 6, "incorrect number of Hessian images (%i) for 3D" % len(
         Hs
     )
     # fmt: off
     assert_array_almost_equal(
-        Hs[2][:, 2, :],
-        cp.asarray(
-            [
-                [0,  0, 0,  0, 0],  # noqa
-                [0,  1, 0, -1, 0],  # noqa
-                [0,  0, 0,  0, 0],  # noqa
-                [0, -1, 0,  1, 0],  # noqa
-                [0,  0, 0,  0, 0],  # noqa
-            ]
-        )
-    )
+        Hs[2][:, 2, :], cp.asarray([[0,  0,  0,  0,  0],    # noqa
+                                    [0,  1,  0, -1,  0],    # noqa
+                                    [0,  0,  0,  0,  0],    # noqa
+                                    [0, -1,  0,  1,  0],    # noqa
+                                    [0,  0,  0,  0,  0]]))  # noqa
     # fmt: on
 
 
 def test_structure_tensor_eigenvalues():
     square = cp.zeros((5, 5))
     square[2, 2] = 1
-    A_elems = structure_tensor(square, sigma=0.1, order="rc")
+    A_elems = structure_tensor(square, sigma=0.1, order='rc')
     l1, l2 = structure_tensor_eigenvalues(A_elems)
-    assert_array_equal(
-        l1,
-        np.array(
-            [
-                [0, 0, 0, 0, 0],
-                [0, 2, 4, 2, 0],
-                [0, 4, 0, 4, 0],
-                [0, 2, 4, 2, 0],
-                [0, 0, 0, 0, 0],
-            ]
-        ),
-    )
-    assert_array_equal(
-        l2,
-        np.array(
-            [
-                [0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0],
-            ]
-        ),
-    )
+    assert_array_equal(l1, cp.asarray([[0, 0, 0, 0, 0],
+                                       [0, 2, 4, 2, 0],
+                                       [0, 4, 0, 4, 0],
+                                       [0, 2, 4, 2, 0],
+                                       [0, 0, 0, 0, 0]]))
+    assert_array_equal(l2, cp.asarray([[0, 0, 0, 0, 0],
+                                       [0, 0, 0, 0, 0],
+                                       [0, 0, 0, 0, 0],
+                                       [0, 0, 0, 0, 0],
+                                       [0, 0, 0, 0, 0]]))
+
+
+def test_structure_tensor_eigenvalues_3d():
+    image = np.pad(cube(9), 5, mode='constant') * 1000
+    boundary = (np.pad(cube(9), 5, mode='constant')
+                - np.pad(cube(7), 6, mode='constant')).astype(bool)
+    A_elems = structure_tensor(image, sigma=0.1)
+    e0, e1, e2 = structure_tensor_eigenvalues(A_elems)
+    # e0 should detect facets
+    assert np.all(e0[boundary] != 0)
 
 
 def test_structure_tensor_eigvals():
     square = cp.zeros((5, 5))
     square[2, 2] = 1
-
-    Arr, Arc, Acc = structure_tensor(square, sigma=0.1)
-    with expected_warnings(["deprecation warning: "]):
-        l1, l2 = structure_tensor_eigvals(Arr, Arc, Acc)
-
-    assert_array_equal(
-        l1,
-        cp.asarray(
-            [
-                [0, 0, 0, 0, 0],
-                [0, 2, 4, 2, 0],
-                [0, 4, 0, 4, 0],
-                [0, 2, 4, 2, 0],
-                [0, 0, 0, 0, 0],
-            ]
-        ),
-    )
-    assert_array_equal(
-        l2,
-        cp.asarray(
-            [
-                [0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0],
-                [0, 0, 0, 0, 0],
-            ]
-        ),
-    )
+    A_elems = structure_tensor(square, sigma=0.1, order='rc')
+    with expected_warnings(['structure_tensor_eigvals is deprecated']):
+        eigvals = structure_tensor_eigvals(*A_elems)
+    eigenvalues = structure_tensor_eigenvalues(A_elems)
+    for ev1, ev2 in zip(eigvals, eigenvalues):
+        assert_array_equal(ev1, ev2)
 
 
 def test_hessian_matrix_eigvals():
     square = cp.zeros((5, 5))
     square[2, 2] = 4
-    H = hessian_matrix(square, sigma=0.1, order="rc")
+    H = hessian_matrix(square, sigma=0.1, order='rc')
     l1, l2 = hessian_matrix_eigvals(H)
     # fmt: off
-    assert_array_almost_equal(
-        l1,
-        cp.asarray(
-            [
-                [0, 0,  2, 0, 0],  # noqa
-                [0, 1,  0, 1, 0],  # noqa
-                [2, 0, -2, 0, 2],  # noqa
-                [0, 1,  0, 1, 0],  # noqa
-                [0, 0,  2, 0, 0],  # noqa
-            ]
-        )
-    )
-    assert_array_almost_equal(
-        l2,
-        cp.asarray(
-            [
-                [0,  0,  0,  0, 0],  # noqa
-                [0, -1,  0, -1, 0],  # noqa
-                [0,  0, -2,  0, 0],  # noqa
-                [0, -1,  0, -1, 0],  # noqa
-                [0,  0,  0,  0, 0],  # noqa
-            ]
-        )
-    )
+    assert_array_almost_equal(l1, cp.asarray([[0, 0,  2, 0, 0],      # noqa
+                                              [0, 1,  0, 1, 0],      # noqa
+                                              [2, 0, -2, 0, 2],      # noqa
+                                              [0, 1,  0, 1, 0],      # noqa
+                                              [0, 0,  2, 0, 0]]))    # noqa
+    assert_array_almost_equal(l2, cp.asarray([[0,  0,  0,  0, 0],    # noqa
+                                              [0, -1,  0, -1, 0],    # noqa
+                                              [0,  0, -2,  0, 0],    # noqa
+                                              [0, -1,  0, -1, 0],    # noqa
+                                              [0,  0,  0,  0, 0]]))  # noqa
+
     # fmt: on
 
 
@@ -344,10 +239,10 @@ def test_hessian_matrix_eigvals_3d(im3d):
     assert np.max(response0) > 0
 
 
-# @test_parallel()
 def test_hessian_matrix_det():
     image = cp.zeros((5, 5))
     image[2, 2] = 1
+    # TODO: approximate=True case not implemented
     det = hessian_matrix_det(image, 5, approximate=False)
     assert_array_almost_equal(det, 0, decimal=3)
 
@@ -407,22 +302,19 @@ def test_square_image():
     # assert len(results) == 57
 
     # Harris
-    results = peak_local_max(
-        corner_harris(im, method="k"), min_distance=10, threshold_rel=0
-    )
+    results = peak_local_max(corner_harris(im, method='k'),
+                             min_distance=10, threshold_rel=0)
     # interest at corner
     assert len(results) == 1
 
-    results = peak_local_max(
-        corner_harris(im, method="eps"), min_distance=10, threshold_rel=0
-    )
+    results = peak_local_max(corner_harris(im, method='eps'),
+                             min_distance=10, threshold_rel=0)
     # interest at corner
     assert len(results) == 1
 
     # Shi-Tomasi
-    results = peak_local_max(
-        corner_shi_tomasi(im), min_distance=10, threshold_rel=0
-    )
+    results = peak_local_max(corner_shi_tomasi(im),
+                             min_distance=10, threshold_rel=0)
     # interest at corner
     assert len(results) == 1
 
@@ -440,19 +332,16 @@ def test_noisy_square_image():
     # assert results.any()
 
     # Harris
-    results = peak_local_max(
-        corner_harris(im, method="k"), min_distance=10, threshold_rel=0
-    )
+    results = peak_local_max(corner_harris(im, method='k'),
+                             min_distance=10, threshold_rel=0)
     assert len(results) == 1
-    results = peak_local_max(
-        corner_harris(im, method="eps"), min_distance=10, threshold_rel=0
-    )
+    results = peak_local_max(corner_harris(im, method='eps'),
+                             min_distance=10, threshold_rel=0)
     assert len(results) == 1
 
     # Shi-Tomasi
-    results = peak_local_max(
-        corner_shi_tomasi(im, sigma=1.5), min_distance=10, threshold_rel=0
-    )
+    results = peak_local_max(corner_shi_tomasi(im, sigma=1.5),
+                             min_distance=10, threshold_rel=0)
     assert len(results) == 1
 
 
@@ -464,15 +353,15 @@ def test_squared_dot():
     # Moravec fails
 
     # Harris
-    results = peak_local_max(
-        corner_harris(im), min_distance=10, threshold_rel=0
-    )
+    results = peak_local_max(corner_harris(im),
+                             min_distance=10, threshold_rel=0)
+
     assert (results == cp.asarray([[6, 6]])).all()
 
     # Shi-Tomasi
-    results = peak_local_max(
-        corner_shi_tomasi(im), min_distance=10, threshold_rel=0
-    )
+    results = peak_local_max(corner_shi_tomasi(im),
+                             min_distance=10, threshold_rel=0)
+
     assert (results == cp.asarray([[6, 6]])).all()
 
 
@@ -493,27 +382,18 @@ def test_rotated_img():
     # assert (cp.sort(results[:, 1]) == cp.sort(results_rotated[:, 0])).all()
 
     # Harris
-    threshold_rel = 1e-8
-    # TODO: skimage version uses threshold_rel = 0, but that causes a minor
-    #       difference in results vs. results_rotated here.
-    results = peak_local_max(
-        corner_harris(im), min_distance=10, threshold_rel=threshold_rel
-    )
-    results_rotated = peak_local_max(
-        corner_harris(im_rotated), min_distance=10, threshold_rel=threshold_rel
-    )
-    assert (cp.sort(results[:, 0]) == cp.sort(results_rotated[:, 1])).all()
-    assert (cp.sort(results[:, 1]) == cp.sort(results_rotated[:, 0])).all()
+    results = cp.nonzero(corner_harris(im))
+    results_rotated = cp.nonzero(corner_harris(im_rotated))
+
+    assert (cp.sort(results[0]) == cp.sort(results_rotated[1])).all()
+    assert (cp.sort(results[1]) == cp.sort(results_rotated[0])).all()
 
     # Shi-Tomasi
-    results = peak_local_max(
-        corner_shi_tomasi(im), min_distance=10, threshold_rel=0
-    )
-    results_rotated = peak_local_max(
-        corner_shi_tomasi(im_rotated), min_distance=10, threshold_rel=0
-    )
-    assert (cp.sort(results[:, 0]) == cp.sort(results_rotated[:, 1])).all()
-    assert (cp.sort(results[:, 1]) == cp.sort(results_rotated[:, 0])).all()
+    results = cp.nonzero(corner_shi_tomasi(im))
+    results_rotated = cp.nonzero(corner_shi_tomasi(im_rotated))
+
+    assert (cp.sort(results[0]) == cp.sort(results_rotated[1])).all()
+    assert (cp.sort(results[1]) == cp.sort(results_rotated[0])).all()
 
 
 # def test_subpix_edge():
@@ -573,9 +453,8 @@ def test_num_peaks():
 
     for i in range(20):
         n = cp.random.randint(1, 21)
-        results = peak_local_max(
-            img_corners, min_distance=10, threshold_rel=0, num_peaks=n
-        )
+        results = peak_local_max(img_corners,
+                                 min_distance=10, threshold_rel=0, num_peaks=n)
         assert results.shape[0] == n
 
 
@@ -584,22 +463,19 @@ def test_corner_peaks():
     response[2:5, 2:5] = 1
     response[8:10, 0:2] = 1
 
-    corners = corner_peaks(
-        response, exclude_border=False, min_distance=10, threshold_rel=0
-    )
+    corners = corner_peaks(response, exclude_border=False, min_distance=10,
+                           threshold_rel=0)
     assert corners.shape == (1, 2)
 
-    corners = corner_peaks(
-        response, exclude_border=False, min_distance=5, threshold_rel=0
-    )
+    corners = corner_peaks(response, exclude_border=False, min_distance=5,
+                           threshold_rel=0)
     assert corners.shape == (2, 2)
 
     corners = corner_peaks(response, exclude_border=False, min_distance=1)
     assert corners.shape == (5, 2)
 
-    corners = corner_peaks(
-        response, exclude_border=False, min_distance=1, indices=False
-    )
+    corners = corner_peaks(response, exclude_border=False, min_distance=1,
+                           indices=False)
     assert cp.sum(corners) == 5
 
 

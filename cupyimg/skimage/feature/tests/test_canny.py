@@ -12,16 +12,14 @@ from cupyimg.skimage.util import img_as_float
 class TestCanny(unittest.TestCase):
     def test_00_00_zeros(self):
         """Test that the Canny filter finds no points for a blank field"""
-        result = feature.canny(
-            cp.zeros((20, 20)), 4, 0, 0, cp.ones((20, 20), bool)
-        )
+        result = feature.canny(cp.zeros((20, 20)), 4, 0, 0, cp.ones((20, 20),
+                               bool))
         self.assertFalse(cp.any(result))
 
     def test_00_01_zeros_mask(self):
         """Test that the Canny filter finds no points in a masked image"""
-        result = feature.canny(
-            cp.random.uniform(size=(20, 20)), 4, 0, 0, cp.zeros((20, 20), bool)
-        )
+        result = (feature.canny(cp.random.uniform(size=(20, 20)), 4, 0, 0,
+                                cp.zeros((20, 20), bool)))
         self.assertFalse(cp.any(result))
 
     def test_01_01_circle(self):
@@ -70,14 +68,12 @@ class TestCanny(unittest.TestCase):
         self.assertTrue(point_count < 1600)
 
     def test_image_shape(self):
-        self.assertRaises(
-            ValueError, feature.canny, cp.zeros((20, 20, 20)), 4, 0, 0
-        )
+        self.assertRaises(ValueError, feature.canny, cp.zeros((20, 20, 20)), 4,
+                          0, 0)
 
     def test_mask_none(self):
-        result1 = feature.canny(
-            cp.zeros((20, 20)), 4, 0, 0, cp.ones((20, 20), bool)
-        )
+        result1 = feature.canny(cp.zeros((20, 20)), 4, 0, 0, cp.ones((20, 20),
+                                bool))
         result2 = feature.canny(cp.zeros((20, 20)), 4, 0, 0)
         self.assertTrue(cp.all(result1 == result2))
 
@@ -88,71 +84,37 @@ class TestCanny(unittest.TestCase):
         # Correct output produced manually with quantiles
         # of 0.8 and 0.6 for high and low respectively
         correct_output = cp.asarray(
-            [
-                [False, False, False, False, False, False],
-                [False, True, True, True, False, False],
-                [False, False, False, True, False, False],
-                [False, False, False, True, False, False],
-                [False, False, True, True, False, False],
-                [False, False, False, False, False, False],
-            ],
-        )
+            [[False, False, False, False, False, False],
+             [False,  True,  True,  True, False, False],   # noqa
+             [False, False, False,  True, False, False],   # noqa
+             [False, False, False,  True, False, False],   # noqa
+             [False, False,  True,  True, False, False],   # noqa
+             [False, False, False, False, False, False]])
 
-        result = feature.canny(
-            image, low_threshold=0.6, high_threshold=0.8, use_quantiles=True
-        )
+        result = feature.canny(image, low_threshold=0.6, high_threshold=0.8,
+                               use_quantiles=True)
 
         assert_array_equal(result, correct_output)
 
     def test_invalid_use_quantiles(self):
-        image = img_as_float(cp.asarray(data.camera()[::50, ::50]))
+        image = img_as_float(data.camera()[::50, ::50])
 
-        self.assertRaises(
-            ValueError,
-            feature.canny,
-            image,
-            use_quantiles=True,
-            low_threshold=0.5,
-            high_threshold=3.6,
-        )
+        self.assertRaises(ValueError, feature.canny, image, use_quantiles=True,
+                          low_threshold=0.5, high_threshold=3.6)
 
-        self.assertRaises(
-            ValueError,
-            feature.canny,
-            image,
-            use_quantiles=True,
-            low_threshold=-5,
-            high_threshold=0.5,
-        )
+        self.assertRaises(ValueError, feature.canny, image, use_quantiles=True,
+                          low_threshold=-5, high_threshold=0.5)
 
-        self.assertRaises(
-            ValueError,
-            feature.canny,
-            image,
-            use_quantiles=True,
-            low_threshold=99,
-            high_threshold=0.9,
-        )
+        self.assertRaises(ValueError, feature.canny, image, use_quantiles=True,
+                          low_threshold=99, high_threshold=0.9)
 
-        self.assertRaises(
-            ValueError,
-            feature.canny,
-            image,
-            use_quantiles=True,
-            low_threshold=0.5,
-            high_threshold=-100,
-        )
+        self.assertRaises(ValueError, feature.canny, image, use_quantiles=True,
+                          low_threshold=0.5, high_threshold=-100)
 
         # Example from issue #4282
         image = data.camera()
-        self.assertRaises(
-            ValueError,
-            feature.canny,
-            image,
-            use_quantiles=True,
-            low_threshold=50,
-            high_threshold=150,
-        )
+        self.assertRaises(ValueError, feature.canny, image, use_quantiles=True,
+                          low_threshold=50, high_threshold=150)
 
     def test_dtype(self):
         """Check that the same output is produced regardless of image dtype."""
