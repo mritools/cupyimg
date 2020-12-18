@@ -78,11 +78,13 @@ def integrate(ii, start, end):
     # convert negative indices into equivalent positive indices
     start_negatives = start < 0
     end_negatives = end < 0
-    start = (start + total_shape) * start_negatives + start * ~(start_negatives)
-    end = (end + total_shape) * end_negatives + end * ~(end_negatives)
+    start = (start + total_shape) * start_negatives + \
+             start * ~(start_negatives)  # noqa
+    end = (end + total_shape) * end_negatives + \
+           end * ~(end_negatives)  # noqa
 
     if np.any((end - start) < 0):
-        raise IndexError("end coordinates must be greater or equal to start")
+        raise IndexError('end coordinates must be greater or equal to start')
 
     # bit_perm is the total number of terms in the expression
     # of S. For example, in the case of a 4x4 2D image
@@ -116,19 +118,18 @@ def integrate(ii, start, end):
     for i in range(bit_perm):  # for all permutations
         # boolean permutation array eg [True, False] for '10'
         binary = bin(i)[2:].zfill(width)
-        bool_mask = [bit == "1" for bit in binary]
+        bool_mask = [bit == '1' for bit in binary]
 
         sign = (-1) ** sum(bool_mask)  # determine sign of permutation
 
-        bad = [
-            np.any(((start[r] - 1) * bool_mask) < 0) for r in range(rows)
-        ]  # find out bad start rows
+        bad = [np.any(((start[r] - 1) * bool_mask) < 0)
+               for r in range(rows)]  # find out bad start rows
 
-        corner_points = (end * (np.invert(bool_mask))) + (
-            (start - 1) * bool_mask
-        )  # find corner for each row
+        # find corner for each row
+        corner_points = (end * (np.invert(bool_mask))) + \
+                         ((start - 1) * bool_mask)  # noqa
 
-        # TODO: grlee77: check efficiency here
+        # CuPy Backend: TODO: check efficiency here
         if scalar_output:
             S += sign * ii[tuple(corner_points[0])] if (not bad[0]) else 0
         else:

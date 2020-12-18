@@ -257,6 +257,8 @@ class FundamentalMatrixTransform(GeometricTransform):
 
     """
 
+    # CuPy Backend: if matrix is None cannot infer array module from it
+    #               added explicit xp module argument for now
     def __init__(self, matrix=None, *, dimensionality=2, xp=cp):
         if matrix is None:
             # default to an identity transform
@@ -464,6 +466,8 @@ class EssentialMatrixTransform(FundamentalMatrixTransform):
 
     """
 
+    # CuPy Backend: if matrix is None cannot infer array module from it
+    #               added explicit xp module argument for now
     def __init__(
         self,
         rotation=None,
@@ -488,19 +492,12 @@ class EssentialMatrixTransform(FundamentalMatrixTransform):
             # Matrix representation of the cross product for t.
             if isinstance(translation, cp.ndarray):
                 translation = cp.asnumpy(translation)
-            t_x = xp.asarray(
-                [
-                    0,
-                    -translation[2],
-                    translation[1],
-                    translation[2],
-                    0,
-                    -translation[0],
-                    -translation[1],
-                    translation[0],
-                    0,
-                ]
-            ).reshape(3, 3)
+            # CuPy Backend: TODO: always keep t_x, rotation, etc. on host?
+            # fmt: off
+            t_x = xp.array([0, -translation[2], translation[1],
+                            translation[2], 0, -translation[0],
+                            -translation[1], translation[0], 0]).reshape(3, 3)
+            # fmt: on
             self.params = t_x @ rotation
         elif matrix is not None:
             if matrix.shape != (3, 3):
@@ -800,8 +797,8 @@ class ProjectiveTransform(GeometricTransform):
 
     def __nice__(self):
         """common 'paramstr' used by __str__ and __repr__"""
-        npstring = np.array2string(cp.asnumpy(self.params), separator=", ")
-        paramstr = "matrix=\n" + textwrap.indent(npstring, "    ")
+        npstring = np.array2string(cp.asnumpy(self.params), separator=', ')
+        paramstr = 'matrix=\n' + textwrap.indent(npstring, '    ')
         return paramstr
 
     def __repr__(self):
@@ -809,14 +806,14 @@ class ProjectiveTransform(GeometricTransform):
         paramstr = self.__nice__()
         classname = self.__class__.__name__
         classstr = classname
-        return "<{}({}) at {}>".format(classstr, paramstr, hex(id(self)))
+        return '<{}({}) at {}>'.format(classstr, paramstr, hex(id(self)))
 
     def __str__(self):
         """Add standard str formatting around a __nice__ string"""
         paramstr = self.__nice__()
         classname = self.__class__.__name__
         classstr = classname
-        return "<{}({})>".format(classstr, paramstr)
+        return '<{}({})>'.format(classstr, paramstr)
 
     @property
     def dimensionality(self):
@@ -886,29 +883,18 @@ class AffineTransform(ProjectiveTransform):
         If both ``matrix`` and any of the other parameters are provided.
     """
 
-    def __init__(
-        self,
-        matrix=None,
-        scale=None,
-        rotation=None,
-        shear=None,
-        translation=None,
-        *,
-        dimensionality=2,
-        xp=cp,
-    ):
-        params = any(
-            param is not None for param in (scale, rotation, shear, translation)
-        )
+    def __init__(self, matrix=None, scale=None, rotation=None, shear=None,
+                 translation=None, *, dimensionality=2, xp=cp):
+        params = any(param is not None
+                     for param in (scale, rotation, shear, translation))
 
         # these parameters get overwritten if a higher-D matrix is given
         self._coeffs = range(dimensionality * (dimensionality + 1))
 
         if params and matrix is not None:
-            raise ValueError(
-                "You cannot specify the transformation matrix and"
-                " the implicit parameters at the same time."
-            )
+            raise ValueError("You cannot specify the transformation matrix and"
+                             " the implicit parameters at the same time.")
+
         if params and dimensionality > 2:
             raise ValueError("Parameter input is only supported in 2D.")
         elif matrix is not None:
@@ -995,8 +981,8 @@ class AffineTransform(ProjectiveTransform):
         return self.params[0 : self.dimensionality, self.dimensionality]
 
 
-# TODO: grlee77: PiecewiseAffineTransform is inefficient currently
-#                (It only operates via transfer to/from CPU).
+# CuPy Backend: TODO: PiecewiseAffineTransform is inefficient currently
+#                     (It only operates via transfer to/from CPU).
 class PiecewiseAffineTransform(GeometricTransform):
     """Piecewise affine transformation.
 
@@ -1240,22 +1226,13 @@ class EuclideanTransform(ProjectiveTransform):
     .. [1] https://en.wikipedia.org/wiki/Rotation_matrix#In_three_dimensions
     """
 
-    def __init__(
-        self,
-        matrix=None,
-        rotation=None,
-        translation=None,
-        *,
-        dimensionality=2,
-        xp=cp,
-    ):
+    def __init__(self, matrix=None, rotation=None, translation=None, *,
+                 dimensionality=2, xp=cp,):
         params_given = rotation is not None or translation is not None
 
         if params_given and matrix is not None:
-            raise ValueError(
-                "You cannot specify the transformation matrix and"
-                " the implicit parameters at the same time."
-            )
+            raise ValueError("You cannot specify the transformation matrix and"
+                             " the implicit parameters at the same time.")
         elif matrix is not None:
             if matrix.shape[0] != matrix.shape[1]:
                 raise ValueError("Invalid shape of transformation matrix.")
@@ -1376,26 +1353,15 @@ class SimilarityTransform(EuclideanTransform):
 
     """
 
-    def __init__(
-        self,
-        matrix=None,
-        scale=None,
-        rotation=None,
-        translation=None,
-        *,
-        dimensionality=2,
-        xp=cp,
-    ):
+    def __init__(self, matrix=None, scale=None, rotation=None,
+                 translation=None, *, dimensionality=2, xp=cp):
         self.params = None
-        params = any(
-            param is not None for param in (scale, rotation, translation)
-        )
+        params = any(param is not None
+                     for param in (scale, rotation, translation))
 
         if params and matrix is not None:
-            raise ValueError(
-                "You cannot specify the transformation matrix and"
-                " the implicit parameters at the same time."
-            )
+            raise ValueError("You cannot specify the transformation matrix and"
+                             " the implicit parameters at the same time.")
         elif matrix is not None:
             if matrix.ndim == 1:  # parameter vector: scale, rot, translation
                 if dimensionality > 3:
@@ -1623,22 +1589,21 @@ class PolynomialTransform(GeometricTransform):
 
     def inverse(self, coords):
         raise Exception(
-            "There is no explicit way to do the inverse polynomial "
-            "transformation. Instead, estimate the inverse transformation "
-            "parameters by exchanging source and destination coordinates,"
-            "then apply the forward transformation."
-        )
+            'There is no explicit way to do the inverse polynomial '
+            'transformation. Instead, estimate the inverse transformation '
+            'parameters by exchanging source and destination coordinates,'
+            'then apply the forward transformation.')
 
 
 TRANSFORMS = {
-    "euclidean": EuclideanTransform,
-    "similarity": SimilarityTransform,
-    "affine": AffineTransform,
-    "piecewise-affine": PiecewiseAffineTransform,
-    "projective": ProjectiveTransform,
-    "fundamental": FundamentalMatrixTransform,
-    "essential": EssentialMatrixTransform,
-    "polynomial": PolynomialTransform,
+    'euclidean': EuclideanTransform,
+    'similarity': SimilarityTransform,
+    'affine': AffineTransform,
+    'piecewise-affine': PiecewiseAffineTransform,
+    'projective': ProjectiveTransform,
+    'fundamental': FundamentalMatrixTransform,
+    'essential': EssentialMatrixTransform,
+    'polynomial': PolynomialTransform,
 }
 
 
@@ -1681,8 +1646,8 @@ def estimate_transform(ttype, src, dst, **kwargs):
     >>> from skimage import transform
 
     >>> # estimate transformation parameters
-    >>> src = xp.asarray([0, 0, 10, 10]).reshape((2, 2))
-    >>> dst = xp.asarray([12, 14, 1, -20]).reshape((2, 2))
+    >>> src = xp.array([0, 0, 10, 10]).reshape((2, 2))
+    >>> dst = xp.array([12, 14, 1, -20]).reshape((2, 2))
 
     >>> tform = transform.estimate_transform('similarity', src, dst)
 
@@ -1707,9 +1672,8 @@ def estimate_transform(ttype, src, dst, **kwargs):
     """
     ttype = ttype.lower()
     if ttype not in TRANSFORMS:
-        raise ValueError(
-            "the transformation type '%s' is not" "implemented" % ttype
-        )
+        raise ValueError('the transformation type \'%s\' is not'
+                         'implemented' % ttype)
 
     tform = TRANSFORMS[ttype](dimensionality=src.shape[1])
     tform.estimate(src, dst, **kwargs)

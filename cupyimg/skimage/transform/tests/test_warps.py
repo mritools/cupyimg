@@ -1,15 +1,16 @@
 import cupy as cp
 from cupy.testing import assert_array_almost_equal, assert_array_equal
 import numpy as np
+from numpy.testing import assert_almost_equal, assert_equal
 import pytest
 
 from skimage.data import checkerboard, astronaut
 from skimage.color.colorconv import rgb2gray
 from skimage.draw.draw import circle_perimeter_aa
-from skimage.feature.peak import peak_local_max
 from skimage._shared.testing import test_parallel
 from skimage._shared._warnings import expected_warnings
 
+from cupyimg.skimage.feature.peak import peak_local_max
 from cupyimg.skimage.util.dtype import img_as_float
 from cupyimg.scipy.ndimage import map_coordinates
 
@@ -84,9 +85,8 @@ def test_warp_matrix():
     # _warp_fast
     outx = warp(x, matrix, order=1)
     assert_array_almost_equal(outx, refx)
-    if False:  # TODO: cupy's map_coordinates only supports order 0 and 1
-        # check for ndimage.map_coordinates
-        outx = warp(x, matrix, order=5)
+    # check for ndimage.map_coordinates
+    outx = warp(x, matrix, order=5)
 
 
 def test_warp_nd():
@@ -112,28 +112,14 @@ def test_warp_clip():
     x = cp.zeros((5, 5), dtype=np.double)
     x[2, 2] = 1
 
-    outx = rescale(
-        x,
-        3,
-        order=3,
-        clip=False,
-        multichannel=False,
-        anti_aliasing=False,
-        mode="constant",
-    )
+    outx = rescale(x, 3, order=3, clip=False,
+                   multichannel=False, anti_aliasing=False, mode='constant')
     assert outx.min() < 0
 
-    outx = rescale(
-        x,
-        3,
-        order=3,
-        clip=True,
-        multichannel=False,
-        anti_aliasing=False,
-        mode="constant",
-    )
-    assert_array_almost_equal(outx.min(), 0)
-    assert_array_almost_equal(outx.max(), 1)
+    outx = rescale(x, 3, order=3, clip=True,
+                   multichannel=False, anti_aliasing=False, mode='constant')
+    assert_almost_equal(float(outx.min()), 0)
+    assert_almost_equal(float(outx.max()), 1)
 
 
 def test_homography():
@@ -141,12 +127,14 @@ def test_homography():
     x[1, 1] = 1
     theta = -np.pi / 2
     # fmt: off
-    M = cp.asarray([[np.cos(theta), - np.sin(theta), 0],
-                    [np.sin(theta),   np.cos(theta), 4],
-                    [0,               0,             1]])
+    M = cp.array([[np.cos(theta), - np.sin(theta), 0],
+                  [np.sin(theta),   np.cos(theta), 4],
+                  [0,               0,             1]])
     # fmt: on
 
-    x90 = warp(x, inverse_map=ProjectiveTransform(M).inverse, order=1)
+    x90 = warp(x,
+               inverse_map=ProjectiveTransform(M).inverse,
+               order=1)
     assert_array_almost_equal(x90, cp.rot90(x))
 
 
@@ -191,7 +179,7 @@ def test_rotate_resize_center():
     # new dimension should be d = sqrt(2 * (10/2)^2)
     assert x45.shape == (14, 14)
     if False:
-        # TODO: grlee77: seems to be a subtle difference in rounding somewhere.
+        # CuPy Backend: ubtle difference in rounding somewhere.
         # (visually rotations of real images look reasonable)
         assert_array_equal(x45, ref_x45)
 
@@ -205,9 +193,8 @@ def test_rescale():
     # same scale factor
     x = cp.zeros((5, 5), dtype=np.double)
     x[1, 1] = 1
-    scaled = rescale(
-        x, 2, order=0, multichannel=False, anti_aliasing=False, mode="constant"
-    )
+    scaled = rescale(x, 2, order=0,
+                     multichannel=False, anti_aliasing=False, mode='constant')
     ref = cp.zeros((10, 10))
     ref[2:4, 2:4] = 1
     assert_array_almost_equal(scaled, ref)
@@ -216,14 +203,8 @@ def test_rescale():
     x = cp.zeros((5, 5), dtype=np.double)
     x[1, 1] = 1
 
-    scaled = rescale(
-        x,
-        (2, 1),
-        order=0,
-        multichannel=False,
-        anti_aliasing=False,
-        mode="constant",
-    )
+    scaled = rescale(x, (2, 1), order=0,
+                     multichannel=False, anti_aliasing=False, mode='constant')
     ref = cp.zeros((10, 5))
     ref[2:4, 1] = 1
     assert_array_almost_equal(scaled, ref)
@@ -232,84 +213,67 @@ def test_rescale():
 def test_rescale_invalid_scale():
     x = cp.zeros((10, 10, 3))
     with pytest.raises(ValueError):
-        rescale(
-            x, (2, 2), multichannel=False, anti_aliasing=False, mode="constant"
-        )
+        rescale(x, (2, 2),
+                multichannel=False, anti_aliasing=False, mode='constant')
     with pytest.raises(ValueError):
-        rescale(
-            x,
-            (2, 2, 2),
-            multichannel=True,
-            anti_aliasing=False,
-            mode="constant",
-        )
+        rescale(x, (2, 2, 2),
+                multichannel=True, anti_aliasing=False, mode='constant')
 
 
 def test_rescale_multichannel():
     # 1D + channels
     x = cp.zeros((8, 3), dtype=np.double)
-    scaled = rescale(
-        x, 2, order=0, multichannel=True, anti_aliasing=False, mode="constant"
-    )
-    assert_array_equal(scaled.shape, (16, 3))
+    scaled = rescale(x, 2, order=0, multichannel=True, anti_aliasing=False,
+                     mode='constant')
+    assert_equal(scaled.shape, (16, 3))
     # 2D
-    scaled = rescale(
-        x, 2, order=0, multichannel=False, anti_aliasing=False, mode="constant"
-    )
+    scaled = rescale(x, 2, order=0, multichannel=False, anti_aliasing=False,
+                     mode='constant')
     assert_array_equal(scaled.shape, (16, 6))
 
     # 2D + channels
     x = cp.zeros((8, 8, 3), dtype=np.double)
-    scaled = rescale(
-        x, 2, order=0, multichannel=True, anti_aliasing=False, mode="constant"
-    )
-    assert_array_equal(scaled.shape, (16, 16, 3))
+    scaled = rescale(x, 2, order=0, multichannel=True, anti_aliasing=False,
+                     mode='constant')
+    assert_equal(scaled.shape, (16, 16, 3))
     # 3D
-    scaled = rescale(
-        x, 2, order=0, multichannel=False, anti_aliasing=False, mode="constant"
-    )
-    assert_array_equal(scaled.shape, (16, 16, 6))
+    scaled = rescale(x, 2, order=0, multichannel=False, anti_aliasing=False,
+                     mode='constant')
+    assert_equal(scaled.shape, (16, 16, 6))
 
     # 3D + channels
     x = cp.zeros((8, 8, 8, 3), dtype=np.double)
-    scaled = rescale(
-        x, 2, order=0, multichannel=True, anti_aliasing=False, mode="constant"
-    )
+    scaled = rescale(x, 2, order=0, multichannel=True, anti_aliasing=False,
+                     mode='constant')
     assert_array_equal(scaled.shape, (16, 16, 16, 3))
     # 4D
-    scaled = rescale(
-        x, 2, order=0, multichannel=False, anti_aliasing=False, mode="constant"
-    )
-    assert_array_equal(scaled.shape, (16, 16, 16, 6))
+    scaled = rescale(x, 2, order=0, multichannel=False, anti_aliasing=False,
+                     mode='constant')
+    assert_equal(scaled.shape, (16, 16, 16, 6))
 
 
 def test_rescale_multichannel_multiscale():
     x = cp.zeros((5, 5, 3), dtype=np.double)
-    scaled = rescale(
-        x,
-        (2, 1),
-        order=0,
-        multichannel=True,
-        anti_aliasing=False,
-        mode="constant",
-    )
-    assert_array_equal(scaled.shape, (10, 5, 3))
+    scaled = rescale(x, (2, 1), order=0, multichannel=True,
+                     anti_aliasing=False, mode='constant')
+    assert_equal(scaled.shape, (10, 5, 3))
 
 
 def test_rescale_multichannel_defaults():
     x = cp.zeros((8, 3), dtype=np.double)
-    scaled = rescale(x, 2, order=0, anti_aliasing=False, mode="constant")
-    assert_array_equal(scaled.shape, (16, 6))
+    scaled = rescale(x, 2, order=0, anti_aliasing=False, mode='constant')
+    assert_equal(scaled.shape, (16, 6))
 
     x = cp.zeros((8, 8, 3), dtype=np.double)
-    scaled = rescale(x, 2, order=0, anti_aliasing=False, mode="constant")
-    assert_array_equal(scaled.shape, (16, 16, 6))
+    scaled = rescale(x, 2, order=0, anti_aliasing=False, mode='constant')
+    assert_equal(scaled.shape, (16, 16, 6))
 
 
 def test_resize2d():
     x = cp.zeros((5, 5), dtype=np.double)
     x[1, 1] = 1
-    resized = resize(x, (10, 10), order=0, anti_aliasing=False, mode="constant")
+    resized = resize(x, (10, 10), order=0, anti_aliasing=False,
+                     mode='constant')
     ref = cp.zeros((10, 10))
     ref[2:4, 2:4] = 1
     assert_array_almost_equal(resized, ref)
@@ -319,16 +283,16 @@ def test_resize3d_keep():
     # keep 3rd dimension
     x = cp.zeros((5, 5, 3), dtype=np.double)
     x[1, 1, :] = 1
-    resized = resize(x, (10, 10), order=0, anti_aliasing=False, mode="constant")
+    resized = resize(x, (10, 10), order=0, anti_aliasing=False,
+                     mode='constant')
     with pytest.raises(ValueError):
         # output_shape too short
-        resize(x, (10,), order=0, anti_aliasing=False, mode="constant")
+        resize(x, (10,), order=0, anti_aliasing=False, mode='constant')
     ref = cp.zeros((10, 10, 3))
     ref[2:4, 2:4, :] = 1
     assert_array_almost_equal(resized, ref)
-    resized = resize(
-        x, (10, 10, 3), order=0, anti_aliasing=False, mode="constant"
-    )
+    resized = resize(x, (10, 10, 3), order=0, anti_aliasing=False,
+                     mode='constant')
     assert_array_almost_equal(resized, ref)
 
 
@@ -336,9 +300,8 @@ def test_resize3d_resize():
     # resize 3rd dimension
     x = cp.zeros((5, 5, 3), dtype=np.double)
     x[1, 1, :] = 1
-    resized = resize(
-        x, (10, 10, 1), order=0, anti_aliasing=False, mode="constant"
-    )
+    resized = resize(x, (10, 10, 1), order=0, anti_aliasing=False,
+                     mode='constant')
     ref = cp.zeros((10, 10, 1))
     ref[2:4, 2:4] = 1
     assert_array_almost_equal(resized, ref)
@@ -348,9 +311,8 @@ def test_resize3d_2din_3dout():
     # 3D output with 2D input
     x = cp.zeros((5, 5), dtype=np.double)
     x[1, 1] = 1
-    resized = resize(
-        x, (10, 10, 1), order=0, anti_aliasing=False, mode="constant"
-    )
+    resized = resize(x, (10, 10, 1), order=0, anti_aliasing=False,
+                     mode='constant')
     ref = cp.zeros((10, 10, 1))
     ref[2:4, 2:4] = 1
     assert_array_almost_equal(resized, ref)
@@ -361,9 +323,8 @@ def test_resize2d_4d():
     x = cp.zeros((5, 5), dtype=np.double)
     x[1, 1] = 1
     out_shape = (10, 10, 1, 1)
-    resized = resize(
-        x, out_shape, order=0, anti_aliasing=False, mode="constant"
-    )
+    resized = resize(x, out_shape, order=0, anti_aliasing=False,
+                     mode='constant')
     ref = cp.zeros(out_shape)
     ref[2:4, 2:4, ...] = 1
     assert_array_almost_equal(resized, ref)
@@ -374,11 +335,10 @@ def test_resize_nd():
         shape = 2 + np.arange(dim) * 2
         x = cp.ones(tuple(shape))
         out_shape = np.asarray(shape) * 1.5
-        resized = resize(
-            x, out_shape, order=0, mode="reflect", anti_aliasing=False
-        )
+        resized = resize(x, out_shape, order=0, mode='reflect',
+                         anti_aliasing=False)
         expected_shape = 1.5 * shape
-        assert_array_equal(resized.shape, expected_shape)
+        assert_equal(resized.shape, expected_shape)
         assert cp.all(resized == 1)
 
 
@@ -387,10 +347,9 @@ def test_resize3d_bilinear():
     x = cp.zeros((5, 5, 2), dtype=np.double)
     x[1, 1, 0] = 0
     x[1, 1, 1] = 1
-    resized = resize(
-        x, (10, 10, 1), order=1, mode="constant", anti_aliasing=False
-    )
-    ref = cp.zeros((10, 10, 1))
+    resized = resize(x, (10, 10, 1), order=1, mode='constant',
+                     anti_aliasing=False)
+    ref = np.zeros((10, 10, 1))
     ref[1:5, 1:5, :] = 0.03125
     ref[1:5, 2:4, :] = 0.09375
     ref[2:4, 1:5, :] = 0.09375
@@ -415,9 +374,9 @@ def test_resize_dtype():
 
 
 def test_swirl():
-    image = img_as_float(cp.asarray(checkerboard()))
+    image = img_as_float(cp.array(checkerboard()))
 
-    swirl_params = {"radius": 80, "rotation": 0, "order": 2, "mode": "reflect"}
+    swirl_params = {'radius': 80, 'rotation': 0, 'order': 2, 'mode': 'reflect'}
 
     # with expected_warnings(["Bi-quadratic.*bug"]):
     swirled = swirl(image, strength=10, **swirl_params)
@@ -425,7 +384,7 @@ def test_swirl():
 
     assert cp.mean(cp.abs(image - unswirled)) < 0.01
 
-    swirl_params.pop("mode")
+    swirl_params.pop('mode')
 
     # with expected_warnings(["Bi-quadratic.*bug"]):
     swirled = swirl(image, strength=10, **swirl_params)
@@ -442,7 +401,7 @@ def test_const_cval_out_of_range():
 
 
 def test_warp_identity():
-    img = img_as_float(cp.asarray(rgb2gray(astronaut())))
+    img = img_as_float(cp.array(rgb2gray(astronaut())))
     assert len(img.shape) == 2
     assert cp.allclose(img, warp(img, AffineTransform(rotation=0)))
     assert not cp.allclose(img, warp(img, AffineTransform(rotation=0.1)))
@@ -459,7 +418,7 @@ def test_warp_identity():
 
 
 def test_warp_coords_example():
-    image = cp.asarray(astronaut().astype(np.float32))
+    image = cp.array(astronaut().astype(np.float32))
     assert 3 == image.shape[2]
     tform = SimilarityTransform(translation=(0, -10), xp=cp)
     coords = warp_coords(tform, (30, 30, 3))
@@ -469,143 +428,85 @@ def test_warp_coords_example():
 def test_downsize():
     x = cp.zeros((10, 10), dtype=np.double)
     x[2:4, 2:4] = 1
-    scaled = resize(x, (5, 5), order=0, anti_aliasing=False, mode="constant")
-    assert_array_equal(scaled.shape, (5, 5))
-    assert_array_equal(scaled[1, 1], 1)
-    assert_array_equal(scaled[2:, :].sum(), 0)
-    assert_array_equal(scaled[:, 2:].sum(), 0)
+    scaled = resize(x, (5, 5), order=0, anti_aliasing=False, mode='constant')
+    assert_equal(scaled.shape, (5, 5))
+    assert_equal(float(scaled[1, 1]), 1)
+    assert_equal(float(scaled[2:, :].sum()), 0)
+    assert_equal(float(scaled[:, 2:].sum()), 0)
 
 
 def test_downsize_anti_aliasing():
     x = cp.zeros((10, 10), dtype=np.double)
     x[2, 2] = 1
-    scaled = resize(x, (5, 5), order=1, anti_aliasing=True, mode="constant")
-    assert_array_equal(scaled.shape, (5, 5))
-    assert cp.all(scaled[:3, :3] > 0)
-    assert_array_equal(scaled[3:, :].sum(), 0)
-    assert_array_equal(scaled[:, 3:].sum(), 0)
+    scaled = resize(x, (5, 5), order=1, anti_aliasing=True, mode='constant')
+    assert_equal(scaled.shape, (5, 5))
+    assert np.all(scaled[:3, :3] > 0)
+    assert_equal(float(scaled[3:, :].sum()), 0)
+    assert_equal(float(scaled[:, 3:].sum()), 0)
 
     sigma = 0.125
     out_size = (5, 5)
-    resize(
-        x,
-        out_size,
-        order=1,
-        mode="constant",
-        anti_aliasing=True,
-        anti_aliasing_sigma=sigma,
-    )
-    resize(
-        x,
-        out_size,
-        order=1,
-        mode="edge",
-        anti_aliasing=True,
-        anti_aliasing_sigma=sigma,
-    )
-    resize(
-        x,
-        out_size,
-        order=1,
-        mode="symmetric",
-        anti_aliasing=True,
-        anti_aliasing_sigma=sigma,
-    )
-    resize(
-        x,
-        out_size,
-        order=1,
-        mode="reflect",
-        anti_aliasing=True,
-        anti_aliasing_sigma=sigma,
-    )
-    resize(
-        x,
-        out_size,
-        order=1,
-        mode="wrap",
-        anti_aliasing=True,
-        anti_aliasing_sigma=sigma,
-    )
+    resize(x, out_size, order=1, mode='constant',
+           anti_aliasing=True, anti_aliasing_sigma=sigma)
+    resize(x, out_size, order=1, mode='edge',
+           anti_aliasing=True, anti_aliasing_sigma=sigma)
+    resize(x, out_size, order=1, mode='symmetric',
+           anti_aliasing=True, anti_aliasing_sigma=sigma)
+    resize(x, out_size, order=1, mode='reflect',
+           anti_aliasing=True, anti_aliasing_sigma=sigma)
+    resize(x, out_size, order=1, mode='wrap',
+           anti_aliasing=True, anti_aliasing_sigma=sigma)
+
     with pytest.raises(ValueError):  # Unknown mode, or cannot translate mode
-        resize(
-            x,
-            out_size,
-            order=1,
-            mode="non-existent",
-            anti_aliasing=True,
-            anti_aliasing_sigma=sigma,
-        )
+        resize(x, out_size, order=1, mode='non-existent',
+               anti_aliasing=True, anti_aliasing_sigma=sigma)
 
 
 def test_downsize_anti_aliasing_invalid_stddev():
     x = cp.zeros((10, 10), dtype=np.double)
     with pytest.raises(ValueError):
-        resize(
-            x,
-            (5, 5),
-            order=0,
-            anti_aliasing=True,
-            anti_aliasing_sigma=-1,
-            mode="constant",
-        )
+        resize(x, (5, 5), order=0, anti_aliasing=True, anti_aliasing_sigma=-1,
+               mode='constant')
     with expected_warnings(["Anti-aliasing standard deviation greater"]):
-        resize(
-            x,
-            (5, 15),
-            order=0,
-            anti_aliasing=True,
-            anti_aliasing_sigma=(1, 1),
-            mode="reflect",
-        )
-        resize(
-            x,
-            (5, 15),
-            order=0,
-            anti_aliasing=True,
-            anti_aliasing_sigma=(0, 1),
-            mode="reflect",
-        )
+        resize(x, (5, 15), order=0, anti_aliasing=True,
+               anti_aliasing_sigma=(1, 1), mode="reflect")
+        resize(x, (5, 15), order=0, anti_aliasing=True,
+               anti_aliasing_sigma=(0, 1), mode="reflect")
 
 
 def test_downscale():
     x = cp.zeros((10, 10), dtype=np.double)
     x[2:4, 2:4] = 1
-    scaled = rescale(
-        x,
-        0.5,
-        order=0,
-        anti_aliasing=False,
-        multichannel=False,
-        mode="constant",
-    )
-    assert_array_equal(scaled.shape, (5, 5))
-    assert_array_equal(scaled[1, 1], 1)
-    assert_array_equal(scaled[2:, :].sum(), 0)
-    assert_array_equal(scaled[:, 2:].sum(), 0)
+    scaled = rescale(x, 0.5, order=0, anti_aliasing=False,
+                     multichannel=False, mode='constant')
+    assert_equal(scaled.shape, (5, 5))
+    assert_equal(float(scaled[1, 1]), 1)
+    assert_equal(float(scaled[2:, :].sum()), 0)
+    assert_equal(float(scaled[:, 2:].sum()), 0)
 
 
 def test_downscale_anti_aliasing():
     x = cp.zeros((10, 10), dtype=np.double)
     x[2, 2] = 1
-    scaled = rescale(
-        x, 0.5, order=1, anti_aliasing=True, multichannel=False, mode="constant"
-    )
-    assert_array_equal(scaled.shape, (5, 5))
-    assert cp.all(scaled[:3, :3] > 0)
-    assert_array_equal(scaled[3:, :].sum(), 0)
-    assert_array_equal(scaled[:, 3:].sum(), 0)
+    scaled = rescale(x, 0.5, order=1, anti_aliasing=True,
+                     multichannel=False, mode='constant')
+    assert_equal(scaled.shape, (5, 5))
+    assert np.all(scaled[:3, :3] > 0)
+    assert_equal(float(scaled[3:, :].sum()), 0)
+    assert_equal(float(scaled[:, 3:].sum()), 0)
 
 
 def test_downscale_local_mean():
     image1 = cp.arange(4 * 6).reshape(4, 6)
     out1 = downscale_local_mean(image1, (2, 3))
-    expected1 = cp.array([[4.0, 7.0], [16.0, 19.0]])
+    expected1 = np.array([[4., 7.],
+                          [16., 19.]])
     assert_array_equal(expected1, out1)
 
     image2 = cp.arange(5 * 8).reshape(5, 8)
     out2 = downscale_local_mean(image2, (4, 5))
-    expected2 = cp.array([[14.0, 10.8], [8.5, 5.7]])
+    expected2 = np.array([[14., 10.8],
+                          [8.5, 5.7]])
     assert_array_equal(expected2, out2)
 
 
@@ -632,42 +533,19 @@ def test_slow_warp_nonint_oshape():
 
 def test_keep_range():
     image = cp.linspace(0, 2, 25).reshape(5, 5)
-    out = rescale(
-        image,
-        2,
-        preserve_range=False,
-        clip=True,
-        order=0,
-        mode="constant",
-        multichannel=False,
-        anti_aliasing=False,
-    )
+    out = rescale(image, 2, preserve_range=False, clip=True, order=0,
+                  mode='constant', multichannel=False, anti_aliasing=False)
     assert out.min() == 0
     assert out.max() == 2
 
-    out = rescale(
-        image,
-        2,
-        preserve_range=True,
-        clip=True,
-        order=0,
-        mode="constant",
-        multichannel=False,
-        anti_aliasing=False,
-    )
+    out = rescale(image, 2, preserve_range=True, clip=True, order=0,
+                  mode='constant', multichannel=False, anti_aliasing=False)
     assert out.min() == 0
     assert out.max() == 2
 
-    out = rescale(
-        image.astype(np.uint8),
-        2,
-        preserve_range=False,
-        mode="constant",
-        multichannel=False,
-        anti_aliasing=False,
-        clip=True,
-        order=0,
-    )
+    out = rescale(image.astype(np.uint8), 2, preserve_range=False,
+                  mode='constant', multichannel=False, anti_aliasing=False,
+                  clip=True, order=0)
     assert out.min() == 0
     assert out.max() == 2 / 255.0
 
@@ -684,30 +562,24 @@ def test_zero_image_size():
 
 
 def test_linear_polar_mapping():
-    output_coords = cp.asarray(
-        [
-            [0, 0],
-            [0, 90],
-            [0, 180],
-            [0, 270],
-            [99, 0],
-            [99, 180],
-            [99, 270],
-            [99, 45],
-        ]
-    )
-    ground_truth = cp.asarray(
-        [
-            [100, 100],
-            [100, 100],
-            [100, 100],
-            [100, 100],
-            [199, 100],
-            [1, 100],
-            [100, 1],
-            [170.00357134, 170.00357134],
-        ]
-    )
+    # fmt: off
+    output_coords = cp.array([[0, 0],
+                             [0, 90],
+                             [0, 180],
+                             [0, 270],
+                             [99, 0],
+                             [99, 180],
+                             [99, 270],
+                             [99, 45]])
+    ground_truth = cp.array([[100, 100],
+                             [100, 100],
+                             [100, 100],
+                             [100, 100],
+                             [199, 100],
+                             [1, 100],
+                             [100, 1],
+                             [170.00357134, 170.00357134]])
+    # fmt: on
     k_angle = 360 / (2 * np.pi)
     k_radius = 1
     center = (100, 100)
@@ -716,30 +588,24 @@ def test_linear_polar_mapping():
 
 
 def test_log_polar_mapping():
-    output_coords = cp.asarray(
-        [
-            [0, 0],
-            [0, 90],
-            [0, 180],
-            [0, 270],
-            [99, 0],
-            [99, 180],
-            [99, 270],
-            [99, 45],
-        ]
-    )
-    ground_truth = cp.asarray(
-        [
-            [101, 100],
-            [100, 101],
-            [99, 100],
-            [100, 99],
-            [195.4992586, 100],
-            [4.5007414, 100],
-            [100, 4.5007414],
-            [167.52817336, 167.52817336],
-        ]
-    )
+    # fmt: off
+    output_coords = cp.array([[0, 0],
+                              [0, 90],
+                              [0, 180],
+                              [0, 270],
+                              [99, 0],
+                              [99, 180],
+                              [99, 270],
+                              [99, 45]])
+    ground_truth = cp.array([[101, 100],
+                             [100, 101],
+                             [99, 100],
+                             [100, 99],
+                             [195.4992586, 100],
+                             [4.5007414, 100],
+                             [100, 4.5007414],
+                             [167.52817336, 167.52817336]])
+    # fmt: on
     k_angle = 360 / (2 * np.pi)
     k_radius = 100 / cp.log(100)
     center = (100, 100)
@@ -755,33 +621,23 @@ def test_linear_warp_polar():
         image[rr, cc] = val
     warped = warp_polar(image, radius=25)
     profile = warped.mean(axis=0)
-    # TODO: grlee77: peak_local_max.  For now, transfer to CPU to use
-    #                peak_local_max (not yet implemented for GPU)
-    peaks = peak_local_max(profile.get())
+    peaks = cp.asnumpy(peak_local_max(profile))
     assert np.alltrue([peak in radii for peak in peaks])
 
 
 def test_log_warp_polar():
-    radii = [
-        np.exp(2),
-        np.exp(3),
-        np.exp(4),
-        np.exp(5),
-        np.exp(5) - 1,
-        np.exp(5) + 1,
-    ]
+    radii = [np.exp(2), np.exp(3), np.exp(4), np.exp(5),
+             np.exp(5) - 1, np.exp(5) + 1]
     radii = [int(x) for x in radii]
     image = cp.zeros([301, 301])
     for rad in radii:
         rr, cc, val = circle_perimeter_aa(150, 150, rad)
         image[rr, cc] = val
-    warped = warp_polar(image, radius=200, scaling="log")
+    warped = warp_polar(image, radius=200, scaling='log')
     profile = warped.mean(axis=0)
-    # TODO: grlee77: peak_local_max.  For now, transfer to CPU to use
-    #                peak_local_max (not yet implemented for GPU)
-    peaks_coord = peak_local_max(profile.get())
+    peaks_coord = peak_local_max(profile)
     peaks_coord.sort(axis=0)
-    gaps = peaks_coord[1:] - peaks_coord[:-1]
+    gaps = cp.asnumpy(peaks_coord[1:] - peaks_coord[:-1])
     assert np.alltrue([x >= 38 and x <= 40 for x in gaps])
 
 
@@ -826,17 +682,17 @@ def test_bool_img_resize():
 def test_bool_array_warnings():
     img = cp.zeros((10, 10), dtype=bool)
 
-    with expected_warnings(["Input image dtype is bool"]):
+    with expected_warnings(['Input image dtype is bool']):
         rescale(img, 0.5, anti_aliasing=True)
 
-    with expected_warnings(["Input image dtype is bool"]):
+    with expected_warnings(['Input image dtype is bool']):
         resize(img, (5, 5), anti_aliasing=True)
 
-    with expected_warnings(["Input image dtype is bool"]):
+    with expected_warnings(['Input image dtype is bool']):
         rescale(img, 0.5, order=1)
 
-    with expected_warnings(["Input image dtype is bool"]):
+    with expected_warnings(['Input image dtype is bool']):
         resize(img, (5, 5), order=1)
 
-    with expected_warnings(["Input image dtype is bool"]):
+    with expected_warnings(['Input image dtype is bool']):
         warp(img, cp.eye(3), order=1)
