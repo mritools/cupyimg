@@ -1,5 +1,4 @@
 import cupy as cp
-import numpy as np
 
 from cupyimg.scipy.ndimage.filters import gaussian_filter
 from .. import img_as_float
@@ -8,7 +7,9 @@ from .. import img_as_float
 def _unsharp_mask_single_channel(image, radius, amount, vrange):
     """Single channel implementation of the unsharp masking filter."""
 
-    blurred = gaussian_filter(image, sigma=radius, mode="reflect")
+    blurred = gaussian_filter(image,
+                              sigma=radius,
+                              mode='reflect')
 
     result = image + (image - blurred) * amount
     if vrange is not None:
@@ -16,9 +17,8 @@ def _unsharp_mask_single_channel(image, radius, amount, vrange):
     return result
 
 
-def unsharp_mask(
-    image, radius=1.0, amount=1.0, multichannel=False, preserve_range=False
-):
+def unsharp_mask(image, radius=1.0, amount=1.0, multichannel=False,
+                 preserve_range=False):
     """Unsharp masking filter.
 
     The sharp details are identified as the difference between the original
@@ -118,7 +118,7 @@ def unsharp_mask(
     """
     vrange = None  # Range for valid values; used for clipping.
     if preserve_range:
-        fimg = image.astype(np.float)
+        fimg = image.astype(float)
     else:
         fimg = img_as_float(image)
         negative = cp.any(fimg < 0)
@@ -128,11 +128,10 @@ def unsharp_mask(
             vrange = [0.0, 1.0]
 
     if multichannel:
-        result = cp.empty_like(fimg, dtype=np.float)
+        result = cp.empty_like(fimg, dtype=float)
         for channel in range(image.shape[-1]):
             result[..., channel] = _unsharp_mask_single_channel(
-                fimg[..., channel], radius, amount, vrange
-            )
+                fimg[..., channel], radius, amount, vrange)
         return result
     else:
         return _unsharp_mask_single_channel(fimg, radius, amount, vrange)

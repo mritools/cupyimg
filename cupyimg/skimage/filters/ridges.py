@@ -99,19 +99,16 @@ def _check_sigmas(sigmas):
     ValueError if any input value is negative
 
     """
-    if isinstance(sigmas, cp.ndarray):
-        sigmas = cp.asnumpy(sigmas)
-    sigmas = np.asarray(sigmas).ravel()
-    if np.any(sigmas < 0.0):
-        raise ValueError(
-            "Sigma values should be equal to or greater " "than zero."
-        )
-    return sigmas
+    if np.isscalar(sigmas):
+        sigmas = (sigmas,)
+    if any(s < 0.0 for s in sigmas):
+        raise ValueError('Sigma values should be equal to or greater '
+                         'than zero.')
+    return np.asarray(sigmas)
 
 
-def compute_hessian_eigenvalues(
-    image, sigma, sorting="none", mode="constant", cval=0
-):
+def compute_hessian_eigenvalues(image, sigma, sorting='none',
+                                mode='constant', cval=0):
     """
     Compute Hessian eigenvalues of nD images.
 
@@ -141,16 +138,15 @@ def compute_hessian_eigenvalues(
         of the input image.
     """
 
-    # Import has to be here due to circular import error
+    # Import moved here to avoid circular import error
     from ..feature import hessian_matrix, hessian_matrix_eigvals
 
     # Convert image to float
     image = img_as_float(image)
 
     # Make nD hessian
-    hessian_elements = hessian_matrix(
-        image, sigma=sigma, order="rc", mode=mode, cval=cval
-    )
+    hessian_elements = hessian_matrix(image, sigma=sigma, order='rc',
+                                      mode=mode, cval=cval)
 
     # Correct for scale
     hessian_elements = [(sigma ** 2) * e for e in hessian_elements]
@@ -159,12 +155,12 @@ def compute_hessian_eigenvalues(
     # hessian_eigenvalues = np.array(hessian_matrix_eigvals(hessian_elements))
     hessian_eigenvalues = hessian_matrix_eigvals(hessian_elements)
 
-    if sorting == "abs":
+    if sorting == 'abs':
 
         # Sort eigenvalues by absolute values in ascending order
         hessian_eigenvalues = _sortbyabs(hessian_eigenvalues, axis=0)
 
-    elif sorting == "val":
+    elif sorting == 'val':
 
         # Sort eigenvalues by values in ascending order
         hessian_eigenvalues = cp.sort(hessian_eigenvalues, axis=0)
@@ -173,14 +169,8 @@ def compute_hessian_eigenvalues(
     return hessian_eigenvalues
 
 
-def meijering(
-    image,
-    sigmas=range(1, 10, 2),
-    alpha=None,
-    black_ridges=True,
-    mode="reflect",
-    cval=0,
-):
+def meijering(image, sigmas=range(1, 10, 2), alpha=None,
+              black_ridges=True, mode='reflect', cval=0):
     """
     Filter an image with the Meijering neuriteness filter.
 
@@ -251,9 +241,10 @@ def meijering(
     for i, sigma in enumerate(sigmas):
 
         # Calculate (sorted) eigenvalues
-        eigenvalues = compute_hessian_eigenvalues(
-            image, sigma, sorting="abs", mode=mode, cval=cval
-        )
+        eigenvalues = compute_hessian_eigenvalues(image, sigma, sorting='abs',
+                                                  mode=mode, cval=cval)
+        # CuPy Backend: do intermediate computations withy tiny arrays on the CPU
+        # TODO: refactor to avoid host-device transfer
         eigenvalues = cp.asnumpy(eigenvalues)
 
         if ndim > 1:
@@ -263,16 +254,8 @@ def meijering(
             coefficients[0] = 1
 
             # Compute normalized eigenvalues l_i = e_i + sum_{j!=i} alpha * e_j
-            auxiliary = [
-                np.sum(
-                    [
-                        eigenvalues[i] * np.roll(coefficients, j)[i]
-                        for j in range(ndim)
-                    ],
-                    axis=0,
-                )
-                for i in range(ndim)
-            ]
+            auxiliary = [np.sum([eigenvalues[i] * np.roll(coefficients, j)[i]
+                         for j in range(ndim)], axis=0) for i in range(ndim)]
 
             # Get maximum eigenvalues by magnitude
             auxiliary = auxiliary[-1]
@@ -291,7 +274,8 @@ def meijering(
     return cp.max(filtered_array, axis=0)
 
 
-def sato(image, sigmas=range(1, 10, 2), black_ridges=True, mode=None, cval=0):
+def sato(image, sigmas=range(1, 10, 2), black_ridges=True,
+         mode=None, cval=0):
     """
     Filter an image with the Sato tubeness filter.
 
@@ -345,16 +329,12 @@ def sato(image, sigmas=range(1, 10, 2), black_ridges=True, mode=None, cval=0):
     sigmas = _check_sigmas(sigmas)
 
     if mode is None:
-        warn(
-            "Previously, sato implicitly used 'constant' as the "
-            "border mode when dealing with the edge of the array. The new "
-            "behavior is 'reflect'. To recover the old behavior, use "
-            "mode='constant'. To avoid this warning, please explicitly "
-            "set the mode.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        mode = "reflect"
+        warn("Previously, sato implicitly used 'constant' as the "
+             "border mode when dealing with the edge of the array. The new "
+             "behavior is 'reflect'. To recover the old behavior, use "
+             "mode='constant'. To avoid this warning, please explicitly "
+             "set the mode.", category=FutureWarning, stacklevel=2)
+        mode = 'reflect'
 
     # Invert image to detect bright ridges on dark background
     if not black_ridges:
@@ -368,12 +348,15 @@ def sato(image, sigmas=range(1, 10, 2), black_ridges=True, mode=None, cval=0):
     for i, sigma in enumerate(sigmas):
 
         # Calculate (sorted) eigenvalues
-        lamba1, *lambdas = compute_hessian_eigenvalues(
-            image, sigma, sorting="val", mode=mode, cval=cval
-        )
+        lamba1, *lambdas = compute_hessian_eigenvalues(image, sigma,
+                                                       sorting='val',
+                                                       mode=mode, cval=cval)
 
         # Compute tubeness, see  equation (9) in reference [1]_.
         # cp.abs(lambda2) in 2D, cp.sqrt(cp.abs(lambda2 * lambda3)) in 3D
+
+        # CuPy Backend: cp.multiply does not have a reduce method
+        # filtered = cp.abs(cp.multiply.reduce(lambdas)) ** (1 / len(lambdas))
         filtered = cp.abs(reduce(cp.multiply, lambdas)) ** (1 / len(lambdas))
 
         # Remove background and store results in (n+1)D matrices
@@ -383,18 +366,9 @@ def sato(image, sigmas=range(1, 10, 2), black_ridges=True, mode=None, cval=0):
     return cp.max(filtered_array, axis=0)
 
 
-def frangi(
-    image,
-    sigmas=range(1, 10, 2),
-    scale_range=None,
-    scale_step=None,
-    alpha=0.5,
-    beta=0.5,
-    gamma=15,
-    black_ridges=True,
-    mode="reflect",
-    cval=0,
-):
+def frangi(image, sigmas=range(1, 10, 2), scale_range=None,
+           scale_step=None, alpha=0.5, beta=0.5, gamma=15,
+           black_ridges=True, mode='reflect', cval=0):
     """
     Filter an image with the Frangi vesselness filter.
 
@@ -463,11 +437,9 @@ def frangi(
     .. [3] Ellis, D. G.: https://github.com/ellisdg/frangi3d/tree/master/frangi
     """
     if scale_range is not None and scale_step is not None:
-        warn(
-            "Use keyword parameter `sigmas` instead of `scale_range` and "
-            "`scale_range` which will be removed in version 0.17.",
-            stacklevel=2,
-        )
+        warn('Use keyword parameter `sigmas` instead of `scale_range` and '
+             '`scale_range` which will be removed in version 0.17.',
+             stacklevel=2)
         sigmas = np.arange(scale_range[0], scale_range[1], scale_step)
 
     # Check image dimensions
@@ -497,9 +469,9 @@ def frangi(
     for i, sigma in enumerate(sigmas):
 
         # Calculate (abs sorted) eigenvalues
-        lambda1, *lambdas = compute_hessian_eigenvalues(
-            image, sigma, sorting="abs", mode=mode, cval=cval
-        )
+        lambda1, *lambdas = compute_hessian_eigenvalues(image, sigma,
+                                                        sorting='abs',
+                                                        mode=mode, cval=cval)
 
         # Compute sensitivity to deviation from a plate-like
         # structure see equations (11) and (15) in reference [1]_
@@ -508,6 +480,8 @@ def frangi(
         # Compute sensitivity to deviation from a blob-like structure,
         # see equations (10) and (15) in reference [1]_,
         # np.abs(lambda2) in 2D, np.sqrt(np.abs(lambda2 * lambda3)) in 3D
+        # CuPy Backend: cp.multiply does not have a reduce method
+        # filtered_raw = np.abs(np.multiply.reduce(lambdas))**(1/len(lambdas))
         filtered_raw = cp.abs(reduce(cp.multiply, lambdas)) ** (
             1 / len(lambdas)
         )
@@ -519,11 +493,10 @@ def frangi(
 
         # Compute output image for given (sigma) scale and store results in
         # (n+1)D matrices, see equations (13) and (15) in reference [1]_
-        filtered_array[i] = (
-            (1 - cp.exp(-r_a / alpha_sq))
-            * cp.exp(-r_b / beta_sq)
-            * (1 - cp.exp(-r_g / gamma_sq))
-        )
+        filtered_array[i] = ((1 - cp.exp(-r_a / alpha_sq))
+                             * cp.exp(-r_b / beta_sq)
+                             * (1 - cp.exp(-r_g / gamma_sq)))
+
         lambdas_array[i] = cp.max(cp.asarray(lambdas), axis=0)
 
     # Remove background
@@ -533,18 +506,9 @@ def frangi(
     return cp.max(filtered_array, axis=0)
 
 
-def hessian(
-    image,
-    sigmas=range(1, 10, 2),
-    scale_range=None,
-    scale_step=None,
-    alpha=0.5,
-    beta=0.5,
-    gamma=15,
-    black_ridges=True,
-    mode=None,
-    cval=0,
-):
+def hessian(image, sigmas=range(1, 10, 2), scale_range=None, scale_step=None,
+            alpha=0.5, beta=0.5, gamma=15, black_ridges=True, mode=None,
+            cval=0):
     """Filter an image with the Hybrid Hessian filter.
 
     This filter can be used to detect continuous edges, e.g. vessels,
@@ -607,29 +571,17 @@ def hessian(
     """
 
     if mode is None:
-        warn(
-            "Previously, hessian implicitly used 'constant' as the "
-            "border mode when dealing with the edge of the array. The new "
-            "behavior is 'reflect'. To recover the old behavior, use "
-            "mode='constant'. To avoid this warning, please explicitly "
-            "set the mode.",
-            category=FutureWarning,
-            stacklevel=2,
-        )
-        mode = "reflect"
+        warn("Previously, hessian implicitly used 'constant' as the "
+             "border mode when dealing with the edge of the array. The new "
+             "behavior is 'reflect'. To recover the old behavior, use "
+             "mode='constant'. To avoid this warning, please explicitly "
+             "set the mode.", category=FutureWarning, stacklevel=2)
+        mode = 'reflect'
 
-    filtered = frangi(
-        image,
-        sigmas=sigmas,
-        scale_range=scale_range,
-        scale_step=scale_step,
-        alpha=alpha,
-        beta=beta,
-        gamma=gamma,
-        black_ridges=black_ridges,
-        mode=mode,
-        cval=cval,
-    )
+    filtered = frangi(image, sigmas=sigmas, scale_range=scale_range,
+                      scale_step=scale_step, alpha=alpha, beta=beta,
+                      gamma=gamma, black_ridges=black_ridges, mode=mode,
+                      cval=cval)
 
     filtered[filtered <= 0] = 1
     return filtered

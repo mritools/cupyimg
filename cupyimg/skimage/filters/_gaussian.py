@@ -7,19 +7,11 @@ from ..util import img_as_float
 from .._shared.utils import warn, convert_to_float
 
 
-__all__ = ["gaussian", "difference_of_gaussians"]
+__all__ = ['gaussian', 'difference_of_gaussians']
 
 
-def gaussian(
-    image,
-    sigma=1,
-    output=None,
-    mode="nearest",
-    cval=0,
-    multichannel=None,
-    preserve_range=False,
-    truncate=4.0,
-):
+def gaussian(image, sigma=1, output=None, mode='nearest', cval=0,
+             multichannel=None, preserve_range=False, truncate=4.0):
     """Multi-dimensional Gaussian filter.
 
     Parameters
@@ -113,14 +105,12 @@ def gaussian(
     except ValueError:
         spatial_dims = image.ndim
     if spatial_dims is None and multichannel is None:
-        msg = (
-            "Images with dimensions (M, N, 3) are interpreted as 2D+RGB "
-            "by default. Use `multichannel=False` to interpret as "
-            "3D image with last dimension of length 3."
-        )
+        msg = ("Images with dimensions (M, N, 3) are interpreted as 2D+RGB "
+               "by default. Use `multichannel=False` to interpret as "
+               "3D image with last dimension of length 3.")
         warn(RuntimeWarning(msg))
         multichannel = True
-    # Note: slight refactor to avoid overhead of cp.any(cp.asarray(sigma))
+    # CuPy Backend: refactor to avoid overhead of cp.any(cp.asarray(sigma))
     sigma_msg = "Sigma values less than zero are not valid"
     if not isinstance(sigma, Iterable):
         if sigma < 0:
@@ -139,9 +129,8 @@ def gaussian(
         output = cp.empty_like(image)
     elif not np.issubdtype(output.dtype, np.floating):
         raise ValueError("Provided output data type is not float")
-    ndi.gaussian_filter(
-        image, sigma, output=output, mode=mode, cval=cval, truncate=truncate
-    )
+    ndi.gaussian_filter(image, sigma, output=output, mode=mode, cval=cval,
+                        truncate=truncate)
     return output
 
 
@@ -176,16 +165,9 @@ def _guess_spatial_dimensions(image):
         raise ValueError("Expected 2D, 3D, or 4D array, got %iD." % image.ndim)
 
 
-def difference_of_gaussians(
-    image,
-    low_sigma,
-    high_sigma=None,
-    *,
-    mode="nearest",
-    cval=0,
-    multichannel=False,
-    truncate=4.0,
-):
+def difference_of_gaussians(image, low_sigma, high_sigma=None, *,
+                            mode='nearest', cval=0, multichannel=False,
+                            truncate=4.0):
     """Find features between ``low_sigma`` and ``high_sigma`` in size.
 
     This function uses the Difference of Gaussians method for applying
@@ -282,53 +264,38 @@ def difference_of_gaussians(
 
     """
     image = img_as_float(image)
-    low_sigma = np.array(low_sigma, dtype="float", ndmin=1)
-    if high_sigma is None:
-        high_sigma = low_sigma * 1.6
-    else:
-        high_sigma = np.array(high_sigma, dtype="float", ndmin=1)
+    # CuPy Backend: refactored low_sigma and high_sigma processing
 
     if multichannel is True:
         spatial_dims = image.ndim - 1
     else:
         spatial_dims = image.ndim
 
+    if np.isscalar(low_sigma):
+        low_sigma = (low_sigma,) * spatial_dims
+
+    low_sigma = tuple(map(float, low_sigma))
+    if high_sigma is None:
+        high_sigma = tuple(l * 1.6 for l in low_sigma)
+    elif np.isscalar(high_sigma):
+        high_sigma = (high_sigma,) * spatial_dims
+    high_sigma = tuple(map(float, high_sigma))
+
     if len(low_sigma) != 1 and len(low_sigma) != spatial_dims:
-        raise ValueError(
-            "low_sigma must have length equal to number of"
-            " spatial dimensions of input"
-        )
+        raise ValueError('low_sigma must have length equal to number of'
+                         ' spatial dimensions of input')
     if len(high_sigma) != 1 and len(high_sigma) != spatial_dims:
-        raise ValueError(
-            "high_sigma must have length equal to number of"
-            " spatial dimensions of input"
-        )
+        raise ValueError('high_sigma must have length equal to number of'
+                         ' spatial dimensions of input')
 
-    low_sigma = low_sigma * np.ones(spatial_dims)
-    high_sigma = high_sigma * np.ones(spatial_dims)
+    if any(h < l for h, l in zip(high_sigma, low_sigma)):
+        raise ValueError('high_sigma must be equal to or larger than'
+                         'low_sigma for all axes')
 
-    if any(high_sigma < low_sigma):
-        raise ValueError(
-            "high_sigma must be equal to or larger than"
-            "low_sigma for all axes"
-        )
+    im1 = gaussian(image, low_sigma, mode=mode, cval=cval,
+                   multichannel=multichannel, truncate=truncate)
 
-    im1 = gaussian(
-        image,
-        low_sigma,
-        mode=mode,
-        cval=cval,
-        multichannel=multichannel,
-        truncate=truncate,
-    )
-
-    im2 = gaussian(
-        image,
-        high_sigma,
-        mode=mode,
-        cval=cval,
-        multichannel=multichannel,
-        truncate=truncate,
-    )
+    im2 = gaussian(image, high_sigma, mode=mode, cval=cval,
+                   multichannel=multichannel, truncate=truncate)
 
     return im1 - im2

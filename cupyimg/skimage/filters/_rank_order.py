@@ -51,7 +51,7 @@ def rank_order(image):
     sort_rank = cp.zeros_like(sort_order)
     is_different = flat_image[:-1] != flat_image[1:]
     cp.cumsum(is_different, out=sort_rank[1:])
-    original_values = cp.zeros((sort_rank[-1].get() + 1,), image.dtype)
+    original_values = cp.zeros((int(sort_rank[-1]) + 1,), image.dtype)
     original_values[0] = flat_image[0]
     original_values[1:] = flat_image[1:][is_different]
     int_image = cp.zeros_like(sort_order)

@@ -6,7 +6,6 @@ import math
 import cupy as cp
 import numpy as np
 from cupyimg.scipy import ndimage as ndi
-from cupyimg import numpy as cnp
 
 from ..exposure import histogram
 from .._shared.utils import check_nD, warn
@@ -14,21 +13,25 @@ from ..transform import integral_image
 from ..util import crop, dtype_limits
 
 
-__all__ = [
-    "try_all_threshold",
-    "threshold_otsu",
-    "threshold_yen",
-    "threshold_isodata",
-    "threshold_li",
-    "threshold_local",
-    "threshold_minimum",
-    "threshold_mean",
-    "threshold_niblack",
-    "threshold_sauvola",
-    "threshold_triangle",
-    "apply_hysteresis_threshold",
-    "threshold_multiotsu",
-]
+__all__ = ['try_all_threshold',
+           'threshold_otsu',
+           'threshold_yen',
+           'threshold_isodata',
+           'threshold_li',
+           'threshold_local',
+           'threshold_minimum',
+           'threshold_mean',
+           'threshold_niblack',
+           'threshold_sauvola',
+           'threshold_triangle',
+           'apply_hysteresis_threshold',
+           'threshold_multiotsu']
+
+
+# TODO: use cp.cumsum directly once the following issue in CuPy is resolved:
+#       https://github.com/cupy/cupy/issues/4456
+def _cumsum(x, *args, **kwargs):
+    return cp.cumsum(x.copy(), *args, **kwargs)
 
 
 def _try_all(image, methods=None, figsize=None, num_cols=2, verbose=True):
@@ -59,13 +62,12 @@ def _try_all(image, methods=None, figsize=None, num_cols=2, verbose=True):
     methods = methods or {}
 
     num_rows = math.ceil((len(methods) + 1.0) / num_cols)
-    fig, ax = plt.subplots(
-        num_rows, num_cols, figsize=figsize, sharex=True, sharey=True
-    )
+    fig, ax = plt.subplots(num_rows, num_cols, figsize=figsize,
+                           sharex=True, sharey=True)
     ax = ax.ravel()
 
     ax[0].imshow(cp.asnumpy(image), cmap=plt.cm.gray)
-    ax[0].set_title("Original")
+    ax[0].set_title('Original')
 
     i = 1
     for name, func in methods.items():
@@ -73,20 +75,14 @@ def _try_all(image, methods=None, figsize=None, num_cols=2, verbose=True):
         try:
             ax[i].imshow(cp.asnumpy(func(image)), cmap=plt.cm.gray)
         except Exception as e:
-            ax[i].text(
-                0.5,
-                0.5,
-                "%s" % type(e).__name__,
-                ha="center",
-                va="center",
-                transform=ax[i].transAxes,
-            )
+            ax[i].text(0.5, 0.5, "%s" % type(e).__name__,
+                       ha="center", va="center", transform=ax[i].transAxes)
         i += 1
         if verbose:
             print(func.__orifunc__)
 
     for a in ax:
-        a.axis("off")
+        a.axis('off')
 
     fig.tight_layout()
     return fig, ax
@@ -142,30 +138,20 @@ def try_all_threshold(image, figsize=(8, 5), verbose=True):
         return wrapper
 
     # Global algorithms.
-    methods = OrderedDict(
-        {
-            "Isodata": thresh(threshold_isodata),
-            "Li": thresh(threshold_li),
-            "Mean": thresh(threshold_mean),
-            "Minimum": thresh(threshold_minimum),
-            "Otsu": thresh(threshold_otsu),
-            "Triangle": thresh(threshold_triangle),
-            "Yen": thresh(threshold_yen),
-        }
-    )
+    methods = OrderedDict({'Isodata': thresh(threshold_isodata),
+                           'Li': thresh(threshold_li),
+                           'Mean': thresh(threshold_mean),
+                           'Minimum': thresh(threshold_minimum),
+                           'Otsu': thresh(threshold_otsu),
+                           'Triangle': thresh(threshold_triangle),
+                           'Yen': thresh(threshold_yen)})
 
-    return _try_all(image, figsize=figsize, methods=methods, verbose=verbose)
+    return _try_all(image, figsize=figsize,
+                    methods=methods, verbose=verbose)
 
 
-def threshold_local(
-    image,
-    block_size,
-    method="gaussian",
-    offset=0,
-    mode="reflect",
-    param=None,
-    cval=0,
-):
+def threshold_local(image, block_size, method='gaussian', offset=0,
+                    mode='reflect', param=None, cval=0):
     """Compute a threshold mask image based on local pixel neighborhood.
 
     Also known as adaptive or dynamic thresholding. The threshold value is
@@ -226,49 +212,36 @@ def threshold_local(
     ...                                         param=func)
     """
     if block_size % 2 == 0:
-        raise ValueError(
-            "The kwarg ``block_size`` must be odd! Given "
-            "``block_size`` {0} is even.".format(block_size)
-        )
+        raise ValueError("The kwarg ``block_size`` must be odd! Given "
+                         "``block_size`` {0} is even.".format(block_size))
     check_nD(image, 2)
-    thresh_image = cp.zeros(image.shape, "double")
-    if method == "generic":
+    thresh_image = cp.zeros(image.shape, 'double')
+    if method == 'generic':
         raise NotImplementedError("TODO: implement generic_filter")
         ndi.generic_filter(
             image, param, block_size, output=thresh_image, mode=mode, cval=cval
         )
-    elif method == "gaussian":
+    elif method == 'gaussian':
         if param is None:
             # automatically determine sigma which covers > 99% of distribution
             sigma = (block_size - 1) / 6.0
         else:
             sigma = param
-        ndi.gaussian_filter(
-            image, sigma, output=thresh_image, mode=mode, cval=cval
-        )
-    elif method == "mean":
+        ndi.gaussian_filter(image, sigma, output=thresh_image, mode=mode,
+                            cval=cval)
+    elif method == 'mean':
         mask = 1.0 / block_size * cp.ones((block_size,))
         # separation of filters to speedup convolution
-        ndi.convolve1d(
-            image, mask, axis=0, output=thresh_image, mode=mode, cval=cval
-        )
-        ndi.convolve1d(
-            thresh_image,
-            mask,
-            axis=1,
-            output=thresh_image,
-            mode=mode,
-            cval=cval,
-        )
-    elif method == "median":
-        ndi.median_filter(
-            image, block_size, output=thresh_image, mode=mode, cval=cval
-        )
+        ndi.convolve1d(image, mask, axis=0, output=thresh_image, mode=mode,
+                       cval=cval)
+        ndi.convolve1d(thresh_image, mask, axis=1, output=thresh_image,
+                       mode=mode, cval=cval)
+    elif method == 'median':
+        ndi.median_filter(image, block_size, output=thresh_image, mode=mode,
+                          cval=cval)
     else:
-        raise ValueError(
-            "Invalid method specified. Please use `generic`, "
-            "`gaussian`, `mean`, or `median`."
-        )
+        raise ValueError("Invalid method specified. Please use `generic`, "
+                         "`gaussian`, `mean`, or `median`.")
 
     return thresh_image - offset
 
@@ -356,10 +329,8 @@ def threshold_otsu(image=None, nbins=256, *, hist=None):
     The input image must be grayscale.
     """
     if image is not None and image.ndim > 2 and image.shape[-1] in (3, 4):
-        msg = (
-            "threshold_otsu is expected to work correctly only for "
-            "grayscale images; image shape {0} looks like an RGB image"
-        )
+        msg = "threshold_otsu is expected to work correctly only for " \
+              "grayscale images; image shape {0} looks like an RGB image"
         warn(msg.format(image.shape))
 
     # Check if the image is multi-colored or not
@@ -373,11 +344,11 @@ def threshold_otsu(image=None, nbins=256, *, hist=None):
     counts, bin_centers = _validate_image_histogram(image, hist, nbins)
 
     # class probabilities for all possible thresholds
-    weight1 = cp.cumsum(counts)
-    weight2 = cp.cumsum(counts[::-1])[::-1]
+    weight1 = _cumsum(counts)
+    weight2 = _cumsum(counts[::-1])[::-1]
     # class means for all possible thresholds
-    mean1 = cp.cumsum(counts * bin_centers) / weight1
-    mean2 = (cp.cumsum((counts * bin_centers)[::-1]) / weight2[::-1])[::-1]
+    mean1 = _cumsum(counts * bin_centers) / weight1
+    mean2 = (_cumsum((counts * bin_centers)[::-1]) / weight2[::-1])[::-1]
 
     # Clip ends to align class 1 and class 2 variables:
     # The last value of ``weight1``/``mean1`` should pair with zero values in
@@ -440,15 +411,14 @@ def threshold_yen(image=None, nbins=256, *, hist=None):
 
     # Calculate probability mass function
     pmf = counts.astype(cp.float32) / counts.sum()
-    P1 = cp.cumsum(pmf)  # Cumulative normalized histogram
-    P1_sq = cp.cumsum(pmf * pmf)
+    P1 = _cumsum(pmf)  # Cumulative normalized histogram
+    P1_sq = _cumsum(pmf * pmf)
     # Get cumsum calculated from end of squared array:
-    P2_sq = cp.cumsum(pmf[::-1] ** 2)[::-1]
+    P2_sq = _cumsum(pmf[::-1] ** 2)[::-1]
     # P2_sq indexes is shifted +1. I assume, with P1[:-1] it's help avoid
     # '-inf' in crit. ImageJ Yen implementation replaces those values by zero.
-    crit = cp.log(
-        ((P1_sq[:-1] * P2_sq[1:]) ** -1) * (P1[:-1] * (1.0 - P1[:-1])) ** 2
-    )
+    crit = cp.log(((P1_sq[:-1] * P2_sq[1:]) ** -1) *
+                  (P1[:-1] * (1.0 - P1[:-1])) ** 2)
     return bin_centers[crit.argmax()]
 
 
@@ -525,7 +495,7 @@ def threshold_isodata(image=None, nbins=256, return_all=False, *, hist=None):
 
     # csuml and csumh contain the count of pixels in that bin or lower, and
     # in all bins strictly higher than that bin, respectively
-    csuml = cp.cumsum(counts)
+    csuml = _cumsum(counts)
     csumh = csuml[-1] - csuml
 
     # intensity_sum contains the total pixel intensity from each bin
@@ -541,7 +511,7 @@ def threshold_isodata(image=None, nbins=256, return_all=False, *, hist=None):
     # can be in the top bin.
     # To avoid the division by zero, we simply skip over the last element in
     # all future computation.
-    csum_intensity = cp.cumsum(intensity_sum)
+    csum_intensity = _cumsum(intensity_sum)
     lower = csum_intensity[:-1] / csuml[:-1]
     higher = (csum_intensity[-1] - csum_intensity[:-1]) / csumh[:-1]
 
@@ -612,16 +582,8 @@ def _cross_entropy(image, threshold, bins=_DEFAULT_ENTROPY_BINS):
            :DOI:`10.1016/S0167-8655(98)00057-9`
     """
     bins = cp.asarray(bins)  # required for _DEFAULT_ENTROPY_BINS tuple
-    try:
-        # use CuPy's implementation when available
-        histogram, bin_edges = cp.histogram(image, bins=bins, density=True)
-    except TypeError:
-        histogram, bin_edges = cnp.histogram(image, bins=bins, density=True)
-    try:
-        # use CuPy's implementation when available
-        bin_centers = cp.convolve(bin_edges, [0.5, 0.5], mode="valid")
-    except AttributeError:
-        bin_centers = cnp.convolve(bin_edges, [0.5, 0.5], mode="valid")
+    histogram, bin_edges = cp.histogram(image, bins=bins, density=True)
+    bin_centers = cp.convolve(bin_edges, cp.array([0.5, 0.5]), mode='valid')
     t = cp.flatnonzero(bin_centers > threshold)[0]
     m0a = cp.sum(histogram[:t])  # 0th moment, background
     m0b = cp.sum(histogram[t:])
@@ -633,9 +595,8 @@ def _cross_entropy(image, threshold, bins=_DEFAULT_ENTROPY_BINS):
     return nu
 
 
-def threshold_li(
-    image, *, tolerance=None, initial_guess=None, iter_callback=None
-):
+def threshold_li(image, *, tolerance=None, initial_guess=None,
+                 iter_callback=None):
     """Compute threshold value by Li's iterative Minimum Cross Entropy method.
 
     Parameters
@@ -697,7 +658,7 @@ def threshold_li(
 
     # Make sure image has more than one value; otherwise, return that value
     # This works even for cp.inf
-    val0 = image[(0,) * image.ndim]
+    val0 = image.ravel()[0]
     if cp.all(image == val0):  # device synchronize!
         return val0
 
@@ -723,19 +684,14 @@ def threshold_li(
         t_next = initial_guess - image_min
         image_max = cp.max(image) + image_min
         if not 0 < t_next < cp.max(image):
-            msg = (
-                "The initial guess for threshold_li must be within the "
-                "range of the image. Got {} for image min {} and max {} ".format(
-                    initial_guess, image_min, image_max
-                )
-            )
+            msg = ('The initial guess for threshold_li must be within the '
+                   'range of the image. Got {} for image min {} and max {} '
+                   .format(initial_guess, image_min, image_max))
             raise ValueError(msg)
     else:
-        raise TypeError(
-            "Incorrect type for `initial_guess`; should be "
-            "a floating point value, or a function mapping an "
-            "array to a floating point value."
-        )
+        raise TypeError('Incorrect type for `initial_guess`; should be '
+                        'a floating point value, or a function mapping an '
+                        'array to a floating point value.')
 
     # initial value for t_curr must be different from t_next by at
     # least the tolerance. Since the image is positive, we ensure this
@@ -754,9 +710,8 @@ def threshold_li(
         mean_fore = cp.mean(image[foreground])
         mean_back = cp.mean(image[~foreground])
 
-        t_next = (mean_back - mean_fore) / (
-            cp.log(mean_back) - cp.log(mean_fore)
-        )
+        t_next = ((mean_back - mean_fore) /
+                  (cp.log(mean_back) - cp.log(mean_fore)))
 
         if iter_callback is not None:
             iter_callback(t_next + image_min)
@@ -824,8 +779,8 @@ def threshold_minimum(image=None, nbins=256, max_iter=10000, *, hist=None):
         maximum_idxs = list()
         direction = 1
 
-        # better to transfer hist back to cpu?
-        hist = hist.get()  # device synchronize
+        # TODO: better to transfer hist back to cpu?
+        hist = cp.asnumpy(hist)  # device synchronize
 
         for i in range(hist.shape[0] - 1):
             if direction > 0:
@@ -849,11 +804,10 @@ def threshold_minimum(image=None, nbins=256, max_iter=10000, *, hist=None):
             break
 
     if len(maximum_idxs) != 2:
-        raise RuntimeError("Unable to find two maxima in histogram")
+        raise RuntimeError('Unable to find two maxima in histogram')
     elif counter == max_iter - 1:
-        raise RuntimeError(
-            "Maximum iteration reached for histogram" "smoothing"
-        )
+        raise RuntimeError('Maximum iteration reached for histogram'
+                           'smoothing')
 
     # Find lowest point between the maxima
     threshold_idx = cp.argmin(
@@ -929,7 +883,7 @@ def threshold_triangle(image, nbins=256):
     """
     # nbins is ignored for integer arrays
     # so, we recalculate the effective nbins.
-    hist, bin_centers = histogram(image.ravel(), nbins, source_range="image")
+    hist, bin_centers = histogram(image.ravel(), nbins, source_range='image')
     nbins = len(hist)
 
     # Find peak, lowest and highest gray levels.
@@ -959,7 +913,7 @@ def threshold_triangle(image, nbins=256):
         peak_height /= norm
         width /= norm
     except TypeError:
-        # TODO: fix cupy?
+        # TODO: CuPy bug?
         # workaround for:
         #    TypeError: output (typecode 'd') could not be coerced to provided output parameter (typecode 'l') according to the casting rule "same_kind"
         peak_height = peak_height / norm
@@ -978,6 +932,7 @@ def threshold_triangle(image, nbins=256):
     return bin_centers[arg_level]
 
 
+# TODO: move to _sparse.py as in scikit-image?
 def _validate_window_size(axis_sizes):
     """Ensure all sizes in ``axis_sizes`` are odd.
 
@@ -1035,7 +990,8 @@ def _mean_std(image, w):
     _validate_window_size(w)
 
     pad_width = tuple((k // 2 + 1, k // 2) for k in w)
-    padded = cp.pad(image.astype("float"), pad_width, mode="reflect")
+    padded = cp.pad(image.astype('float'), pad_width,
+                    mode='reflect')
     padded_sq = padded * padded
 
     integral = integral_image(padded)
@@ -1046,6 +1002,8 @@ def _mean_std(image, w):
         kern[indices] = (-1) ** (image.ndim % 2 != np.sum(indices) % 2)
 
     total_window_size = np.prod(w)
+    # CuPy Backend:
+    # TODO: haven't implemented special correlate_sparse method yet
     sum_full = ndi.correlate(integral, kern, mode="constant")
     m = crop(sum_full, pad_width) / total_window_size
     sum_sq_full = ndi.correlate(integral_sq, kern, mode="constant")
@@ -1299,29 +1257,26 @@ def threshold_multiotsu(image, classes=3, nbins=256):
         )
 
     if len(image.shape) > 2 and image.shape[-1] in (3, 4):
-        msg = (
-            "threshold_multiotsu is expected to work correctly only for "
-            "grayscale images; image shape {0} looks like an RGB image"
-        )
+        msg = ("threshold_multiotsu is expected to work correctly only for "
+               "grayscale images; image shape {0} looks like an RGB image")
         warn(msg.format(image.shape))
 
     # calculating the histogram and the probability of each gray level.
-    prob, bin_centers = histogram(
-        image.ravel(), nbins=nbins, source_range="image", normalize=True
-    )
+    prob, bin_centers = histogram(image.ravel(),
+                                  nbins=nbins,
+                                  source_range='image',
+                                  normalize=True)
 
     nvalues = np.count_nonzero(prob)
     if nvalues < classes:
-        msg = (
-            "The input image has only {} different values. "
-            "It can not be thresholded in {} classes"
-        )
+        msg = ("The input image has only {} different values. "
+               "It can not be thresholded in {} classes")
         raise ValueError(msg.format(nvalues, classes))
     elif nvalues == classes:
         thresh_idx = np.where(prob > 0)[0][:-1]
     else:
         # Need probabilities on the CPU to use the Cython code
-        # (prob is typically small, so CPU computations should be faster)
+        # CuPy Backend: prob is small, so CPU computations should be faster
         prob = cp.asnumpy(prob)  # synchronization!
         prob = prob.astype("float32")
 
@@ -1333,7 +1288,7 @@ def threshold_multiotsu(image, classes=3, nbins=256):
             # image is uint16 for example): in this case, the
             # allocated memory is too large.
             thresh_idx = _get_multiotsu_thresh_indices(prob, classes - 1)
-        # transfer indices back to the GPU if the input was on the GPU
+        # transfer indices back to the GPU
         thresh_idx = cp.asarray(thresh_idx)  # synchronization!
 
     thresh = bin_centers[thresh_idx]

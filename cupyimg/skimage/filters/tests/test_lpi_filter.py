@@ -7,7 +7,7 @@ from cupyimg.skimage.filters import LPIFilter2D, inverse, wiener
 
 
 class TestLPIFilter2D(unittest.TestCase):
-    img = cp.asarray(data.camera()[:50, :50])
+    img = cp.array(data.camera()[:50, :50])
 
     def filt_func(self, r, c):
         return cp.exp(-cp.hypot(r, c) / 1)
@@ -22,11 +22,8 @@ class TestLPIFilter2D(unittest.TestCase):
     def test_ip_shape(self):
         rows, columns = self.img.shape[:2]
 
-        for c_slice in [
-            slice(0, columns),
-            slice(0, columns - 5),
-            slice(0, columns - 20),
-        ]:
+        for c_slice in [slice(0, columns), slice(0, columns - 5),
+                        slice(0, columns - 20)]:
             yield (self.tst_shape, self.img[:, c_slice])
 
     def test_inverse(self):

@@ -32,12 +32,17 @@ VSCHARR_WEIGHTS = HSCHARR_WEIGHTS.T
 
 PREWITT_EDGE = np.array([1, 0, -1])
 PREWITT_SMOOTH = np.full((3,), 1 / 3)
-HPREWITT_WEIGHTS = PREWITT_EDGE.reshape((3, 1)) * PREWITT_SMOOTH.reshape((1, 3))
+HPREWITT_WEIGHTS = (PREWITT_EDGE.reshape((3, 1))
+                    * PREWITT_SMOOTH.reshape((1, 3)))
 VPREWITT_WEIGHTS = HPREWITT_WEIGHTS.T
 
 # 2D-only filter weights
-ROBERTS_PD_WEIGHTS = np.array([[1, 0], [0, -1]], dtype=np.double)
-ROBERTS_ND_WEIGHTS = np.array([[0, 1], [-1, 0]], dtype=np.double)
+# fmt: off
+ROBERTS_PD_WEIGHTS = np.array([[1, 0],
+                               [0, -1]], dtype=np.double)
+ROBERTS_ND_WEIGHTS = np.array([[0, 1],
+                               [-1, 0]], dtype=np.double)
+# fmt: on
 
 # These filter weights can be found in Farid & Simoncelli (2004),
 # Table 1 (3rd and 4th row). Additional decimal places were computed
@@ -45,8 +50,8 @@ ROBERTS_ND_WEIGHTS = np.array([[0, 1], [-1, 0]], dtype=np.double)
 # fmt: off
 p = np.array([[0.0376593171958126, 0.249153396177344, 0.426374573253687,
                0.249153396177344, 0.0376593171958126]])
-d1 = np.asarray([[0.109603762960254, 0.276690988455557, 0,
-                 -0.276690988455557, -0.109603762960254]])
+d1 = np.array([[0.109603762960254, 0.276690988455557, 0, -0.276690988455557,
+                -0.109603762960254]])
 # fmt: on
 HFARID_WEIGHTS = d1.T * p
 VFARID_WEIGHTS = np.copy(HFARID_WEIGHTS.T)
@@ -125,16 +130,8 @@ def _reshape_nd(arr, ndim, dim):
     return np.reshape(arr, kernel_shape)
 
 
-def _generic_edge_filter(
-    image,
-    *,
-    smooth_weights,
-    edge_weights=[1, 0, -1],
-    axis=None,
-    mode="reflect",
-    cval=0.0,
-    mask=None,
-):
+def _generic_edge_filter(image, *, smooth_weights, edge_weights=[1, 0, -1],
+                         axis=None, mode='reflect', cval=0.0, mask=None):
     """Apply a generic, n-dimensional edge filter.
 
     The filter is computed by applying the edge weights along one dimension
@@ -179,7 +176,7 @@ def _generic_edge_filter(
 
     output = cp.zeros(image.shape, dtype=float)
 
-    # Note: added these to cp.asarray calls not present in skimage
+    # TODO: added these to cp.asarray calls not present in skimage
     #       may want to remove, but will probably require updating the tests.
     edge_weights = cp.asarray(edge_weights)
     smooth_weights = cp.asarray(smooth_weights)
@@ -196,11 +193,11 @@ def _generic_edge_filter(
 
     if return_magnitude:
         output /= ndim
-        output = cp.sqrt(output, out=output)
+        cp.sqrt(output, out=output)
     return output
 
 
-def sobel(image, mask=None, *, axis=None, mode="reflect", cval=0.0):
+def sobel(image, mask=None, *, axis=None, mode='reflect', cval=0.0):
     """Find edges in an image using the Sobel filter.
 
     Parameters
@@ -250,9 +247,8 @@ def sobel(image, mask=None, *, axis=None, mode="reflect", cval=0.0):
     >>> edges = filters.sobel(camera)
     """
     image = img_as_float(image)
-    output = _generic_edge_filter(
-        image, smooth_weights=SOBEL_SMOOTH, axis=axis, mode=mode, cval=cval
-    )
+    output = _generic_edge_filter(image, smooth_weights=SOBEL_SMOOTH,
+                                  axis=axis, mode=mode, cval=cval)
     output = _mask_filter_result(output, mask)
     return output
 
@@ -317,7 +313,7 @@ def sobel_v(image, mask=None):
     return sobel(image, mask=mask, axis=1)
 
 
-def scharr(image, mask=None, *, axis=None, mode="reflect", cval=0.0):
+def scharr(image, mask=None, *, axis=None, mode='reflect', cval=0.0):
     """Find the edge magnitude using the Scharr transform.
 
     Parameters
@@ -372,9 +368,8 @@ def scharr(image, mask=None, *, axis=None, mode="reflect", cval=0.0):
     >>> edges = filters.scharr(camera)
     """
     image = img_as_float(image)
-    output = _generic_edge_filter(
-        image, smooth_weights=SCHARR_SMOOTH, axis=axis, mode=mode, cval=cval
-    )
+    output = _generic_edge_filter(image, smooth_weights=SCHARR_SMOOTH,
+                                  axis=axis, mode=mode, cval=cval)
     output = _mask_filter_result(output, mask)
     return output
 
@@ -448,7 +443,7 @@ def scharr_v(image, mask=None):
     return scharr(image, mask=mask, axis=1)
 
 
-def prewitt(image, mask=None, *, axis=None, mode="reflect", cval=0.0):
+def prewitt(image, mask=None, *, axis=None, mode='reflect', cval=0.0):
     """Find the edge magnitude using the Prewitt transform.
 
     Parameters
@@ -500,9 +495,8 @@ def prewitt(image, mask=None, *, axis=None, mode="reflect", cval=0.0):
     >>> edges = filters.prewitt(camera)
     """
     image = img_as_float(image)
-    output = _generic_edge_filter(
-        image, smooth_weights=PREWITT_SMOOTH, axis=axis, mode=mode, cval=cval
-    )
+    output = _generic_edge_filter(image, smooth_weights=PREWITT_SMOOTH,
+                                  axis=axis, mode=mode, cval=cval)
     output = _mask_filter_result(output, mask)
     return output
 
@@ -597,7 +591,7 @@ def roberts(image, mask=None):
 
     """
     check_nD(image, 2)
-    # Note: refactored this section slightly for efficiency with CuPy
+    # CuPy Backend: refactored this section slightly for efficiency with CuPy
     pos_diag_sq = roberts_pos_diag(image, mask)
     pos_diag_sq *= pos_diag_sq
 
@@ -607,7 +601,6 @@ def roberts(image, mask=None):
 
     out = np.sqrt(out, out=out)
     out /= math.sqrt(2)
-
     return out
 
 
@@ -641,7 +634,7 @@ def roberts_pos_diag(image, mask=None):
     """
     check_nD(image, 2)
     image = img_as_float(image)
-    result = ndi.convolve(image, cp.asarray(ROBERTS_PD_WEIGHTS))
+    result = ndi.convolve(image, cp.array(ROBERTS_PD_WEIGHTS))
     return _mask_filter_result(result, mask)
 
 
@@ -675,7 +668,7 @@ def roberts_neg_diag(image, mask=None):
     """
     check_nD(image, 2)
     image = img_as_float(image)
-    result = ndi.convolve(image, cp.asarray(ROBERTS_ND_WEIGHTS))
+    result = ndi.convolve(image, cp.array(ROBERTS_ND_WEIGHTS))
     return _mask_filter_result(result, mask)
 
 
@@ -757,7 +750,7 @@ def farid(image, *, mask=None):
     >>> edges = filters.farid(camera)
     """
     check_nD(image, 2)
-    # Note: refactored this section slightly for efficiency with CuPy
+    # CuPy Backend: refactored this section slightly for efficiency with CuPy
     h_sq = farid_h(image, mask=mask)
     h_sq *= h_sq
 
@@ -801,7 +794,7 @@ def farid_h(image, *, mask=None):
     """
     check_nD(image, 2)
     image = img_as_float(image)
-    result = ndi.convolve(image, cp.asarray(HFARID_WEIGHTS))
+    result = ndi.convolve(image, cp.array(HFARID_WEIGHTS))
     return _mask_filter_result(result, mask)
 
 
@@ -834,5 +827,5 @@ def farid_v(image, *, mask=None):
     """
     check_nD(image, 2)
     image = img_as_float(image)
-    result = ndi.convolve(image, cp.asarray(VFARID_WEIGHTS))
+    result = ndi.convolve(image, cp.array(VFARID_WEIGHTS))
     return _mask_filter_result(result, mask)
