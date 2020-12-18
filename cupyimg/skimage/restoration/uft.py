@@ -89,7 +89,7 @@ def uifftn(inarray, dim=None):
     """
     if dim is None:
         dim = inarray.ndim
-    outarray = fft.ifftn(inarray, axes=range(-dim, 0), norm="ortho")
+    outarray = fft.ifftn(inarray, axes=range(-dim, 0), norm='ortho')
     return outarray
 
 
@@ -130,7 +130,7 @@ def urfftn(inarray, dim=None):
     """
     if dim is None:
         dim = inarray.ndim
-    outarray = fft.rfftn(inarray, axes=range(-dim, 0), norm="ortho")
+    outarray = fft.rfftn(inarray, axes=range(-dim, 0), norm='ortho')
     return outarray
 
 
@@ -175,7 +175,7 @@ def uirfftn(inarray, dim=None, shape=None):
     """
     if dim is None:
         dim = inarray.ndim
-    outarray = fft.irfftn(inarray, shape, axes=range(-dim, 0), norm="ortho")
+    outarray = fft.irfftn(inarray, shape, axes=range(-dim, 0), norm='ortho')
     return outarray
 
 
@@ -412,9 +412,9 @@ def ir2tf(imp_resp, shape, dim=None, is_real=True):
     # problem. Work with odd and even size.
     for axis, axis_size in enumerate(imp_resp.shape):
         if axis >= imp_resp.ndim - dim:
-            irpadded = cp.roll(
-                irpadded, shift=-math.floor(axis_size / 2), axis=axis
-            )
+            irpadded = cp.roll(irpadded,
+                               shift=-math.floor(axis_size / 2),
+                               axis=axis)
     if is_real:
         return fft.rfftn(irpadded, axes=range(-dim, 0))
     else:

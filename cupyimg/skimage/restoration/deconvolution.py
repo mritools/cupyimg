@@ -1,5 +1,7 @@
 """Implementations restoration functions"""
 
+import math
+
 import cupy as cp
 import numpy as np
 import cupy.random as npr
@@ -129,9 +131,8 @@ def wiener(image, psf, balance, reg=None, is_real=True, clip=True):
     areg2 *= areg2
     wiener_filter = cp.conj(trans_func) / (atf2 + balance * areg2)
     if is_real:
-        deconv = uft.uirfft2(
-            wiener_filter * uft.urfft2(image), shape=image.shape
-        )
+        deconv = uft.uirfft2(wiener_filter * uft.urfft2(image),
+                             shape=image.shape)
     else:
         deconv = uft.uifft2(wiener_filter * uft.ufft2(image))
 
@@ -142,9 +143,8 @@ def wiener(image, psf, balance, reg=None, is_real=True, clip=True):
     return deconv
 
 
-def unsupervised_wiener(
-    image, psf, reg=None, user_params=None, is_real=True, clip=True
-):
+def unsupervised_wiener(image, psf, reg=None, user_params=None, is_real=True,
+                        clip=True):
     """Unsupervised Wiener-Hunt deconvolution.
 
     Return the deconvolution with a Wiener-Hunt approach, where the
@@ -237,13 +237,8 @@ def unsupervised_wiener(
 
            http://research.orieux.fr/files/papers/OGR-JOSA10.pdf
     """
-    params = {
-        "threshold": 1e-4,
-        "max_iter": 200,
-        "min_iter": 30,
-        "burnin": 15,
-        "callback": None,
-    }
+    params = {'threshold': 1e-4, 'max_iter': 200,
+              'min_iter': 30, 'burnin': 15, 'callback': None}
     params.update(user_params or {})
 
     if reg is None:
@@ -288,7 +283,7 @@ def unsupervised_wiener(
         # weighting (correlation in direct space)
         precision = gn_chain[-1] * atf2 + gx_chain[-1] * areg2  # Eq. 29
         excursion = (
-            np.sqrt(0.5)
+            math.sqrt(0.5)
             / cp.sqrt(precision)
             * (
                 cp.random.standard_normal(data_spectrum.shape)
@@ -305,42 +300,33 @@ def unsupervised_wiener(
             params["callback"](x_sample)
 
         # sample of Eq. 31 p(gn | x^k, gx^k, y)
-        gn_chain.append(
-            npr.gamma(
-                image.size / 2,
-                2 / uft.image_quad_norm(data_spectrum - x_sample * trans_fct),
-            )
-        )
+        gn_chain.append(npr.gamma(image.size / 2,
+                                  2 / uft.image_quad_norm(data_spectrum -
+                                                          x_sample *
+                                                          trans_fct)))
 
         # sample of Eq. 31 p(gx | x^k, gn^k-1, y)
-        gx_chain.append(
-            npr.gamma(
-                (image.size - 1) / 2, 2 / uft.image_quad_norm(x_sample * reg)
-            )
-        )
+        gx_chain.append(npr.gamma((image.size - 1) / 2,
+                                  2 / uft.image_quad_norm(x_sample * reg)))
 
         # current empirical average
-        if iteration > params["burnin"]:
+        if iteration > params['burnin']:
             x_postmean = prev_x_postmean + x_sample
 
-        if iteration > (params["burnin"] + 1):
-            current = x_postmean / (iteration - params["burnin"])
-            previous = prev_x_postmean / (iteration - params["burnin"] - 1)
-
-            delta = (
-                cp.sum(cp.abs(current - previous))
-                / cp.sum(cp.abs(x_postmean))
-                / (iteration - params["burnin"])
-            )
+        if iteration > (params['burnin'] + 1):
+            current = x_postmean / (iteration - params['burnin'])
+            previous = prev_x_postmean / (iteration - params['burnin'] - 1)
+            delta = cp.sum(cp.abs(current - previous)) / \
+                cp.sum(cp.abs(x_postmean)) / (iteration - params['burnin'])
 
         prev_x_postmean = x_postmean
 
         # stop of the algorithm
-        if (iteration > params["min_iter"]) and (delta < params["threshold"]):
+        if (iteration > params['min_iter']) and (delta < params['threshold']):
             break
 
     # Empirical average \approx POSTMEAN Eq. 44
-    x_postmean = x_postmean / (iteration - params["burnin"])
+    x_postmean = x_postmean / (iteration - params['burnin'])
     if is_real:
         x_postmean = uft.uirfft2(x_postmean, shape=image.shape)
     else:
@@ -350,12 +336,11 @@ def unsupervised_wiener(
         x_postmean[x_postmean > 1] = 1
         x_postmean[x_postmean < -1] = -1
 
-    return (x_postmean, {"noise": gn_chain, "prior": gx_chain})
+    return (x_postmean, {'noise': gn_chain, 'prior': gx_chain})
 
 
-def richardson_lucy(
-    image, psf, iterations=50, clip=True, filter_epsilon=None,
-):
+def richardson_lucy(image, psf, iterations=50, clip=True,
+                    filter_epsilon=None):
     """Richardson-Lucy deconvolution.
 
     Parameters
@@ -402,12 +387,12 @@ def richardson_lucy(
     psf_mirror = cp.ascontiguousarray(psf[::-1, ::-1])
 
     for _ in range(iterations):
-        conv = convolve(im_deconv, psf, mode="same")
+        conv = convolve(im_deconv, psf, mode='same')
         if filter_epsilon:
             relative_blur = cp.where(conv < filter_epsilon, 0, image / conv)
         else:
             relative_blur = image / conv
-        im_deconv *= convolve(relative_blur, psf_mirror, mode="same")
+        im_deconv *= convolve(relative_blur, psf_mirror, mode='same')
 
     if clip:
         im_deconv[im_deconv > 1] = 1

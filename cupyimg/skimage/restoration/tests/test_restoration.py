@@ -1,21 +1,14 @@
-from os.path import abspath, dirname, join as pjoin
-
 import cupy as cp
+from cupy import testing
 import numpy as np
+import pytest
 from scipy.signal import convolve2d
-from cupyimg.scipy import ndimage as ndi
+from skimage._shared.testing import fetch
 
+from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage.color import rgb2gray
 from cupyimg.skimage import restoration
 from cupyimg.skimage.restoration import uft
-from cupy import testing
-
-try:
-    from skimage._shared.testing import fetch
-
-    have_fetch = True
-except ImportError:
-    have_fetch = False
 
 
 def camera():
@@ -46,24 +39,23 @@ def test_wiener():
 
     deconvolved = restoration.wiener(data, psf, 0.05)
 
-    if have_fetch:
-        path = fetch("restoration/tests/camera_wiener.npy")
-    else:
-        path = pjoin(dirname(abspath(__file__)), "camera_wiener.npy")
+    path = fetch('restoration/tests/camera_wiener.npy')
     cp.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3)
 
     _, laplacian = uft.laplacian(2, data.shape)
     otf = uft.ir2tf(psf, data.shape, is_real=False)
-    deconvolved = restoration.wiener(
-        data, otf, 0.05, reg=laplacian, is_real=False
-    )
-    cp.testing.assert_allclose(cp.real(deconvolved), np.load(path), rtol=1e-3)
+    deconvolved = restoration.wiener(data, otf, 0.05,
+                                     reg=laplacian,
+                                     is_real=False)
+    cp.testing.assert_allclose(cp.real(deconvolved),
+                               np.load(path),
+                               rtol=1e-3)
 
 
 def test_unsupervised_wiener():
     psf = np.ones((5, 5)) / 25
-    data = convolve2d(test_img.get(), psf, "same")
-    cp.random.seed(0)
+    data = convolve2d(cp.asnumpy(test_img), psf, 'same')
+    np.random.seed(0)
     data += 0.1 * data.std() * np.random.standard_normal(data.shape)
 
     psf = cp.asarray(psf)
@@ -80,8 +72,8 @@ def test_unsupervised_wiener():
     _, laplacian = uft.laplacian(2, data.shape)
     otf = uft.ir2tf(psf, data.shape, is_real=False)
 
-    cp.random.seed(0)
-    restoration.unsupervised_wiener(
+    np.random.seed(0)
+    deconvolved = restoration.unsupervised_wiener(  # noqa
         data,
         otf,
         reg=laplacian,
@@ -116,13 +108,13 @@ def test_image_shape():
     # test the reconstruction error
     sup_relative_error = cp.abs(deconv_sup - image) / image
     un_relative_error = cp.abs(deconv_un - image) / image
-    cp.testing.assert_array_less(np.median(sup_relative_error.get()), 0.1)
-    cp.testing.assert_array_less(np.median(un_relative_error.get()), 0.1)
+    cp.testing.assert_array_less(cp.median(sup_relative_error), 0.1)
+    cp.testing.assert_array_less(cp.median(un_relative_error), 0.1)
 
 
 def test_richardson_lucy():
     psf = np.ones((5, 5)) / 25
-    data = convolve2d(test_img.get(), psf, "same")
+    data = convolve2d(cp.asnumpy(test_img), psf, 'same')
     np.random.seed(0)
     data += 0.1 * data.std() * np.random.standard_normal(data.shape)
 
@@ -130,22 +122,29 @@ def test_richardson_lucy():
     psf = cp.asarray(psf)
     deconvolved = restoration.richardson_lucy(data, psf, 5)
 
-    if have_fetch:
-        path = fetch("restoration/tests/camera_rl.npy")
-    else:
-        path = pjoin(dirname(abspath(__file__)), "camera_rl.npy")
+    path = fetch('restoration/tests/camera_rl.npy')
     cp.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3)
 
 
+@pytest.mark.parametrize('dtype_image', [np.float32, np.float64])
+@pytest.mark.parametrize('dtype_psf', [np.float32, np.float64])
 @testing.with_requires("scikit-image>=0.18")
-def test_richardson_lucy_filtered():
-    from skimage.data import image_fetcher
+def test_richardson_lucy_filtered(dtype_image, dtype_psf):
+    if dtype_image == np.float64:
+        atol = 1e-8
+    else:
+        atol = 1e-5
 
     test_img_astro = rgb2gray(astronaut())
 
-    psf = cp.ones((5, 5)) / 25
-    data = cp.asarray(convolve2d(test_img_astro.get(), psf.get(), "same"))
-    deconvolved = restoration.richardson_lucy(data, psf, 5, filter_epsilon=1e-6)
+    psf = cp.ones((5, 5), dtype=dtype_psf) / 25
+    data = cp.array(
+        convolve2d(cp.asnumpy(test_img_astro), cp.asnumpy(psf), 'same'),
+        dtype=dtype_image)
+    deconvolved = restoration.richardson_lucy(data, psf, 5,
+                                              filter_epsilon=1e-6)
+    assert deconvolved.dtype == data.dtype
 
-    path = image_fetcher.fetch("restoration/tests/astronaut_rl.npy")
-    np.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3, atol=1e-6)
+    path = fetch('restoration/tests/astronaut_rl.npy')
+    cp.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3,
+                               atol=atol)

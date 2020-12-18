@@ -87,9 +87,8 @@ def _denoise_tv_chambolle_nd(image, weight=0.1, eps=2.0e-4, n_iter_max=200):
     return out
 
 
-def denoise_tv_chambolle(
-    image, weight=0.1, eps=2.0e-4, n_iter_max=200, multichannel=False
-):
+def denoise_tv_chambolle(image, weight=0.1, eps=2.0e-4, n_iter_max=200,
+                         multichannel=False):
     """Perform total-variation denoising on n-dimensional images.
 
     Parameters
@@ -160,16 +159,14 @@ def denoise_tv_chambolle(
 
     """
     im_type = image.dtype
-
-    if not im_type.kind == "f":
+    if not im_type.kind == 'f':
         image = img_as_float(image)
 
     if multichannel:
         out = cp.zeros_like(image)
         for c in range(image.shape[-1]):
-            out[..., c] = _denoise_tv_chambolle_nd(
-                image[..., c], weight, eps, n_iter_max
-            )
+            out[..., c] = _denoise_tv_chambolle_nd(image[..., c], weight, eps,
+                                                   n_iter_max)
     else:
         out = _denoise_tv_chambolle_nd(image, weight, eps, n_iter_max)
     return out
