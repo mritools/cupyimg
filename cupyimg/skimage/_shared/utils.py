@@ -9,15 +9,8 @@ import numpy as np
 from ..util import img_as_float
 from ._warnings import all_warnings, warn
 
-__all__ = [
-    "deprecated",
-    "get_bound_method_class",
-    "all_warnings",
-    "safe_as_int",
-    "check_nD",
-    "check_shape_equality",
-    "warn",
-]
+__all__ = ['deprecated', 'get_bound_method_class', 'all_warnings',
+           'safe_as_int', 'check_nD', 'check_shape_equality', 'warn']
 
 
 class skimage_deprecation(Warning):
@@ -46,9 +39,8 @@ class change_default_value:
 
     """
 
-    def __init__(
-        self, arg_name, *, new_value, changed_version, warning_msg=None
-    ):
+    def __init__(self, arg_name, *, new_value, changed_version,
+                 warning_msg=None):
         self.arg_name = arg_name
         self.new_value = new_value
         self.warning_msg = warning_msg
@@ -66,8 +58,7 @@ class change_default_value:
                 f"the default {self.arg_name} value is {old_value}. "
                 f"From version {self.changed_version}, the {self.arg_name} "
                 f"default value will be {self.new_value}. To avoid "
-                f"this warning, please explicitly set {self.arg_name} value."
-            )
+                f"this warning, please explicitly set {self.arg_name} value.")
 
         @functools.wraps(func)
         def fixed_func(*args, **kwargs):
@@ -106,8 +97,7 @@ class remove_arg:
             f"{self.arg_name} argument is deprecated and will be removed "
             f"in version {self.changed_version}. To avoid this warning, "
             f"please do not use the {self.arg_name} argument. Please "
-            f"see {func.__name__} documentation for more details."
-        )
+            f"see {func.__name__} documentation for more details.")
 
         if self.help_msg is not None:
             warning_msg += f" {self.help_msg}"
@@ -143,14 +133,11 @@ class deprecate_kwarg:
     def __init__(self, kwarg_mapping, warning_msg=None, removed_version=None):
         self.kwarg_mapping = kwarg_mapping
         if warning_msg is None:
-            self.warning_msg = (
-                "'{old_arg}' is a deprecated argument name "
-                "for `{func_name}`. "
-            )
+            self.warning_msg = ("'{old_arg}' is a deprecated argument name "
+                                "for `{func_name}`. ")
             if removed_version is not None:
-                self.warning_msg += "It will be removed in version {}. ".format(
-                    removed_version
-                )
+                self.warning_msg += ("It will be removed in version {}. "
+                                     .format(removed_version))
             self.warning_msg += "Please use '{new_arg}' instead."
         else:
             self.warning_msg = warning_msg
@@ -161,21 +148,14 @@ class deprecate_kwarg:
             for old_arg, new_arg in self.kwarg_mapping.items():
                 if old_arg in kwargs:
                     #  warn that the function interface has changed:
-                    warnings.warn(
-                        self.warning_msg.format(
-                            old_arg=old_arg,
-                            func_name=func.__name__,
-                            new_arg=new_arg,
-                        ),
-                        FutureWarning,
-                        stacklevel=2,
-                    )
+                    warnings.warn(self.warning_msg.format(
+                        old_arg=old_arg, func_name=func.__name__,
+                        new_arg=new_arg), FutureWarning, stacklevel=2)
                     # Substitute new_arg to old_arg
                     kwargs[new_arg] = kwargs.pop(old_arg)
 
             # Call the function with the fixed arguments
             return func(*args, **kwargs)
-
         return fixed_func
 
 
@@ -195,56 +175,51 @@ class deprecated(object):
         The package version in which the deprecated function will be removed.
     """
 
-    def __init__(self, alt_func=None, behavior="warn", removed_version=None):
+    def __init__(self, alt_func=None, behavior='warn', removed_version=None):
         self.alt_func = alt_func
         self.behavior = behavior
         self.removed_version = removed_version
 
     def __call__(self, func):
 
-        alt_msg = ""
+        alt_msg = ''
         if self.alt_func is not None:
-            alt_msg = " Use ``%s`` instead." % self.alt_func
-        rmv_msg = ""
+            alt_msg = ' Use ``%s`` instead.' % self.alt_func
+        rmv_msg = ''
         if self.removed_version is not None:
-            rmv_msg = (
-                " and will be removed in version %s" % self.removed_version
-            )
+            rmv_msg = (' and will be removed in version %s' %
+                       self.removed_version)
 
-        msg = (
-            "Function ``%s`` is deprecated" % func.__name__
-            + rmv_msg
-            + "."
-            + alt_msg
-        )
+        msg = ('Function ``%s`` is deprecated' % func.__name__
+               + rmv_msg + '.' + alt_msg)
 
         @functools.wraps(func)
         def wrapped(*args, **kwargs):
-            if self.behavior == "warn":
+            if self.behavior == 'warn':
                 func_code = func.__code__
-                warnings.simplefilter("always", skimage_deprecation)
-                warnings.warn_explicit(
-                    msg,
-                    category=skimage_deprecation,
-                    filename=func_code.co_filename,
-                    lineno=func_code.co_firstlineno + 1,
-                )
-            elif self.behavior == "raise":
+                warnings.simplefilter('always', skimage_deprecation)
+                warnings.warn_explicit(msg,
+                                       category=skimage_deprecation,
+                                       filename=func_code.co_filename,
+                                       lineno=func_code.co_firstlineno + 1)
+            elif self.behavior == 'raise':
                 raise skimage_deprecation(msg)
             return func(*args, **kwargs)
 
         # modify doc string to display deprecation warning
-        doc = "**Deprecated function**." + alt_msg
+        doc = '**Deprecated function**.' + alt_msg
         if wrapped.__doc__ is None:
             wrapped.__doc__ = doc
         else:
-            wrapped.__doc__ = doc + "\n\n    " + wrapped.__doc__
+            wrapped.__doc__ = doc + '\n\n    ' + wrapped.__doc__
 
         return wrapped
 
 
 def get_bound_method_class(m):
-    """Return the class for a bound method."""
+    """Return the class for a bound method.
+
+    """
     return m.__self__.__class__
 
 
@@ -297,16 +272,17 @@ def safe_as_int(val, atol=1e-3):
     53
 
     """
-    # TODO: grlee77: reduce use of this function on cupy and provide a more
-    #                appropriate GPU alternative with less overhead.
+    # CuPy Backend: TODO: reduce use of safe_as_int function on cupy and
+    #               provide a more appropriate GPU alternative with less
+    #               overhead.
     xp = cp.get_array_module(val)
     mod = xp.asarray(val) % 1  # Extract mantissa
 
     # Check for and subtract any mod values > 0.5 from 1
-    if mod.ndim == 0:  # Scalar input, cannot be indexed
+    if mod.ndim == 0:                        # Scalar input, cannot be indexed
         if mod > 0.5:
             mod = 1 - mod
-    else:  # Iterable input, now ndarray
+    else:                                    # Iterable input, now ndarray
         mod[mod > 0.5] = 1 - mod[mod > 0.5]  # Test on each side of nearest int
 
     try:
@@ -317,14 +293,7 @@ def safe_as_int(val, atol=1e-3):
             "{0}, check inputs.".format(val)
         )
 
-    if xp is cp:
-        # TODO: use cp.around, but currently it has a bug: see cupy/cupy#2330
-        val = np.round(val.get()).astype(np.int64)
-        if isinstance(val, np.ndarray):
-            val = cp.asarray(val)
-        return val
-    else:
-        return xp.round(val).astype(np.int64)
+    return xp.around(val).astype(np.int64)
 
 
 def check_shape_equality(im1, im2):
@@ -357,7 +326,7 @@ def check_nD(array, ndim, arg_name="image"):
         raise ValueError(msg_empty_array % (arg_name))
     if array.ndim not in ndim:
         raise ValueError(
-            msg_incorrect_dim % (arg_name, "-or-".join([str(n) for n in ndim]))
+            msg_incorrect_dim % (arg_name, '-or-'.join([str(n) for n in ndim]))
         )
 
 
@@ -384,10 +353,8 @@ def check_random_state(seed):
         return cp.random.RandomState(seed)
     if isinstance(seed, cp.random.RandomState):
         return seed
-    raise ValueError(
-        "%r cannot be used to seed a numpy.random.RandomState"
-        " instance" % seed
-    )
+    raise ValueError('%r cannot be used to seed a numpy.random.RandomState'
+                     ' instance' % seed)
 
 
 def convert_to_float(image, preserve_range):
@@ -415,7 +382,7 @@ def convert_to_float(image, preserve_range):
     if preserve_range:
         # Convert image to double only if it is not single or double
         # precision float
-        if image.dtype.char not in "df":
+        if image.dtype.char not in 'df':
             image = image.astype(float)
     else:
         image = img_as_float(image)
@@ -447,18 +414,14 @@ def _validate_interpolation_order(image_dtype, order):
         return 0 if image_dtype == bool else 1
 
     if order < 0 or order > 5:
-        raise ValueError(
-            "Spline interpolation order has to be in the " "range 0-5."
-        )
+        raise ValueError("Spline interpolation order has to be in the "
+                         "range 0-5.")
 
     if image_dtype == bool and order != 0:
-        warn(
-            "Input image dtype is bool. Interpolation is not defined "
-            "with bool data type. Please set order to 0 or explicitely "
-            "cast input image to another data type. Starting from version "
-            "0.19 a ValueError will be raised instead of this warning.",
-            FutureWarning,
-            stacklevel=2,
-        )
+        warn("Input image dtype is bool. Interpolation is not defined "
+             "with bool data type. Please set order to 0 or explicitely "
+             "cast input image to another data type. Starting from version "
+             "0.19 a ValueError will be raised instead of this warning.",
+             FutureWarning, stacklevel=2)
 
     return order

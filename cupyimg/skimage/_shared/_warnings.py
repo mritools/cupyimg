@@ -5,7 +5,7 @@ import re
 import functools
 import os
 
-__all__ = ["all_warnings", "expected_warnings", "warn"]
+__all__ = ['all_warnings', 'expected_warnings', 'warn']
 
 
 # A version of `warnings.warn` with a default stacklevel of 2.
@@ -29,12 +29,12 @@ def all_warnings():
 
     >>> with warnings.catch_warnings():
     ...     warnings.simplefilter('once')
-    ...     foo()
+    ...     foo()                         # doctest: +SKIP
 
     We can now run ``foo()`` without a warning being raised:
 
     >>> from numpy.testing import assert_warns
-    >>> foo()
+    >>> foo()                             # doctest: +SKIP
 
     To catch the warning, we call in the help of ``all_warnings``:
 
@@ -57,7 +57,7 @@ def all_warnings():
     frame = inspect.currentframe()
     if frame:
         for f in inspect.getouterframes(frame):
-            f[0].f_locals["__warningregistry__"] = {}
+            f[0].f_locals['__warningregistry__'] = {}
     del frame
 
     for mod_name, mod in list(sys.modules.items()):
@@ -108,20 +108,18 @@ def expected_warnings(matching):
 
     """
     if isinstance(matching, str):
-        raise ValueError(
-            "``matching`` should be a list of strings and not "
-            "a string itself."
-        )
+        raise ValueError('``matching`` should be a list of strings and not '
+                         'a string itself.')
 
     # Special case for disabling the context manager
     if matching is None:
         yield None
         return
 
-    strict_warnings = os.environ.get("SKIMAGE_TEST_STRICT_WARNINGS", "1")
-    if strict_warnings.lower() == "true":
+    strict_warnings = os.environ.get('SKIMAGE_TEST_STRICT_WARNINGS', '1')
+    if strict_warnings.lower() == 'true':
         strict_warnings = True
-    elif strict_warnings.lower() == "false":
+    elif strict_warnings.lower() == 'false':
         strict_warnings = False
     else:
         strict_warnings = bool(int(strict_warnings))
@@ -133,7 +131,7 @@ def expected_warnings(matching):
         # Allow users to provide None
         while None in matching:
             matching.remove(None)
-        remaining = [m for m in matching if r"\A\Z" not in m.split("|")]
+        remaining = [m for m in matching if r'\A\Z' not in m.split('|')]
         for warn in w:
             found = False
             for match in matching:
@@ -142,7 +140,7 @@ def expected_warnings(matching):
                     if match in remaining:
                         remaining.remove(match)
             if strict_warnings and not found:
-                raise ValueError("Unexpected warning: %s" % str(warn.message))
+                raise ValueError('Unexpected warning: %s' % str(warn.message))
         if strict_warnings and (len(remaining) > 0):
-            msg = "No warning raised matching:\n%s" % "\n".join(remaining)
+            msg = 'No warning raised matching:\n%s' % '\n'.join(remaining)
             raise ValueError(msg)

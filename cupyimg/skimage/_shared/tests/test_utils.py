@@ -18,12 +18,8 @@ def test_change_default_value():
         """Expected docstring"""
         return arg0, arg1, arg2
 
-    @change_default_value(
-        "arg1",
-        new_value=-1,
-        changed_version="0.12",
-        warning_msg="Custom warning message",
-    )
+    @change_default_value('arg1', new_value=-1, changed_version='0.12',
+                          warning_msg="Custom warning message")
     def bar(arg0, arg1=0, arg2=1):
         """Expected docstring"""
         return arg0, arg1, arg2
@@ -33,12 +29,10 @@ def test_change_default_value():
         assert foo(0) == (0, 0, 1)
         assert bar(0) == (0, 0, 1)
 
-    expected_msg = (
-        "The new recommended value for arg1 is -1. Until "
-        "version 0.12, the default arg1 value is 0. From "
-        "version 0.12, the arg1 default value will be -1. "
-        "To avoid this warning, please explicitly set arg1 value."
-    )
+    expected_msg = ("The new recommended value for arg1 is -1. Until "
+                    "version 0.12, the default arg1 value is 0. From "
+                    "version 0.12, the arg1 default value will be -1. "
+                    "To avoid this warning, please explicitly set arg1 value.")
 
     assert str(record[0].message) == expected_msg
     assert str(record[1].message) == "Custom warning message"
@@ -50,24 +44,24 @@ def test_change_default_value():
         assert foo(0, arg1=0) == (0, 0, 1)
 
         # Function name and doc is preserved
-        assert foo.__name__ == "foo"
+        assert foo.__name__ == 'foo'
         if sys.flags.optimize < 2:
             # if PYTHONOPTIMIZE is set to 2, docstrings are stripped
-            assert foo.__doc__ == "Expected docstring"
+            assert foo.__doc__ == 'Expected docstring'
 
     # Assert no warning was raised
     assert not record.list
 
 
 def test_deprecated_kwarg():
-    @deprecate_kwarg({"old_arg1": "new_arg1"})
+
+    @deprecate_kwarg({'old_arg1': 'new_arg1'})
     def foo(arg0, new_arg1=1, arg2=None):
         """Expected docstring"""
         return arg0, new_arg1, arg2
 
-    @deprecate_kwarg(
-        {"old_arg1": "new_arg1"}, warning_msg="Custom warning message"
-    )
+    @deprecate_kwarg({'old_arg1': 'new_arg1'},
+                     warning_msg="Custom warning message")
     def bar(arg0, new_arg1=1, arg2=None):
         """Expected docstring"""
         return arg0, new_arg1, arg2
@@ -78,10 +72,8 @@ def test_deprecated_kwarg():
         assert foo(0, old_arg1=1) == (0, 1, None)
         assert bar(0, old_arg1=1) == (0, 1, None)
 
-    msg = (
-        "'old_arg1' is a deprecated argument name "
-        "for `foo`. Please use 'new_arg1' instead."
-    )
+    msg = ("'old_arg1' is a deprecated argument name "
+           "for `foo`. Please use 'new_arg1' instead.")
     assert str(record[0].message) == msg
     assert str(record[1].message) == "Custom warning message"
 
@@ -98,10 +90,10 @@ def test_deprecated_kwarg():
         assert foo(0, arg2=2) == (0, 1, 2)
         assert foo(0, 1, arg2=2) == (0, 1, 2)
         # Function name and doc is preserved
-        assert foo.__name__ == "foo"
+        assert foo.__name__ == 'foo'
         if sys.flags.optimize < 2:
             # if PYTHONOPTIMIZE is set to 2, docstrings are stripped
-            assert foo.__doc__ == "Expected docstring"
+            assert foo.__doc__ == 'Expected docstring'
 
     # Assert no warning was raised
     assert not record.list
@@ -114,18 +106,14 @@ def test_check_nD():
         check_nD(x, 2)
 
 
-@pytest.mark.parametrize(
-    "dtype", [bool, int, np.uint8, np.uint16, float, np.float32, np.float64]
-)
-@pytest.mark.parametrize("order", [None, -1, 0, 1, 2, 3, 4, 5, 6])
+@pytest.mark.parametrize('dtype', [bool, int, np.uint8, np.uint16,
+                                   float, np.float32, np.float64])
+@pytest.mark.parametrize('order', [None, -1, 0, 1, 2, 3, 4, 5, 6])
 def test_validate_interpolation_order(dtype, order):
     if order is None:
         # Default order
-        assert (
-            _validate_interpolation_order(dtype, None) == 0
-            if dtype == bool
-            else 1
-        )
+        assert (_validate_interpolation_order(dtype, None) == 0
+                if dtype == bool else 1)
     elif order < 0 or order > 5:
         # Order not in valid range
         with pytest.raises(ValueError):
