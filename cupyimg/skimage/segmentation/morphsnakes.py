@@ -9,17 +9,17 @@ from cupyimg import numpy as cnp
 
 from .._shared.utils import check_nD
 
-__all__ = [
-    "morphological_chan_vese",
-    "morphological_geodesic_active_contour",
-    "inverse_gaussian_gradient",
-    "circle_level_set",
-    "disk_level_set",
-    "checkerboard_level_set",
-]
+__all__ = ['morphological_chan_vese',
+           'morphological_geodesic_active_contour',
+           'inverse_gaussian_gradient',
+           'circle_level_set',
+           'disk_level_set',
+           'checkerboard_level_set'
+           ]
 
 
 class _fcycle(object):
+
     def __init__(self, iterable):
         """Call functions from the iterable each time it is called."""
         self.funcs = cycle(iterable)
@@ -30,12 +30,10 @@ class _fcycle(object):
 
 
 # SI and IS operators for 2D and 3D.
-_P2 = [
-    np.eye(3),
-    np.array([[0, 1, 0]] * 3),
-    np.flipud(np.eye(3)),
-    np.rot90([[0, 1, 0]] * 3),
-]
+_P2 = [np.eye(3),
+       np.array([[0, 1, 0]] * 3),
+       np.flipud(np.eye(3)),
+       np.rot90([[0, 1, 0]] * 3)]
 _P3 = [np.zeros((3, 3, 3)) for i in range(9)]
 
 _P3[0][:, :, 1] = 1
@@ -60,9 +58,8 @@ def sup_inf(u):
     elif cnp.ndim(u) == 3:
         P = _P3
     else:
-        raise ValueError(
-            "u has an invalid number of dimensions " "(should be 2 or 3)"
-        )
+        raise ValueError("u has an invalid number of dimensions "
+                         "(should be 2 or 3)")
 
     erosions = []
     for P_i in P:
@@ -80,21 +77,20 @@ def inf_sup(u):
     elif cnp.ndim(u) == 3:
         P = _P3
     else:
-        raise ValueError(
-            "u has an invalid number of dimensions " "(should be 2 or 3)"
-        )
+        raise ValueError("u has an invalid number of dimensions "
+                         "(should be 2 or 3)")
 
     dilations = []
     for P_i in P:
-        d = ndi.binary_dilation(u, cp.asarray(P_i)).astype(np.int8, copy=False)
+        d = ndi.binary_dilation(u, cp.asarray(P_i)).astype(np.int8,
+                                                           copy=False)
         dilations.append(d)
 
     return cp.stack(dilations, axis=0).min(0)
 
 
-_curvop = _fcycle(
-    [lambda u: sup_inf(inf_sup(u)), lambda u: inf_sup(sup_inf(u))]  # SIoIS
-)  # ISoSI
+_curvop = _fcycle([lambda u: sup_inf(inf_sup(u)),   # SIoIS
+                   lambda u: inf_sup(sup_inf(u))])  # ISoSI
 
 
 def _check_input(image, init_level_set):
@@ -102,10 +98,8 @@ def _check_input(image, init_level_set):
     check_nD(image, [2, 3])
 
     if len(image.shape) != len(init_level_set.shape):
-        raise ValueError(
-            "The dimensions of the initial level set do not "
-            "match the dimensions of the image."
-        )
+        raise ValueError("The dimensions of the initial level set do not "
+                         "match the dimensions of the image.")
 
 
 def _init_level_set(init_level_set, image_shape):
@@ -114,17 +108,16 @@ def _init_level_set(init_level_set, image_shape):
     If `init_level_set` is not a string, it is returned as is.
     """
     if isinstance(init_level_set, str):
-        if init_level_set == "checkerboard":
+        if init_level_set == 'checkerboard':
             res = checkerboard_level_set(image_shape)
         # TODO: remove me in 0.19.0
-        elif init_level_set == "circle":
+        elif init_level_set == 'circle':
             res = circle_level_set(image_shape)
-        elif init_level_set == "disk":
+        elif init_level_set == 'disk':
             res = disk_level_set(image_shape)
         else:
-            raise ValueError(
-                "`init_level_set` not in ['checkerboard', 'circle', 'disk']"
-            )
+            raise ValueError("`init_level_set` not in "
+                             "['checkerboard', 'circle', 'disk']")
     else:
         res = init_level_set
     return res
@@ -149,39 +142,44 @@ def circle_level_set(image_shape, center=None, radius=None):
     out : array with shape `image_shape`
         Binary level set of the circle with the given `radius` and `center`.
 
+    Warns
+    -----
+    Deprecated:
+        .. versionadded:: 0.17
+
+            This function is deprecated and will be removed in scikit-image 0.19.
+            Please use the function named ``disk_level_set`` instead.
+
     See Also
     --------
     checkerboard_level_set
     """
-    warnings.warn(
-        "circle_level_set is deprecated in favor of "
-        "disk_level_set."
-        "circle_level_set will be removed in version 0.19",
-        FutureWarning,
-        stacklevel=2,
-    )
+    warnings.warn("circle_level_set is deprecated in favor of "
+                  "disk_level_set."
+                  "circle_level_set will be removed in version 0.19",
+                  FutureWarning, stacklevel=2)
 
     return disk_level_set(image_shape, center=center, radius=radius)
 
 
-def disk_level_set(image_shape, center=None, radius=None):
-    """Create a circle level set with binary values.
+def disk_level_set(image_shape, *, center=None, radius=None):
+    """Create a disk level set with binary values.
 
     Parameters
     ----------
     image_shape : tuple of positive integers
         Shape of the image
     center : tuple of positive integers, optional
-        Coordinates of the center of the circle given in (row, column). If not
+        Coordinates of the center of the disk given in (row, column). If not
         given, it defaults to the center of the image.
     radius : float, optional
-        Radius of the circle. If not given, it is set to the 75% of the
+        Radius of the disk. If not given, it is set to the 75% of the
         smallest image dimension.
 
     Returns
     -------
     out : array with shape `image_shape`
-        Binary level set of the circle with the given `radius` and `center`.
+        Binary level set of the disk with the given `radius` and `center`.
 
     See Also
     --------
@@ -227,8 +225,8 @@ def checkerboard_level_set(image_shape, square_size=5):
     # Alternate 0/1 for even/odd numbers.
     grid = grid & 1
 
-    # Note: use functools.reduce instead of cp.bitwise_xor.reduce
-    #       checkerboard = cp.bitwise_xor.reduce(grid, axis=0)
+    # CuPy Backend: use functools.reduce instead of cp.bitwise_xor.reduce
+    #     checkerboard = cp.bitwise_xor.reduce(grid, axis=0)
     checkerboard = functools.reduce(cp.bitwise_xor, [g for g in grid])
     res = checkerboard.astype(cp.int8)
     return res
@@ -262,19 +260,13 @@ def inverse_gaussian_gradient(image, alpha=100.0, sigma=5.0):
         Preprocessed image (or volume) suitable for
         `morphological_geodesic_active_contour`.
     """
-    gradnorm = ndi.gaussian_gradient_magnitude(image, sigma, mode="nearest")
+    gradnorm = ndi.gaussian_gradient_magnitude(image, sigma, mode='nearest')
     return 1.0 / cp.sqrt(1.0 + alpha * gradnorm)
 
 
-def morphological_chan_vese(
-    image,
-    iterations,
-    init_level_set="checkerboard",
-    smoothing=1,
-    lambda1=1,
-    lambda2=1,
-    iter_callback=lambda x: None,
-):
+def morphological_chan_vese(image, iterations, init_level_set='checkerboard',
+                            smoothing=1, lambda1=1, lambda2=1,
+                            iter_callback=lambda x: None):
     """Morphological Active Contours without Edges (MorphACWE)
 
     Active contours without edges implemented with morphological operators. It
@@ -360,7 +352,7 @@ def morphological_chan_vese(
         c1 = (image * u).sum() / float(u.sum() + 1e-8)
 
         # Image attachment
-        du = cnp.gradient(u)
+        du = cp.gradient(u)
         abs_du = cp.abs(cp.stack(du, axis=0)).sum(0)
         aux = abs_du * (
             lambda1 * (image - c1) ** 2 - lambda2 * (image - c0) ** 2
@@ -378,15 +370,10 @@ def morphological_chan_vese(
     return u
 
 
-def morphological_geodesic_active_contour(
-    gimage,
-    iterations,
-    init_level_set="circle",
-    smoothing=1,
-    threshold="auto",
-    balloon=0,
-    iter_callback=lambda x: None,
-):
+def morphological_geodesic_active_contour(gimage, iterations,
+                                          init_level_set='circle', smoothing=1,
+                                          threshold='auto', balloon=0,
+                                          iter_callback=lambda x: None):
     """Morphological Geodesic Active Contours (MorphGAC).
 
     Geodesic active contours implemented with morphological operators. It can
@@ -470,11 +457,11 @@ def morphological_geodesic_active_contour(
 
     _check_input(image, init_level_set)
 
-    if threshold == "auto":
+    if threshold == 'auto':
         threshold = cp.percentile(image, 40)
 
     structure = cp.ones((3,) * len(image.shape), dtype=cp.int8)
-    dimage = cnp.gradient(image)
+    dimage = cp.gradient(image)
     # threshold_mask = image > threshold
     if balloon != 0:
         threshold_mask_balloon = image > threshold / cp.abs(balloon)
@@ -495,7 +482,7 @@ def morphological_geodesic_active_contour(
 
         # Image attachment
         aux = cp.zeros_like(image)
-        du = cnp.gradient(u)
+        du = cp.gradient(u)
         for el1, el2 in zip(dimage, du):
             aux += el1 * el2
         u[aux > 0] = 1

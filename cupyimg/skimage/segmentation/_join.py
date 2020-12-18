@@ -35,10 +35,8 @@ def join_segmentations(s1, s2):
            [4, 5, 5, 3]])
     """
     if s1.shape != s2.shape:
-        raise ValueError(
-            "Cannot join segmentations of different shape. "
-            + "s1.shape: %s, s2.shape: %s" % (s1.shape, s2.shape)
-        )
+        raise ValueError("Cannot join segmentations of different shape. " +
+                         "s1.shape: %s, s2.shape: %s" % (s1.shape, s2.shape))
     s1 = relabel_sequential(s1)[0]
     s2 = relabel_sequential(s2)[0]
     j = (s2.max() + 1) * s1 + s2
@@ -124,6 +122,7 @@ def relabel_sequential(label_field, offset=1):
         raise ValueError("Cannot relabel array that contains negative values.")
     offset = int(offset)
     in_vals = cp.unique(label_field)
+    # Cupy Backend: currently only int32
     if len(in_vals) > cp.iinfo(cp.int32).max:
         raise ValueError(
             "Too many unique values in label_field (current implementation "

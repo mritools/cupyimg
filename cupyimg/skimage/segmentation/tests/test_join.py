@@ -6,19 +6,25 @@ from cupy.testing import assert_array_equal
 
 
 def test_join_segmentations():
-    s1 = cp.asarray([[0, 0, 1, 1], [0, 2, 1, 1], [2, 2, 2, 1]])
-    s2 = cp.asarray([[0, 1, 1, 0], [0, 1, 1, 0], [0, 1, 1, 1]])
-
+    # fmt: off
+    s1 = cp.array([[0, 0, 1, 1],
+                   [0, 2, 1, 1],
+                   [2, 2, 2, 1]])
+    s2 = cp.array([[0, 1, 1, 0],
+                   [0, 1, 1, 0],
+                   [0, 1, 1, 1]])
     # test correct join
     # NOTE: technically, equality to j_ref is not required, only that there
     # is a one-to-one mapping between j and j_ref. I don't know of an easy way
     # to check this (i.e. not as error-prone as the function being tested)
     j = join_segmentations(s1, s2)
-    j_ref = cp.asarray([[0, 1, 3, 2], [0, 5, 3, 2], [4, 5, 5, 3]])
+    j_ref = np.array([[0, 1, 3, 2],
+                      [0, 5, 3, 2],
+                      [4, 5, 5, 3]])
     assert_array_equal(j, j_ref)
-
+    # fmt: on
     # test correct exception when arrays are different shapes
-    s3 = cp.asarray([[0, 0, 1, 1], [0, 2, 2, 1]])
+    s3 = cp.array([[0, 0, 1, 1], [0, 2, 2, 1]])
     with pytest.raises(ValueError):
         join_segmentations(s1, s3)
 
@@ -29,7 +35,7 @@ def _check_maps(ar, ar_relab, fw, inv):
 
 
 def test_relabel_sequential_offset1():
-    ar = cp.asarray([1, 1, 5, 5, 8, 99, 42])
+    ar = cp.array([1, 1, 5, 5, 8, 99, 42])
     ar_relab, fw, inv = relabel_sequential(ar)
     _check_maps(ar, ar_relab, fw, inv)
     ar_relab_ref = np.array([1, 1, 2, 2, 3, 5, 4])
@@ -46,7 +52,7 @@ def test_relabel_sequential_offset1():
 
 
 def test_relabel_sequential_offset5():
-    ar = cp.asarray([1, 1, 5, 5, 8, 99, 42])
+    ar = cp.array([1, 1, 5, 5, 8, 99, 42])
     ar_relab, fw, inv = relabel_sequential(ar, offset=5)
     _check_maps(ar, ar_relab, fw, inv)
     ar_relab_ref = np.array([5, 5, 6, 6, 7, 9, 8])
@@ -63,7 +69,7 @@ def test_relabel_sequential_offset5():
 
 
 def test_relabel_sequential_offset5_with0():
-    ar = cp.asarray([1, 1, 5, 5, 8, 99, 42, 0])
+    ar = cp.array([1, 1, 5, 5, 8, 99, 42, 0])
     ar_relab, fw, inv = relabel_sequential(ar, offset=5)
     _check_maps(ar, ar_relab, fw, inv)
     ar_relab_ref = np.array([5, 5, 6, 6, 7, 9, 8, 0])
@@ -80,7 +86,7 @@ def test_relabel_sequential_offset5_with0():
 
 
 def test_relabel_sequential_dtype():
-    ar = cp.asarray([1, 1, 5, 5, 8, 99, 42, 0], dtype=cp.uint8)
+    ar = cp.array([1, 1, 5, 5, 8, 99, 42, 0], dtype=cp.uint8)
     ar_relab, fw, inv = relabel_sequential(ar, offset=5)
     _check_maps(ar.astype(int), ar_relab, fw, inv)
     ar_relab_ref = np.array([5, 5, 6, 6, 7, 9, 8, 0])
@@ -98,11 +104,10 @@ def test_relabel_sequential_dtype():
 
 def test_relabel_sequential_signed_overflow():
     imax = cp.iinfo(cp.int32).max
-    labels = cp.asarray([0, 1, 99, 42, 42], dtype=cp.int32)
+    labels = cp.array([0, 1, 99, 42, 42], dtype=cp.int32)
     output, fw, inv = relabel_sequential(labels, offset=imax)
-    reference = np.array(
-        [0, imax, imax + 2, imax + 1, imax + 1], dtype=cp.uint32
-    )
+    reference = cp.array([0, imax, imax + 2, imax + 1, imax + 1],
+                         dtype=cp.uint32)
     assert_array_equal(output, reference)
     assert output.dtype == reference.dtype
 
@@ -114,23 +119,12 @@ def test_very_large_labels():
     assert int(cp.max(output)) == imax + 2
 
 
-@pytest.mark.parametrize(
-    "dtype",
-    (
-        cp.byte,
-        cp.short,
-        cp.intc,
-        cp.int_,
-        cp.longlong,
-        cp.ubyte,
-        cp.ushort,
-        cp.uintc,
-        cp.uint,
-        cp.ulonglong,
-    ),
-)
-@pytest.mark.parametrize("data_already_sequential", (False, True))
-def test_relabel_sequential_int_dtype_stability(data_already_sequential, dtype):
+@pytest.mark.parametrize('dtype', (np.byte, np.short, np.intc, int,
+                                   np.longlong, np.ubyte, np.ushort,
+                                   np.uintc, np.uint, np.ulonglong))
+@pytest.mark.parametrize('data_already_sequential', (False, True))
+def test_relabel_sequential_int_dtype_stability(data_already_sequential,
+                                                dtype):
     if data_already_sequential:
         ar = cp.asarray([1, 3, 0, 2, 5, 4], dtype=dtype)
     else:
@@ -150,32 +144,32 @@ def test_relabel_sequential_int_dtype_overflow():
 
 
 def test_relabel_sequential_negative_values():
-    ar = cp.asarray([1, 1, 5, -5, 8, 99, 42, 0])
+    ar = cp.array([1, 1, 5, -5, 8, 99, 42, 0])
     with pytest.raises(ValueError):
         relabel_sequential(ar)
 
 
-@pytest.mark.parametrize("offset", (0, -3))
-@pytest.mark.parametrize("data_already_sequential", (False, True))
-def test_relabel_sequential_nonpositive_offset(data_already_sequential, offset):
+@pytest.mark.parametrize('offset', (0, -3))
+@pytest.mark.parametrize('data_already_sequential', (False, True))
+def test_relabel_sequential_nonpositive_offset(data_already_sequential,
+                                               offset):
     if data_already_sequential:
-        ar = cp.asarray([1, 3, 0, 2, 5, 4])
+        ar = cp.array([1, 3, 0, 2, 5, 4])
     else:
-        ar = cp.asarray([1, 1, 5, 5, 8, 99, 42, 0])
+        ar = cp.array([1, 1, 5, 5, 8, 99, 42, 0])
     with pytest.raises(ValueError):
         relabel_sequential(ar, offset=offset)
 
 
-@pytest.mark.parametrize("offset", (1, 5))
-@pytest.mark.parametrize("with0", (False, True))
-@pytest.mark.parametrize("input_starts_at_offset", (False, True))
-def test_relabel_sequential_already_sequential(
-    offset, with0, input_starts_at_offset
-):
+@pytest.mark.parametrize('offset', (1, 5))
+@pytest.mark.parametrize('with0', (False, True))
+@pytest.mark.parametrize('input_starts_at_offset', (False, True))
+def test_relabel_sequential_already_sequential(offset, with0,
+                                               input_starts_at_offset):
     if with0:
-        ar = cp.asarray([1, 3, 0, 2, 5, 4])
+        ar = cp.array([1, 3, 0, 2, 5, 4])
     else:
-        ar = cp.asarray([1, 3, 2, 5, 4])
+        ar = cp.array([1, 3, 2, 5, 4])
     if input_starts_at_offset:
         ar[ar > 0] += offset - 1
     ar_relab, fw, inv = relabel_sequential(ar, offset=offset)
@@ -188,20 +182,20 @@ def test_relabel_sequential_already_sequential(
 
 
 def test_incorrect_input_dtype():
-    labels = cp.asarray([0, 2, 2, 1, 1, 8], dtype=float)
+    labels = cp.array([0, 2, 2, 1, 1, 8], dtype=float)
     with pytest.raises(TypeError):
         relabel_sequential(labels)
 
 
 def test_arraymap_call():
-    ar = cp.asarray([1, 1, 5, 5, 8, 99, 42, 0], dtype=cp.intp)
+    ar = cp.array([1, 1, 5, 5, 8, 99, 42, 0], dtype=cp.intp)
     relabeled, fw, inv = relabel_sequential(ar)
     assert_array_equal(relabeled, fw(ar))
     assert_array_equal(ar, inv(relabeled))
 
 
 def test_arraymap_len():
-    ar = cp.asarray([1, 1, 5, 5, 8, 99, 42, 0], dtype=cp.intp)
+    ar = cp.array([1, 1, 5, 5, 8, 99, 42, 0], dtype=cp.intp)
     relabeled, fw, inv = relabel_sequential(ar)
     assert len(fw) == 100
     assert len(fw) == len(cp.asarray(fw))
@@ -210,7 +204,7 @@ def test_arraymap_len():
 
 
 def test_arraymap_set():
-    ar = cp.asarray([1, 1, 5, 5, 8, 99, 42, 0], dtype=cp.intp)
+    ar = cp.array([1, 1, 5, 5, 8, 99, 42, 0], dtype=cp.intp)
     relabeled, fw, inv = relabel_sequential(ar)
     fw[72] = 6
     assert fw[72] == 6
