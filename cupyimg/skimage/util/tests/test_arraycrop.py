@@ -1,28 +1,45 @@
 import cupy as cp
+from cupy.testing import assert_array_equal
 from cupyimg.skimage.util import crop
 
 
 def test_multi_crop():
     arr = cp.arange(45).reshape(9, 5)
     out = crop(arr, ((1, 2), (2, 1)))
-    cp.testing.assert_array_equal(out[0], [7, 8])
-    cp.testing.assert_array_equal(out[-1], [32, 33])
+    assert_array_equal(out[0], [7, 8])
+    assert_array_equal(out[-1], [32, 33])
     assert out.shape == (6, 2)
 
 
 def test_pair_crop():
     arr = cp.arange(45).reshape(9, 5)
     out = crop(arr, (1, 2))
-    cp.testing.assert_array_equal(out[0], [6, 7])
-    cp.testing.assert_array_equal(out[-1], [31, 32])
+    assert_array_equal(out[0], [6, 7])
+    assert_array_equal(out[-1], [31, 32])
+    assert out.shape == (6, 2)
+
+
+def test_pair_tuple_crop():
+    arr = cp.arange(45).reshape(9, 5)
+    out = crop(arr, ((1, 2),))
+    assert_array_equal(out[0], [6, 7])
+    assert_array_equal(out[-1], [31, 32])
     assert out.shape == (6, 2)
 
 
 def test_int_crop():
     arr = cp.arange(45).reshape(9, 5)
     out = crop(arr, 1)
-    cp.testing.assert_array_equal(out[0], [6, 7, 8])
-    cp.testing.assert_array_equal(out[-1], [36, 37, 38])
+    assert_array_equal(out[0], [6, 7, 8])
+    assert_array_equal(out[-1], [36, 37, 38])
+    assert out.shape == (7, 3)
+
+
+def test_int_tuple_crop():
+    arr = cp.arange(45).reshape(9, 5)
+    out = crop(arr, (1,))
+    assert_array_equal(out[0], [6, 7, 8])
+    assert_array_equal(out[-1], [36, 37, 38])
     assert out.shape == (7, 3)
 
 

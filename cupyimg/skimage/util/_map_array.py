@@ -2,7 +2,7 @@ import cupy as cp
 from cupy import core
 
 
-# Note: scikit-image Cython code uses unordered_map, but here we use a simple
+# TODO: scikit-image Cython code uses unordered_map, but here we use a simple
 #       for loop over in_vals. On my hardware, for large arrays, when
 #       nvals < 2900 or so, the GPU implementation is faster. For small nvals
 #       (e.g. 10-100) it is much faster.
@@ -49,7 +49,7 @@ def map_array(input_arr, input_vals, output_vals, out=None):
 
     if not cp.issubdtype(input_arr.dtype, cp.integer):
         raise TypeError(
-            "The dtype of an array to be remapped should be integer."
+            'The dtype of an array to be remapped should be integer.'
         )
     # We ravel the input array for simplicity of iteration in Cython:
     orig_shape = input_arr.shape
@@ -61,18 +61,18 @@ def map_array(input_arr, input_vals, output_vals, out=None):
         out = cp.empty(orig_shape, dtype=output_vals.dtype)
     elif out.shape != orig_shape:
         raise ValueError(
-            "If out array is provided, it should have the same shape as "
-            f"the input array. Input array has shape {orig_shape}, provided "
-            f"output array has shape {out.shape}."
+            'If out array is provided, it should have the same shape as '
+            f'the input array. Input array has shape {orig_shape}, provided '
+            f'output array has shape {out.shape}.'
         )
     try:
         out_view = out.view()
         out_view.shape = (-1,)  # no-copy reshape/ravel
     except AttributeError:  # if out strides are not compatible with 0-copy
         raise ValueError(
-            "If out array is provided, it should be either contiguous "
-            f"or 1-dimensional. Got array with shape {out.shape} and "
-            f"strides {out.strides}."
+            'If out array is provided, it should be either contiguous '
+            f'or 1-dimensional. Got array with shape {out.shape} and '
+            f'strides {out.strides}.'
         )
 
     # ensure all arrays have matching types before sending to Cython
@@ -168,32 +168,25 @@ class ArrayMap:
         return self.out_values.dtype
 
     def __repr__(self):
-        return f"ArrayMap({repr(self.in_values)}, {repr(self.out_values)})"
+        return f'ArrayMap({repr(self.in_values)}, {repr(self.out_values)})'
 
     def __str__(self):
         if len(self.in_values) <= self._max_str_lines + 1:
             rows = range(len(self.in_values))
-            string = "\n".join(
-                ["ArrayMap:"]
-                + [
-                    f"  {self.in_values[i]} → {self.out_values[i]}"
-                    for i in rows
-                ]
+            string = '\n'.join(
+                ['ArrayMap:'] +
+                [f'  {self.in_values[i]} → {self.out_values[i]}' for i in rows]
             )
         else:
             rows0 = list(range(0, self._max_str_lines // 2))
             rows1 = list(range(-self._max_str_lines // 2, 0))
-            string = "\n".join(
-                ["ArrayMap:"]
-                + [
-                    f"  {self.in_values[i]} → {self.out_values[i]}"
-                    for i in rows0
-                ]
-                + ["  ..."]
-                + [
-                    f"  {self.in_values[i]} → {self.out_values[i]}"
-                    for i in rows1
-                ]
+            string = '\n'.join(
+                ['ArrayMap:'] +
+                [f'  {self.in_values[i]} → {self.out_values[i]}'
+                 for i in rows0] +
+                ['  ...'] +
+                [f'  {self.in_values[i]} → {self.out_values[i]}'
+                 for i in rows1]
             )
         return string
 
@@ -206,7 +199,9 @@ class ArrayMap:
             index = cp.asarray([index])
         elif isinstance(index, slice):
             start = index.start or 0  # treat None or 0 the same way
-            stop = index.stop if index.stop is not None else len(self)
+            stop = (index.stop
+                    if index.stop is not None
+                    else len(self))
             step = index.step
             index = cp.arange(start, stop, step)
         if index.dtype == bool:
@@ -219,7 +214,7 @@ class ArrayMap:
         )
 
         if scalar:
-            out = out[0]  # TODO: call .item() to transfer 0-dim array to host?
+            out = out[0]  # TODO: transfer 0-dim array to host?
         return out
 
     def __setitem__(self, indices, values):
