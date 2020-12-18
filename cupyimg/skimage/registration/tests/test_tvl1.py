@@ -26,9 +26,8 @@ def _sin_flow_gen(image0, max_motion=4.5, npics=5):
         first component and the corresponding warped image.
 
     """
-    grid = cp.stack(
-        cp.meshgrid(*[cp.arange(n) for n in image0.shape], indexing="ij")
-    )
+    grid = cp.meshgrid(*[cp.arange(n) for n in image0.shape], indexing='ij')
+    grid = cp.stack(grid)
     gt_flow = cp.zeros_like(grid)
     gt_flow[0, ...] = max_motion * cp.sin(
         grid[0] / grid[0].max() * npics * np.pi
@@ -50,8 +49,8 @@ def test_2d_motion():
 
 def test_3d_motion():
     # Generate synthetic data
-    rnd = cp.random.RandomState(0)
-    image0 = rnd.normal(size=(128, 128, 128))
+    rnd = np.random.RandomState(0)
+    image0 = cp.array(rnd.normal(size=(100, 100, 100)))
     gt_flow, image1 = _sin_flow_gen(image0)
     # Estimate the flow
     flow = optical_flow_tvl1(image0, image1, attachment=5)
@@ -69,8 +68,8 @@ def test_no_motion_2d():
 
 
 def test_no_motion_3d():
-    rnd = cp.random.RandomState(0)
-    img = rnd.normal(size=(128, 128, 128))
+    rnd = np.random.RandomState(0)
+    img = cp.array(rnd.normal(size=(64, 64, 64)))
 
     flow = optical_flow_tvl1(img, img)
 
