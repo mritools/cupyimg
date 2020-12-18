@@ -1,6 +1,8 @@
+import math
+
 import cupy as cp
 import numpy as np
-from cupyimg._misc import _prod
+
 from cupyimg.scipy.signal import fftconvolve
 
 from .._shared.utils import check_nD
@@ -8,7 +10,9 @@ from .._shared.utils import check_nD
 
 def _window_sum_2d(image, window_shape):
 
-    window_sum = cp.cumsum(image, axis=0)
+    # TODO: remove copy in line below once the following issue is resolved
+    #       https://github.com/cupy/cupy/issues/4456
+    window_sum = cp.cumsum(image.copy(), axis=0)
     window_sum = (window_sum[window_shape[0]:-1]
                   - window_sum[:-window_shape[0] - 1])
 
@@ -147,7 +151,7 @@ def match_template(image, template, pad_input=False, mode='constant',
         image_window_sum2 = _window_sum_3d(image * image, template.shape)
 
     template_mean = template.mean()
-    template_volume = _prod(template.shape)
+    template_volume = math.prod(template.shape)
     template_ssd = template - template_mean
     template_ssd *= template_ssd
     template_ssd = cp.sum(template_ssd)
