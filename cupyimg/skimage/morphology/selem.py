@@ -30,9 +30,8 @@ def square(width, dtype=np.uint8):
     return cp.ones((width, width), dtype=dtype)
 
 
-@deprecate_kwarg(
-    {"height": "ncols", "width": "nrows"}, removed_version="0.20.0"
-)
+@deprecate_kwarg({"height": "ncols", "width": "nrows"},
+                 removed_version="0.20.0")
 def rectangle(nrows, ncols, dtype=np.uint8):
     """Generates a flat, rectangular-shaped structuring element.
 
@@ -90,7 +89,7 @@ def diamond(radius, dtype=np.uint8):
         The structuring element where elements of the neighborhood
         are 1 and 0 otherwise.
     """
-    # as the grid is usually small, it should be faster to generate it in NumPy
+    # CuPy Backend: grid is usually small -> faster to generate it in NumPy
     L = np.arange(0, radius * 2 + 1)
     I, J = np.meshgrid(L, L, sparse=True)
     return cp.asarray(
@@ -120,7 +119,7 @@ def disk(radius, dtype=np.uint8):
         The structuring element where elements of the neighborhood
         are 1 and 0 otherwise.
     """
-    # as the grid is usually small, it should be faster to generate it in NumPy
+    # CuPy Backend: grid is usually small -> faster to generate it in NumPy
     L = np.arange(-radius, radius + 1)
     X, Y = np.meshgrid(L, L, sparse=True)
     return cp.asarray((X * X + Y * Y) <= radius * radius, dtype=dtype)
@@ -169,7 +168,7 @@ def ellipse(width, height, dtype=np.uint8):
     rows, cols = draw.ellipse(height, width, height + 1, width + 1)
     selem[rows, cols] = 1
     # Note: no CUDA counterpart for draw.ellipse so compute in NumPy
-    # as the grid is usually small, it should be faster to generate it in NumPy
+    # CuPy Backend: grid is usually small -> faster to generate it in NumPy
     return cp.asarray(selem)
 
 
@@ -233,7 +232,7 @@ def octahedron(radius, dtype=np.uint8):
         -radius : radius : n * 1j,
     ]
     s = np.abs(X) + np.abs(Y) + np.abs(Z)
-    return cp.asarray(s <= radius, dtype=dtype)
+    return cp.array(s <= radius, dtype=dtype)
 
 
 def ball(radius, dtype=np.uint8):
@@ -266,7 +265,7 @@ def ball(radius, dtype=np.uint8):
         -radius : radius : n * 1j,
     ]
     s = X * X + Y * Y + Z * Z
-    return cp.asarray(s <= radius * radius, dtype=dtype)
+    return cp.array(s <= radius * radius, dtype=dtype)
 
 
 def octagon(m, n, dtype=np.uint8):
@@ -308,7 +307,7 @@ def octagon(m, n, dtype=np.uint8):
     selem[-1, m + n - 1] = 1
     selem[m + n - 1, -1] = 1
     selem = convex_hull_image(selem).astype(dtype)
-    return cp.asarray(selem)
+    return cp.array(selem)
 
 
 def star(a, dtype=np.uint8):
@@ -357,7 +356,7 @@ def star(a, dtype=np.uint8):
     selem = selem_square + selem_rotated
     selem[selem > 0] = 1
 
-    return cp.asarray(selem.astype(dtype, copy=False))
+    return cp.array(selem.astype(dtype, copy=False))
 
 
 def _default_selem(ndim):

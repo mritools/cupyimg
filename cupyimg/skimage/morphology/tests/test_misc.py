@@ -1,15 +1,13 @@
-import numpy as np
+import cupy as cp
+from cupy.testing import assert_array_equal
+from numpy.testing import assert_equal
 import pytest
 from cupyimg.skimage.morphology import remove_small_objects, remove_small_holes
 
-from skimage._shared import testing
-from skimage._shared.testing import assert_array_equal, assert_equal
 from skimage._shared._warnings import expected_warnings
 
-label = pytest.importorskip("cupyimg.scipy.ndimage.label")
-
 # fmt: off
-test_image = np.array([[0, 0, 0, 1, 0],
+test_image = cp.array([[0, 0, 0, 1, 0],
                        [1, 1, 1, 0, 0],
                        [1, 1, 1, 0, 1]], bool)
 # fmt: on
@@ -17,7 +15,7 @@ test_image = np.array([[0, 0, 0, 1, 0],
 
 def test_one_connectivity():
     # fmt: off
-    expected = np.array([[0, 0, 0, 0, 0],
+    expected = cp.array([[0, 0, 0, 0, 0],
                          [1, 1, 1, 0, 0],
                          [1, 1, 1, 0, 0]], bool)
     # fmt: on
@@ -27,7 +25,7 @@ def test_one_connectivity():
 
 def test_two_connectivity():
     # fmt: off
-    expected = np.array([[0, 0, 0, 1, 0],
+    expected = cp.array([[0, 0, 0, 1, 0],
                          [1, 1, 1, 0, 0],
                          [1, 1, 1, 0, 0]], bool)
     # fmt: on
@@ -38,20 +36,17 @@ def test_two_connectivity():
 def test_in_place():
     image = test_image.copy()
     observed = remove_small_objects(image, min_size=6, in_place=True)
-    assert_equal(
-        observed is image,
-        True,
-        "remove_small_objects in_place argument failed.",
-    )
+    assert_equal(observed is image, True,
+                 "remove_small_objects in_place argument failed.")
 
 
 def test_labeled_image():
     # fmt: off
-    labeled_image = np.array([[2, 2, 2, 0, 1],
+    labeled_image = cp.array([[2, 2, 2, 0, 1],
                               [2, 2, 2, 0, 1],
                               [2, 0, 0, 0, 0],
                               [0, 0, 3, 3, 3]], dtype=int)
-    expected = np.array([[2, 2, 2, 0, 0],
+    expected = cp.array([[2, 2, 2, 0, 0],
                          [2, 2, 2, 0, 0],
                          [2, 0, 0, 0, 0],
                          [0, 0, 3, 3, 3]], dtype=int)
@@ -62,14 +57,14 @@ def test_labeled_image():
 
 def test_uint_image():
     # fmt: off
-    labeled_image = np.array([[2, 2, 2, 0, 1],
+    labeled_image = cp.array([[2, 2, 2, 0, 1],
                               [2, 2, 2, 0, 1],
                               [2, 0, 0, 0, 0],
-                              [0, 0, 3, 3, 3]], dtype=np.uint8)
-    expected = np.array([[2, 2, 2, 0, 0],
+                              [0, 0, 3, 3, 3]], dtype=cp.uint8)
+    expected = cp.array([[2, 2, 2, 0, 0],
                          [2, 2, 2, 0, 0],
                          [2, 0, 0, 0, 0],
-                         [0, 0, 3, 3, 3]], dtype=np.uint8)
+                         [0, 0, 3, 3, 3]], dtype=cp.uint8)
     # fmt: on
     observed = remove_small_objects(labeled_image, min_size=3)
     assert_array_equal(observed, expected)
@@ -77,171 +72,143 @@ def test_uint_image():
 
 def test_single_label_warning():
     # fmt: off
-    image = np.array([[0, 0, 0, 1, 0],
+    image = cp.array([[0, 0, 0, 1, 0],
                       [1, 1, 1, 0, 0],
                       [1, 1, 1, 0, 0]], int)
     # fmt: on
-    with expected_warnings(["use a boolean array?"]):
+    with expected_warnings(['use a boolean array?']):
         remove_small_objects(image, min_size=6)
 
 
 def test_float_input():
-    float_test = np.random.rand(5, 5)
-    with testing.raises(TypeError):
+    float_test = cp.random.rand(5, 5)
+    with pytest.raises(TypeError):
         remove_small_objects(float_test)
 
 
 def test_negative_input():
-    negative_int = np.random.randint(-4, -1, size=(5, 5))
-    with testing.raises(ValueError):
+    negative_int = cp.random.randint(-4, -1, size=(5, 5))
+    with pytest.raises(ValueError):
         remove_small_objects(negative_int)
 
-
-test_holes_image = np.array(
-    [
-        [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-        [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-        [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
-        [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
-        [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-        [0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
-        [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-    ],
-    np.bool_,
-)
+# fmt: off
+test_holes_image = cp.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                             [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                             [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
+                             [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
+                             [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                             [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+                             [0, 0, 0, 0, 0, 0, 0, 1, 0, 1],
+                             [0, 0, 0, 0, 0, 0, 0, 1, 1, 1]], bool)
+# fmt: on
 
 
 def test_one_connectivity_holes():
-    expected = np.array(
-        [
-            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-        ],
-        np.bool_,
-    )
+    # fmt: off
+    expected = cp.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1]], bool)
+    # fmt: on
     observed = remove_small_holes(test_holes_image, area_threshold=3)
     assert_array_equal(observed, expected)
 
 
 def test_two_connectivity_holes():
-    expected = np.array(
-        [
-            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-        ],
-        np.bool_,
-    )
-    observed = remove_small_holes(
-        test_holes_image, area_threshold=3, connectivity=2
-    )
+    # fmt: off
+    expected = cp.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1]], bool)
+    # fmt: on
+    observed = remove_small_holes(test_holes_image, area_threshold=3,
+                                  connectivity=2)
     assert_array_equal(observed, expected)
 
 
 def test_in_place_holes():
     image = test_holes_image.copy()
     observed = remove_small_holes(image, area_threshold=3, in_place=True)
-    assert_equal(
-        observed is image, True, "remove_small_holes in_place argument failed."
-    )
+    assert_equal(observed is image, True,
+                 "remove_small_holes in_place argument failed.")
 
 
 def test_labeled_image_holes():
-    labeled_holes_image = np.array(
-        [
-            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 2, 2, 2],
-            [0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
-            [0, 0, 0, 0, 0, 0, 0, 2, 2, 2],
-        ],
-        dtype=np.int_,
-    )
-    expected = np.array(
-        [
-            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-        ],
-        dtype=np.bool_,
-    )
-    with expected_warnings(["returned as a boolean array"]):
+    # fmt: off
+    labeled_holes_image = cp.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                                    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                                    [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
+                                    [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
+                                    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 2, 2, 2],
+                                    [0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
+                                    [0, 0, 0, 0, 0, 0, 0, 2, 2, 2]],
+                                   dtype=int)
+    expected = cp.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1]], dtype=bool)
+    # fmt: on
+    with expected_warnings(['returned as a boolean array']):
         observed = remove_small_holes(labeled_holes_image, area_threshold=3)
     assert_array_equal(observed, expected)
 
 
 def test_uint_image_holes():
-    labeled_holes_image = np.array(
-        [
-            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 2, 2, 2],
-            [0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
-            [0, 0, 0, 0, 0, 0, 0, 2, 2, 2],
-        ],
-        dtype=np.uint8,
-    )
-    expected = np.array(
-        [
-            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-            [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
-        ],
-        dtype=np.bool_,
-    )
-    with expected_warnings(["returned as a boolean array"]):
+    # fmt: off
+    labeled_holes_image = cp.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                                    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                                    [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
+                                    [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
+                                    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 2, 2, 2],
+                                    [0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
+                                    [0, 0, 0, 0, 0, 0, 0, 2, 2, 2]],
+                                   dtype=cp.uint8)
+    expected = cp.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1],
+                         [0, 0, 0, 0, 0, 0, 0, 1, 1, 1]], dtype=bool)
+    # fmt: on
+    with expected_warnings(['returned as a boolean array']):
         observed = remove_small_holes(labeled_holes_image, area_threshold=3)
     assert_array_equal(observed, expected)
 
 
 def test_label_warning_holes():
-    labeled_holes_image = np.array(
-        [
-            [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
-            [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 2, 2, 2],
-            [0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
-            [0, 0, 0, 0, 0, 0, 0, 2, 2, 2],
-        ],
-        dtype=np.int_,
-    )
-    with expected_warnings(["use a boolean array?"]):
+    # fmt: off
+    labeled_holes_image = cp.array([[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                                    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                                    [0, 1, 0, 0, 1, 1, 0, 0, 0, 0],
+                                    [0, 1, 1, 1, 0, 1, 0, 0, 0, 0],
+                                    [0, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+                                    [0, 0, 0, 0, 0, 0, 0, 2, 2, 2],
+                                    [0, 0, 0, 0, 0, 0, 0, 2, 0, 2],
+                                    [0, 0, 0, 0, 0, 0, 0, 2, 2, 2]],
+                                   dtype=int)
+    # fmt: on
+    with expected_warnings(['use a boolean array?']):
         remove_small_holes(labeled_holes_image, area_threshold=3)
     remove_small_holes(labeled_holes_image.astype(bool), area_threshold=3)
 
 
 def test_float_input_holes():
-    float_test = np.random.rand(5, 5)
-    with testing.raises(TypeError):
+    float_test = cp.random.rand(5, 5)
+    with pytest.raises(TypeError):
         remove_small_holes(float_test)

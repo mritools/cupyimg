@@ -18,15 +18,13 @@ from cupyimg.skimage.morphology.greyreconstruct import reconstruction
 def test_zeros():
     """Test reconstruction with image and mask of zeros"""
     assert_array_almost_equal(
-        reconstruction(cp.zeros((5, 7)), cp.zeros((5, 7))), 0
-    )
+        reconstruction(cp.zeros((5, 7)), cp.zeros((5, 7))), 0)
 
 
 def test_image_equals_mask():
     """Test reconstruction where the image and mask are the same"""
     assert_array_almost_equal(
-        reconstruction(cp.ones((7, 5)), cp.ones((7, 5))), 1
-    )
+        reconstruction(cp.ones((7, 5)), cp.ones((7, 5))), 1)
 
 
 def test_image_less_than_mask():
@@ -47,26 +45,26 @@ def test_one_image_peak():
 def test_two_image_peaks():
     """Test reconstruction with two peak pixels isolated by the mask"""
     # fmt: off
-    image = cp.asarray([[1, 1, 1, 1, 1, 1, 1, 1],
-                        [1, 2, 1, 1, 1, 1, 1, 1],
-                        [1, 1, 1, 1, 1, 1, 1, 1],
-                        [1, 1, 1, 1, 1, 1, 1, 1],
-                        [1, 1, 1, 1, 1, 1, 3, 1],
-                        [1, 1, 1, 1, 1, 1, 1, 1]])
+    image = cp.array([[1, 1, 1, 1, 1, 1, 1, 1],
+                      [1, 2, 1, 1, 1, 1, 1, 1],
+                      [1, 1, 1, 1, 1, 1, 1, 1],
+                      [1, 1, 1, 1, 1, 1, 1, 1],
+                      [1, 1, 1, 1, 1, 1, 3, 1],
+                      [1, 1, 1, 1, 1, 1, 1, 1]])
 
-    mask = cp.asarray([[4, 4, 4, 1, 1, 1, 1, 1],
-                       [4, 4, 4, 1, 1, 1, 1, 1],
-                       [4, 4, 4, 1, 1, 1, 1, 1],
-                       [1, 1, 1, 1, 1, 4, 4, 4],
-                       [1, 1, 1, 1, 1, 4, 4, 4],
-                       [1, 1, 1, 1, 1, 4, 4, 4]])
+    mask = cp.array([[4, 4, 4, 1, 1, 1, 1, 1],
+                     [4, 4, 4, 1, 1, 1, 1, 1],
+                     [4, 4, 4, 1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1, 4, 4, 4],
+                     [1, 1, 1, 1, 1, 4, 4, 4],
+                     [1, 1, 1, 1, 1, 4, 4, 4]])
 
-    expected = cp.asarray([[2, 2, 2, 1, 1, 1, 1, 1],
-                           [2, 2, 2, 1, 1, 1, 1, 1],
-                           [2, 2, 2, 1, 1, 1, 1, 1],
-                           [1, 1, 1, 1, 1, 3, 3, 3],
-                           [1, 1, 1, 1, 1, 3, 3, 3],
-                           [1, 1, 1, 1, 1, 3, 3, 3]])
+    expected = cp.array([[2, 2, 2, 1, 1, 1, 1, 1],
+                         [2, 2, 2, 1, 1, 1, 1, 1],
+                         [2, 2, 2, 1, 1, 1, 1, 1],
+                         [1, 1, 1, 1, 1, 3, 3, 3],
+                         [1, 1, 1, 1, 1, 3, 3, 3],
+                         [1, 1, 1, 1, 1, 3, 3, 3]])
     # fmt: on
     assert_array_almost_equal(reconstruction(image, mask), expected)
 
@@ -79,11 +77,11 @@ def test_zero_image_one_mask():
 
 def test_fill_hole():
     """Test reconstruction by erosion, which should fill holes in mask."""
-    seed = cp.asarray([0, 8, 8, 8, 8, 8, 8, 8, 8, 0])
-    mask = cp.asarray([0, 3, 6, 2, 1, 1, 1, 4, 2, 0])
+    seed = cp.array([0, 8, 8, 8, 8, 8, 8, 8, 8, 0])
+    mask = cp.array([0, 3, 6, 2, 1, 1, 1, 4, 2, 0])
     result = reconstruction(seed, mask, method="erosion")
     assert_array_almost_equal(
-        result, cp.asarray([0, 3, 6, 4, 4, 4, 4, 4, 2, 0])
+        result, cp.array([0, 3, 6, 4, 4, 4, 4, 4, 2, 0])
     )
 
 
@@ -91,9 +89,9 @@ def test_invalid_seed():
     seed = cp.ones((5, 5))
     mask = cp.ones((5, 5))
     with pytest.raises(ValueError):
-        reconstruction(seed * 2, mask, method="dilation")
+        reconstruction(seed * 2, mask, method='dilation')
     with pytest.raises(ValueError):
-        reconstruction(seed * 0.5, mask, method="erosion")
+        reconstruction(seed * 0.5, mask, method='erosion')
 
 
 def test_invalid_selem():
@@ -107,8 +105,8 @@ def test_invalid_selem():
 
 
 def test_invalid_method():
-    seed = cp.asarray([0, 8, 8, 8, 8, 8, 8, 8, 8, 0])
-    mask = cp.asarray([0, 3, 6, 2, 1, 1, 1, 4, 2, 0])
+    seed = cp.array([0, 8, 8, 8, 8, 8, 8, 8, 8, 0])
+    mask = cp.array([0, 3, 6, 2, 1, 1, 1, 4, 2, 0])
     with pytest.raises(ValueError):
         reconstruction(seed, mask, method="foo")
 
@@ -116,43 +114,31 @@ def test_invalid_method():
 def test_invalid_offset_not_none():
     """Test reconstruction with invalid not None offset parameter"""
     # fmt: off
-    image = cp.asarray([[1, 1, 1, 1, 1, 1, 1, 1],
-                        [1, 2, 1, 1, 1, 1, 1, 1],
-                        [1, 1, 1, 1, 1, 1, 1, 1],
-                        [1, 1, 1, 1, 1, 1, 1, 1],
-                        [1, 1, 1, 1, 1, 1, 3, 1],
-                        [1, 1, 1, 1, 1, 1, 1, 1]])
+    image = cp.array([[1, 1, 1, 1, 1, 1, 1, 1],
+                      [1, 2, 1, 1, 1, 1, 1, 1],
+                      [1, 1, 1, 1, 1, 1, 1, 1],
+                      [1, 1, 1, 1, 1, 1, 1, 1],
+                      [1, 1, 1, 1, 1, 1, 3, 1],
+                      [1, 1, 1, 1, 1, 1, 1, 1]])
 
-    mask = cp.asarray([[4, 4, 4, 1, 1, 1, 1, 1],
-                       [4, 4, 4, 1, 1, 1, 1, 1],
-                       [4, 4, 4, 1, 1, 1, 1, 1],
-                       [1, 1, 1, 1, 1, 4, 4, 4],
-                       [1, 1, 1, 1, 1, 4, 4, 4],
-                       [1, 1, 1, 1, 1, 4, 4, 4]])
+    mask = cp.array([[4, 4, 4, 1, 1, 1, 1, 1],
+                     [4, 4, 4, 1, 1, 1, 1, 1],
+                     [4, 4, 4, 1, 1, 1, 1, 1],
+                     [1, 1, 1, 1, 1, 4, 4, 4],
+                     [1, 1, 1, 1, 1, 4, 4, 4],
+                     [1, 1, 1, 1, 1, 4, 4, 4]])
     # fmt: on
     with pytest.raises(ValueError):
-        reconstruction(
-            image,
-            mask,
-            method="dilation",
-            selem=np.ones((3, 3)),
-            offset=np.array([3, 0]),
-        )
+        reconstruction(image, mask, method='dilation',
+                       selem=cp.ones((3, 3)), offset=cp.array([3, 0]))
 
 
 def test_offset_not_none():
     """Test reconstruction with valid offset parameter"""
-    seed = cp.asarray([0, 3, 6, 2, 1, 1, 1, 4, 2, 0])
-    mask = cp.asarray([0, 8, 6, 8, 8, 8, 8, 4, 4, 0])
-    expected = cp.asarray([0, 3, 6, 6, 6, 6, 6, 4, 4, 0])
+    seed = cp.array([0, 3, 6, 2, 1, 1, 1, 4, 2, 0])
+    mask = cp.array([0, 8, 6, 8, 8, 8, 8, 4, 4, 0])
+    expected = cp.array([0, 3, 6, 6, 6, 6, 6, 4, 4, 0])
 
     assert_array_almost_equal(
-        reconstruction(
-            seed,
-            mask,
-            method="dilation",
-            selem=np.ones(3),
-            offset=np.array([0]),
-        ),
-        expected,
-    )
+        reconstruction(seed, mask, method='dilation',
+                       selem=cp.ones(3), offset=cp.array([0])), expected)

@@ -7,18 +7,12 @@ from .selem import _default_selem
 
 # Our function names don't exactly correspond to ndimages.
 # This dictionary translates from our names to scipy's.
-funcs = ("erosion", "dilation", "opening", "closing")
-skimage2ndimage = {x: "grey_" + x for x in funcs}
+funcs = ('erosion', 'dilation', 'opening', 'closing')
+skimage2ndimage = {x: 'grey_' + x for x in funcs}
 
 # These function names are the same in ndimage.
-funcs = (
-    "binary_erosion",
-    "binary_dilation",
-    "binary_opening",
-    "binary_closing",
-    "black_tophat",
-    "white_tophat",
-)
+funcs = ('binary_erosion', 'binary_dilation', 'binary_opening',
+         'binary_closing', 'black_tophat', 'white_tophat')
 skimage2ndimage.update({x: x for x in funcs})
 
 
@@ -51,10 +45,8 @@ def default_selem(func):
 def _check_dtype_supported(ar):
     # Should use `issubdtype` for bool below, but there's a bug in numpy 1.7
     if not (ar.dtype == bool or cp.issubdtype(ar.dtype, cp.integer)):
-        raise TypeError(
-            "Only bool or integer image types are supported. "
-            "Got %s." % ar.dtype
-        )
+        raise TypeError("Only bool or integer image types are supported. "
+                        "Got %s." % ar.dtype)
 
 
 def remove_small_objects(ar, min_size=64, connectivity=1, in_place=False):
@@ -134,17 +126,13 @@ def remove_small_objects(ar, min_size=64, connectivity=1, in_place=False):
     try:
         component_sizes = cp.bincount(ccs.ravel())
     except ValueError:
-        raise ValueError(
-            "Negative value labels are not supported. Try "
-            "relabeling the input with `scipy.ndimage.label` or "
-            "`skimage.morphology.label`."
-        )
+        raise ValueError("Negative value labels are not supported. Try "
+                         "relabeling the input with `scipy.ndimage.label` or "
+                         "`skimage.morphology.label`.")
 
     if len(component_sizes) == 2 and out.dtype != bool:
-        warn(
-            "Only one label was provided to `remove_small_objects`. "
-            "Did you mean to use a boolean array?"
-        )
+        warn("Only one label was provided to `remove_small_objects`. "
+             "Did you mean to use a boolean array?")
 
     too_small = component_sizes < min_size
     too_small_mask = too_small[ccs]
@@ -217,11 +205,8 @@ def remove_small_holes(ar, area_threshold=64, connectivity=1, in_place=False):
 
     # Creates warning if image is an integer image
     if ar.dtype != bool:
-        warn(
-            "Any labeled images will be returned as a boolean array. "
-            "Did you mean to use a boolean array?",
-            UserWarning,
-        )
+        warn("Any labeled images will be returned as a boolean array. "
+             "Did you mean to use a boolean array?", UserWarning)
 
     if in_place:
         out = ar

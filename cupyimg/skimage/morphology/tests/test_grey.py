@@ -7,17 +7,7 @@ from cupyimg.skimage import color, transform
 from cupyimg.skimage.util import img_as_uint, img_as_ubyte
 from cupyimg.skimage.morphology import grey, selem
 from skimage._shared._warnings import expected_warnings
-from skimage._shared.testing import TestCase, parametrize
-
-try:
-    from skimage._shared.testing import fetch
-
-    have_fetch = True
-except ImportError:
-    import os
-    from skimage import data_dir
-
-    have_fetch = False
+from skimage._shared.testing import TestCase, parametrize, fetch
 
 
 class TestMorphology(TestCase):
@@ -31,38 +21,26 @@ class TestMorphology(TestCase):
     #   np.savez_compressed('gray_morph_output.npz', **output)
 
     def _build_expected_output(self):
-        funcs = (
-            grey.erosion,
-            grey.dilation,
-            grey.opening,
-            grey.closing,
-            grey.white_tophat,
-            grey.black_tophat,
-        )
-        selems_2D = (selem.square, selem.diamond, selem.disk, selem.star)
+        funcs = (grey.erosion, grey.dilation, grey.opening, grey.closing,
+                 grey.white_tophat, grey.black_tophat)
+        selems_2D = (selem.square, selem.diamond,
+                     selem.disk, selem.star)
 
-        image = img_as_ubyte(
-            transform.downscale_local_mean(
-                color.rgb2gray(cp.asarray(data.coffee())), (20, 20)
-            )
-        )
+        image = img_as_ubyte(transform.downscale_local_mean(
+            color.rgb2gray(cp.array(data.coffee())), (20, 20)))
 
         output = {}
         for n in range(1, 4):
             for strel in selems_2D:
                 for func in funcs:
-                    key = "{0}_{1}_{2}".format(strel.__name__, n, func.__name__)
+                    key = '{0}_{1}_{2}'.format(
+                        strel.__name__, n, func.__name__)
                     output[key] = func(image, strel(n))
 
         return output
 
     def test_gray_morphology(self):
-        if have_fetch:
-            expected = dict(np.load(fetch("data/gray_morph_output.npz")))
-        else:
-            expected = dict(
-                np.load(os.path.join(data_dir, "gray_morph_output.npz"))
-            )
+        expected = dict(np.load(fetch('data/gray_morph_output.npz')))
         calculated = self._build_expected_output()
         for k, v in calculated.items():
             cp.testing.assert_array_equal(expected[k], v)
@@ -125,37 +103,29 @@ class TestEccentricStructuringElements(TestCase):
             assert cp.all(tophat == 0)
 
 
-grey_functions = [
-    grey.erosion,
-    grey.dilation,
-    grey.opening,
-    grey.closing,
-    grey.white_tophat,
-    grey.black_tophat,
-]
+grey_functions = [grey.erosion, grey.dilation,
+                  grey.opening, grey.closing,
+                  grey.white_tophat, grey.black_tophat]
 
 
 @parametrize("function", grey_functions)
 def test_default_selem(function):
     strel = selem.diamond(radius=1)
-    image = cp.asarray(
-        [
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
-            [0, 0, 1, 1, 1, 0, 0, 1, 0, 0],
-            [0, 0, 1, 1, 1, 0, 0, 1, 0, 0],
-            [0, 0, 1, 1, 1, 0, 0, 1, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        ],
-        cp.uint8,
-    )
+    # fmt: off
+    image = cp.array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+                      [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+                      [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+                      [0, 0, 1, 1, 1, 0, 0, 1, 0, 0],
+                      [0, 0, 1, 1, 1, 0, 0, 1, 0, 0],
+                      [0, 0, 1, 1, 1, 0, 0, 1, 0, 0],
+                      [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+                      [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+                      [0, 0, 1, 1, 1, 1, 1, 1, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], cp.uint8)
+    # fmt: on
     im_expected = function(image, strel)
     im_test = function(image)
     cp.testing.assert_array_equal(im_expected, im_test)
@@ -163,7 +133,7 @@ def test_default_selem(function):
 
 def test_3d_fallback_default_selem():
     # 3x3x3 cube inside a 7x7x7 image:
-    image = cp.zeros((7, 7, 7), cp.bool)
+    image = cp.zeros((7, 7, 7), bool)
     image[2:-2, 2:-2, 2:-2] = 1
 
     opened = grey.opening(image)
@@ -180,7 +150,7 @@ grey_3d_fallback_functions = [grey.closing, grey.opening]
 @parametrize("function", grey_3d_fallback_functions)
 def test_3d_fallback_cube_selem(function):
     # 3x3x3 cube inside a 7x7x7 image:
-    image = cp.zeros((7, 7, 7), cp.bool)
+    image = cp.zeros((7, 7, 7), bool)
     image[2:-2, 2:-2, 2:-2] = 1
 
     cube = cp.ones((3, 3, 3), dtype=cp.uint8)
@@ -195,10 +165,10 @@ def test_3d_fallback_white_tophat():
     image[3, 2:5, 2:5] = 1
     image[4, 3:5, 3:5] = 1
 
-    with expected_warnings([r"operator.*deprecated|\A\Z"]):
+    with expected_warnings([r'operator.*deprecated|\A\Z']):
         new_image = grey.white_tophat(image)
     footprint = ndi.generate_binary_structure(3, 1)
-    with expected_warnings([r"operator.*deprecated|\A\Z"]):
+    with expected_warnings([r'operator.*deprecated|\A\Z']):
         image_expected = ndi.white_tophat(
             image.view(dtype=cp.uint8), footprint=footprint
         )
@@ -211,10 +181,10 @@ def test_3d_fallback_black_tophat():
     image[3, 2:5, 2:5] = 0
     image[4, 3:5, 3:5] = 0
 
-    with expected_warnings([r"operator.*deprecated|\A\Z"]):
+    with expected_warnings([r'operator.*deprecated|\A\Z']):
         new_image = grey.black_tophat(image)
     footprint = ndi.generate_binary_structure(3, 1)
-    with expected_warnings([r"operator.*deprecated|\A\Z"]):
+    with expected_warnings([r'operator.*deprecated|\A\Z']):
         image_expected = ndi.black_tophat(
             image.view(dtype=cp.uint8), footprint=footprint
         )
@@ -240,35 +210,35 @@ def test_2d_ndimage_equivalence():
 
 # float test images
 # fmt: off
-im = cp.asarray([[0.55, 0.72, 0.6 , 0.54, 0.42],
-                 [0.65, 0.44, 0.89, 0.96, 0.38],
-                 [0.79, 0.53, 0.57, 0.93, 0.07],
-                 [0.09, 0.02, 0.83, 0.78, 0.87],
-                 [0.98, 0.8 , 0.46, 0.78, 0.12]])
+im = cp.array([[0.55, 0.72, 0.6 , 0.54, 0.42],
+               [0.65, 0.44, 0.89, 0.96, 0.38],
+               [0.79, 0.53, 0.57, 0.93, 0.07],
+               [0.09, 0.02, 0.83, 0.78, 0.87],
+               [0.98, 0.8 , 0.46, 0.78, 0.12]])
 
-eroded = cp.asarray([[0.55, 0.44, 0.54, 0.42, 0.38],
-                     [0.44, 0.44, 0.44, 0.38, 0.07],
-                     [0.09, 0.02, 0.53, 0.07, 0.07],
-                     [0.02, 0.02, 0.02, 0.78, 0.07],
-                     [0.09, 0.02, 0.46, 0.12, 0.12]])
+eroded = cp.array([[0.55, 0.44, 0.54, 0.42, 0.38],
+                   [0.44, 0.44, 0.44, 0.38, 0.07],
+                   [0.09, 0.02, 0.53, 0.07, 0.07],
+                   [0.02, 0.02, 0.02, 0.78, 0.07],
+                   [0.09, 0.02, 0.46, 0.12, 0.12]])
 
-dilated = cp.asarray([[0.72, 0.72, 0.89, 0.96, 0.54],
-                      [0.79, 0.89, 0.96, 0.96, 0.96],
-                      [0.79, 0.79, 0.93, 0.96, 0.93],
-                      [0.98, 0.83, 0.83, 0.93, 0.87],
-                      [0.98, 0.98, 0.83, 0.78, 0.87]])
+dilated = cp.array([[0.72, 0.72, 0.89, 0.96, 0.54],
+                    [0.79, 0.89, 0.96, 0.96, 0.96],
+                    [0.79, 0.79, 0.93, 0.96, 0.93],
+                    [0.98, 0.83, 0.83, 0.93, 0.87],
+                    [0.98, 0.98, 0.83, 0.78, 0.87]])
 
-opened = cp.asarray([[0.55, 0.55, 0.54, 0.54, 0.42],
-                     [0.55, 0.44, 0.54, 0.44, 0.38],
-                     [0.44, 0.53, 0.53, 0.78, 0.07],
-                     [0.09, 0.02, 0.78, 0.78, 0.78],
-                     [0.09, 0.46, 0.46, 0.78, 0.12]])
+opened = cp.array([[0.55, 0.55, 0.54, 0.54, 0.42],
+                   [0.55, 0.44, 0.54, 0.44, 0.38],
+                   [0.44, 0.53, 0.53, 0.78, 0.07],
+                   [0.09, 0.02, 0.78, 0.78, 0.78],
+                   [0.09, 0.46, 0.46, 0.78, 0.12]])
 
-closed = cp.asarray([[0.72, 0.72, 0.72, 0.54, 0.54],
-                     [0.72, 0.72, 0.89, 0.96, 0.54],
-                     [0.79, 0.79, 0.79, 0.93, 0.87],
-                     [0.79, 0.79, 0.83, 0.78, 0.87],
-                     [0.98, 0.83, 0.78, 0.78, 0.78]])
+closed = cp.array([[0.72, 0.72, 0.72, 0.54, 0.54],
+                   [0.72, 0.72, 0.89, 0.96, 0.54],
+                   [0.79, 0.79, 0.79, 0.93, 0.87],
+                   [0.79, 0.79, 0.83, 0.78, 0.87],
+                   [0.98, 0.83, 0.78, 0.78, 0.78]])
 # fmt: on
 
 
@@ -291,32 +261,24 @@ def test_uint16():
 
 def test_discontiguous_out_array():
     # fmt: off
-    image = cp.asarray([[5, 6, 2],
-                        [7, 2, 2],
-                        [3, 5, 1]], cp.uint8)
+    image = cp.array([[5, 6, 2],
+                      [7, 2, 2],
+                      [3, 5, 1]], cp.uint8)
     # fmt: on
     out_array_big = cp.zeros((5, 5), cp.uint8)
     out_array = out_array_big[::2, ::2]
-    expected_dilation = cp.array(
-        [
-            [7, 0, 6, 0, 6],
-            [0, 0, 0, 0, 0],
-            [7, 0, 7, 0, 2],
-            [0, 0, 0, 0, 0],
-            [7, 0, 5, 0, 5],
-        ],
-        cp.uint8,
-    )
-    expected_erosion = cp.array(
-        [
-            [5, 0, 2, 0, 2],
-            [0, 0, 0, 0, 0],
-            [2, 0, 2, 0, 1],
-            [0, 0, 0, 0, 0],
-            [3, 0, 1, 0, 1],
-        ],
-        cp.uint8,
-    )
+    # fmt: off
+    expected_dilation = cp.array([[7, 0, 6, 0, 6],
+                                  [0, 0, 0, 0, 0],
+                                  [7, 0, 7, 0, 2],
+                                  [0, 0, 0, 0, 0],
+                                  [7, 0, 5, 0, 5]], cp.uint8)
+    expected_erosion = cp.array([[5, 0, 2, 0, 2],
+                                 [0, 0, 0, 0, 0],
+                                 [2, 0, 2, 0, 1],
+                                 [0, 0, 0, 0, 0],
+                                 [3, 0, 1, 0, 1]], cp.uint8)
+    # fmt: on
     grey.dilation(image, out=out_array)
     cp.testing.assert_array_equal(out_array_big, expected_dilation)
     grey.erosion(image, out=out_array)

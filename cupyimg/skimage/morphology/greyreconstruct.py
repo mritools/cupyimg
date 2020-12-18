@@ -15,7 +15,7 @@ import numpy as np
 from ..filters._rank_order import rank_order
 
 
-def reconstruction(seed, mask, method="dilation", selem=None, offset=None):
+def reconstruction(seed, mask, method='dilation', selem=None, offset=None):
     """Perform a morphological reconstruction of an image.
 
     Morphological reconstruction by dilation is similar to basic morphological
@@ -125,16 +125,14 @@ def reconstruction(seed, mask, method="dilation", selem=None, offset=None):
            Applications", Chapter 6, 2nd edition (2003), ISBN 3540429883.
     """
     assert tuple(seed.shape) == tuple(mask.shape)
-    if method == "dilation" and cp.any(seed > mask):  # synchronize!
-        raise ValueError(
-            "Intensity of seed image must be less than that "
-            "of the mask image for reconstruction by dilation."
-        )
-    elif method == "erosion" and cp.any(seed < mask):  # synchronize!
-        raise ValueError(
-            "Intensity of seed image must be greater than that "
-            "of the mask image for reconstruction by erosion."
-        )
+    if method == 'dilation' and cp.any(seed > mask):  # synchronize!
+        raise ValueError("Intensity of seed image must be less than that "
+                         "of the mask image for reconstruction by dilation.")
+
+    elif method == 'erosion' and cp.any(seed < mask):  # synchronize!
+        raise ValueError("Intensity of seed image must be greater than that "
+                         "of the mask image for reconstruction by erosion.")
+
     try:
         from skimage.morphology._greyreconstruct import reconstruction_loop
     except ImportError:
@@ -169,22 +167,20 @@ def reconstruction(seed, mask, method="dilation", selem=None, offset=None):
     inside_slices = tuple(slice(o, o + s) for o, s in zip(offset, seed.shape))
     # Set padded region to minimum image intensity and mask along first axis so
     # we can interleave image and mask pixels when sorting.
-    if method == "dilation":
+    if method == 'dilation':
         pad_value = int(cp.min(seed))
-    elif method == "erosion":
+    elif method == 'erosion':
         pad_value = int(cp.max(seed))
     else:
-        raise ValueError(
-            "Reconstruction method can be one of 'erosion' "
-            "or 'dilation'. Got '%s'." % method
-        )
+        raise ValueError("Reconstruction method can be one of 'erosion' "
+                         "or 'dilation'. Got '%s'." % method)
 
     # TODO: potentially allow int64 if seed image is too large for int32
     #       skimage currently only supports int32, though
     int_dtype = np.int32
 
-    # Note: modified to allow images_dtype based on input dtype instead of
-    #       float64
+    # CuPy Backend: modified to allow images_dtype based on input dtype
+    #               instead of float64
     images_dtype = np.promote_types(seed.dtype, mask.dtype)
     images = cp.full(dims, pad_value, dtype=images_dtype)
     images[(0, *inside_slices)] = seed
@@ -194,20 +190,20 @@ def reconstruction(seed, mask, method="dilation", selem=None, offset=None):
     # a flattened array
     value_stride = np.array(images.strides[1:]) // images.dtype.itemsize
     image_stride = images.strides[0] // images.dtype.itemsize
-    selem_mgrid = np.mgrid[
-        [slice(-o, d - o) for d, o in zip(selem.shape, offset)]
-    ]
+    selem_mgrid = np.mgrid[[slice(-o, d - o)
+                            for d, o in zip(selem.shape, offset)]]
     selem_offsets = selem_mgrid[:, selem].transpose()
     nb_strides = [
         np.sum(value_stride * selem_offset) for selem_offset in selem_offsets
     ]
     nb_strides = np.array(nb_strides, int_dtype)
 
-    images = images.ravel()  # GRL: changed flatten to ravel to avoid copy
+    # CuPy Backend: changed flatten to ravel to avoid copy
+    images = images.ravel()
 
     # Erosion goes smallest to largest; dilation goes largest to smallest.
     index_sorted = cp.argsort(images).astype(int_dtype, copy=False)
-    if method == "dilation":
+    if method == 'dilation':
         index_sorted = index_sorted[::-1]
 
     # Make a linked list of pixels sorted by value. -1 is the list terminator.
@@ -218,9 +214,9 @@ def reconstruction(seed, mask, method="dilation", selem=None, offset=None):
     next[index_sorted[:-1]] = index_sorted[1:]
 
     # Cython inner-loop compares the rank of pixel values.
-    if method == "dilation":
+    if method == 'dilation':
         value_rank, value_map = rank_order(images)
-    elif method == "erosion":
+    elif method == 'erosion':
         value_rank, value_map = rank_order(-images)
         value_map = -value_map
 

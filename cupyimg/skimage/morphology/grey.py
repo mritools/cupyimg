@@ -8,14 +8,8 @@ from cupyimg.scipy import ndimage as ndi
 from .misc import default_selem
 from ..util import crop
 
-__all__ = [
-    "erosion",
-    "dilation",
-    "opening",
-    "closing",
-    "white_tophat",
-    "black_tophat",
-]
+__all__ = ['erosion', 'dilation', 'opening', 'closing', 'white_tophat',
+           'black_tophat']
 
 
 def _shift_selem(selem, shift_x, shift_y):
@@ -123,7 +117,7 @@ def pad_for_eccentric_selems(func):
                 axis_pad_width = 0
             pad_widths.append((axis_pad_width,) * 2)
         if padding:
-            image = cp.pad(image, pad_widths, mode="edge")
+            image = cp.pad(image, pad_widths, mode='edge')
             out_temp = cp.empty_like(image)
         else:
             out_temp = out
@@ -133,7 +127,6 @@ def pad_for_eccentric_selems(func):
         else:
             out = out_temp
         return out
-
     return func_out
 
 
@@ -415,7 +408,7 @@ def white_tophat(image, selem=None, out=None):
     selem = cp.asarray(selem)
     if out is image:
         opened = opening(image, selem)
-        if cp.issubdtype(opened.dtype, cp.bool_):
+        if cp.issubdtype(opened.dtype, bool):
             cp.logical_xor(out, opened, out=out)
         else:
             out -= opened
@@ -424,11 +417,11 @@ def white_tophat(image, selem=None, out=None):
         out = cp.empty_like(image)
     # work-around for NumPy deprecation warning for arithmetic
     # operations on bool arrays
-    if isinstance(image, cp.ndarray) and image.dtype == cp.bool:
+    if isinstance(image, cp.ndarray) and image.dtype == bool:
         image_ = image.view(dtype=cp.uint8)
     else:
         image_ = image
-    if isinstance(out, cp.ndarray) and out.dtype == cp.bool:
+    if isinstance(out, cp.ndarray) and out.dtype == bool:
         out_ = out.view(dtype=cp.uint8)
     else:
         out_ = out
@@ -492,7 +485,7 @@ def black_tophat(image, selem=None, out=None):
     else:
         original = image
     out = closing(image, selem, out=out)
-    if cp.issubdtype(out.dtype, cp.bool_):
+    if cp.issubdtype(out.dtype, bool):
         cp.logical_xor(out, original, out=out)
     else:
         out -= original
