@@ -49,15 +49,14 @@ def test_PSNR_vs_IPOL():
 
 def test_PSNR_float():
     p_uint8 = peak_signal_noise_ratio(cam, cam_noisy)
-    p_float64 = peak_signal_noise_ratio(
-        cam / 255.0, cam_noisy / 255.0, data_range=1
-    )
+    p_float64 = peak_signal_noise_ratio(cam / 255.0, cam_noisy / 255.0,
+                                        data_range=1)
     assert_almost_equal(p_uint8, p_float64, decimal=5)
 
     # mixed precision inputs
-    p_mixed = peak_signal_noise_ratio(
-        cam / 255.0, cam_noisy.astype(np.float32) / 255.0, data_range=1
-    )
+    p_mixed = peak_signal_noise_ratio(cam / 255.0,
+                                      cam_noisy.astype(np.float32) / 255.0,
+                                      data_range=1)
     assert_almost_equal(p_mixed, p_float64, decimal=5)
 
     # mismatched dtype results in a warning if data_range is unspecified
@@ -76,35 +75,27 @@ def test_PSNR_errors():
 
 def test_NRMSE():
     x = cp.ones(4)
-    y = cp.asarray([0.0, 2.0, 2.0, 2.0])
-    assert_equal(
-        normalized_root_mse(y, x, normalization="mean"), 1 / cp.mean(y)
-    )
-    assert_equal(
-        normalized_root_mse(y, x, normalization="euclidean"), 1 / cp.sqrt(3)
-    )
-    assert_equal(
-        normalized_root_mse(y, x, normalization="min-max"),
-        1 / (y.max() - y.min()),
-    )
+    y = cp.array([0.0, 2.0, 2.0, 2.0])
+    assert_equal(normalized_root_mse(y, x, normalization='mean'),
+                 1 / np.mean(y))
+    assert_equal(normalized_root_mse(y, x, normalization='euclidean'),
+                 1 / np.sqrt(3))
+    assert_equal(normalized_root_mse(y, x, normalization='min-max'),
+                 1 / (y.max() - y.min()))
 
     # mixed precision inputs are allowed
-    assert_almost_equal(
-        normalized_root_mse(y, x.astype(cp.float32), normalization="min-max"),
-        1 / (y.max() - y.min()),
-    )
+    assert_almost_equal(normalized_root_mse(y, x.astype(cp.float32),
+                                            normalization='min-max'),
+                        1 / (y.max() - y.min()))
 
 
 def test_NRMSE_no_int_overflow():
     camf = cam.astype(cp.float32)
     cam_noisyf = cam_noisy.astype(cp.float32)
-    assert_almost_equal(
-        mean_squared_error(cam, cam_noisy), mean_squared_error(camf, cam_noisyf)
-    )
-    assert_almost_equal(
-        normalized_root_mse(cam, cam_noisy),
-        normalized_root_mse(camf, cam_noisyf),
-    )
+    assert_almost_equal(mean_squared_error(cam, cam_noisy),
+                        mean_squared_error(camf, cam_noisyf))
+    assert_almost_equal(normalized_root_mse(cam, cam_noisy),
+                        normalized_root_mse(camf, cam_noisyf))
 
 
 def test_NRMSE_errors():

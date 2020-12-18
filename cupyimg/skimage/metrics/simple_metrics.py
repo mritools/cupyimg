@@ -7,11 +7,9 @@ from skimage._shared.utils import warn, check_shape_equality
 import cupy as cp
 
 
-__all__ = [
-    "mean_squared_error",
-    "normalized_root_mse",
-    "peak_signal_noise_ratio",
-]
+__all__ = ['mean_squared_error',
+           'normalized_root_mse',
+           'peak_signal_noise_ratio']
 
 
 def _as_floats(image0, image1):
@@ -53,7 +51,7 @@ def mean_squared_error(image0, image1):
     return cp.mean(diff * diff, dtype=cp.float64)
 
 
-def normalized_root_mse(image_true, image_test, *, normalization="euclidean"):
+def normalized_root_mse(image_true, image_test, *, normalization='euclidean'):
     """
     Compute the normalized root mean-squared error (NRMSE) between two
     images.
@@ -103,11 +101,11 @@ def normalized_root_mse(image_true, image_test, *, normalization="euclidean"):
 
     # Ensure that both 'Euclidean' and 'euclidean' match
     normalization = normalization.lower()
-    if normalization == "euclidean":
+    if normalization == 'euclidean':
         denom = cp.sqrt(cp.mean((image_true * image_true), dtype=cp.float64))
-    elif normalization == "min-max":
+    elif normalization == 'min-max':
         denom = image_true.max() - image_true.min()
-    elif normalization == "mean":
+    elif normalization == 'mean':
         denom = image_true.mean()
     else:
         raise ValueError("Unsupported norm_type")
@@ -149,18 +147,14 @@ def peak_signal_noise_ratio(image_true, image_test, *, data_range=None):
 
     if data_range is None:
         if image_true.dtype != image_test.dtype:
-            warn(
-                "Inputs have mismatched dtype.  Setting data_range based on "
-                "im_true.",
-                stacklevel=2,
-            )
+            warn("Inputs have mismatched dtype.  Setting data_range based on "
+                 "im_true.", stacklevel=2)
         dmin, dmax = dtype_range[image_true.dtype.type]
         true_min, true_max = cp.min(image_true), cp.max(image_true)
         if true_max > dmax or true_min < dmin:
             raise ValueError(
                 "im_true has intensity values outside the range expected for "
-                "its data type.  Please manually specify the data_range"
-            )
+                "its data type.  Please manually specify the data_range")
         if true_min >= 0:
             # most common case (255 for uint8, 1 for float)
             data_range = dmax
@@ -171,31 +165,3 @@ def peak_signal_noise_ratio(image_true, image_test, *, data_range=None):
 
     err = mean_squared_error(image_true, image_test)
     return 10 * cp.log10((data_range * data_range) / err)
-
-
-def _pad_to(arr, shape):
-    """Pad an array with trailing zeros to a given target shape.
-
-    Parameters
-    ----------
-    arr : ndarray
-        The input array.
-    shape : tuple
-        The target shape.
-
-    Returns
-    -------
-    padded : ndarray
-        The padded array.
-
-    Examples
-    --------
-    >>> _pad_to(np.ones((1, 1), dtype=int), (1, 3))
-    array([[1, 0, 0]])
-    """
-    if not all(s >= i for s, i in zip(shape, arr.shape)):
-        raise ValueError(
-            "Target shape must be strictly greater " "than input shape."
-        )
-    padding = [(0, s - i) for s, i in zip(shape, arr.shape)]
-    return cp.pad(arr, pad_width=padding, mode="constant", constant_values=0)

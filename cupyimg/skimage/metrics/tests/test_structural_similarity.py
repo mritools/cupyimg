@@ -29,7 +29,6 @@ def test_structural_similarity_patch_range():
     X = (rstate.rand(N, N) * 255).astype(cp.uint8)
     Y = (rstate.rand(N, N) * 255).astype(cp.uint8)
 
-    # grlee77: increase value from 0.1 to 0.15
     assert structural_similarity(X, Y, win_size=N) < 0.1
     assert_equal(structural_similarity(X, X, win_size=N), 1)
 
@@ -60,7 +59,7 @@ def test_structural_similarity_image():
 
 # Because we are forcing a random seed state, it is probably good to test
 # against a few seeds in case on seed gives a particularly bad example
-@pytest.mark.parametrize("seed", [1, 2, 3, 5, 8, 13])
+@pytest.mark.parametrize('seed', [1, 2, 3, 5, 8, 13])
 def test_structural_similarity_grad(seed):
     N = 30
     # NOTE: This test is known to randomly fail on some systems (Mac OS X 10.6)
@@ -72,8 +71,8 @@ def test_structural_similarity_grad(seed):
     # X = cp.random.rand(N, N) * 255
     # Y = cp.random.rand(N, N) * 255
     rnd = np.random.RandomState(seed)
-    X = cp.asarray(rnd.rand(N, N) * 255)
-    Y = cp.asarray(rnd.rand(N, N) * 255)
+    X = cp.array(rnd.rand(N, N) * 255)
+    Y = cp.array(rnd.rand(N, N) * 255)
 
     f = structural_similarity(X, Y, data_range=255)
     g = structural_similarity(X, Y, data_range=255, gradient=True)
