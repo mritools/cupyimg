@@ -44,9 +44,6 @@ def test_block_reduce_mean():
 
 
 def test_block_reduce_median():
-    if not hasattr(cp, "median"):
-        pytest.skip("cupy.median is not available")
-        return
     image1 = cp.arange(4 * 6).reshape(4, 6)
     out1 = block_reduce(image1, (2, 3), func=cp.median)
     # fmt: off
@@ -140,9 +137,8 @@ def test_func_kwargs_different_dtype():
                      dtype=cp.float64)
     # fmt: on
 
-    out = block_reduce(
-        image, (2, 2), func=cp.mean, func_kwargs={"dtype": cp.float16}
-    )
+    out = block_reduce(image, (2, 2), func=cp.mean,
+                       func_kwargs={'dtype': cp.float16})
     expected = cp.array([[0.6855, 0.3164], [0.4922, 0.521]], dtype=cp.float16)
 
     # Note: had to set decimal=3 for float16 to pass here when using CuPy

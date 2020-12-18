@@ -113,7 +113,7 @@ def moments_coords_central(coords, center=None, order=3):
         # This format corresponds to coordinate tuples as returned by
         # e.g. cp.nonzero: (row_coords, column_coords).
         # We represent them as an npoints x ndim array.
-        coords = cp.column_stack(coords)
+        coords = cp.stack(coords, axis=-1)
     check_nD(coords, 2)
     ndim = coords.shape[1]
     if center is None:
@@ -124,7 +124,8 @@ def moments_coords_central(coords, center=None, order=3):
     # center the coordinates
     coords = coords.astype(float) - center
 
-    # Note: for efficiency, sum over the last axis (which is memory contiguous)
+    # CuPy backend: for efficiency, sum over the last axis
+    #               (which is memory contiguous)
     # generate all possible exponents for each axis in the given set of points
     # produces a matrix of shape (order + 1, D, N)
     coords = coords.T
@@ -287,7 +288,7 @@ def moments_normalized(mu, order=3):
 
     Notes
     -----
-    Do to the small array sizes, this function should be faster on the CPU.
+    Due to the small array sizes, this function should be faster on the CPU.
     Consider transfering ``mu`` to the host and running
     ``skimage.measure.moments_normalized``.
 
@@ -334,7 +335,7 @@ def moments_hu(nu):
 
     Notes
     -----
-    Do to the small array sizes, this function will be faster on the CPU.
+    Due to the small array sizes, this function will be faster on the CPU.
     Consider transfering ``nu`` to the host and running
     ``skimage.measure.moments_hu`` if the moments are not needed on the
     device.
@@ -367,7 +368,7 @@ def moments_hu(nu):
 
     from skimage.measure import moments_hu
 
-    # Due to small arrays involved, just transfer to/from the CPU
+    # TODO: Due to small arrays involved, just transfer to/from the CPU
     # implementation.
     return cp.asarray(moments_hu(cp.asnumpy(nu)))
 

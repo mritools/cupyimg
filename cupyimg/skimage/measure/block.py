@@ -61,9 +61,8 @@ def block_reduce(image, block_size, func=cp.sum, cval=0, func_kwargs=None):
     """
 
     if len(block_size) != image.ndim:
-        raise ValueError(
-            "`block_size` must have the same length " "as `image.shape`."
-        )
+        raise ValueError("`block_size` must have the same length "
+                         "as `image.shape`.")
 
     if func_kwargs is None:
         func_kwargs = {}
@@ -71,23 +70,19 @@ def block_reduce(image, block_size, func=cp.sum, cval=0, func_kwargs=None):
     pad_width = []
     for i in range(len(block_size)):
         if block_size[i] < 1:
-            raise ValueError(
-                "Down-sampling factors must be >= 1. Use "
-                "`skimage.transform.resize` to up-sample an "
-                "image."
-            )
+            raise ValueError("Down-sampling factors must be >= 1. Use "
+                             "`skimage.transform.resize` to up-sample an "
+                             "image.")
         if image.shape[i] % block_size[i] != 0:
             after_width = block_size[i] - (image.shape[i] % block_size[i])
         else:
             after_width = 0
         pad_width.append((0, after_width))
 
-    image = cp.pad(
-        image, pad_width=pad_width, mode="constant", constant_values=cval
-    )
+    image = cp.pad(image, pad_width=pad_width, mode='constant',
+                   constant_values=cval)
 
     blocked = view_as_blocks(image, block_size)
 
-    return func(
-        blocked, axis=tuple(range(image.ndim, blocked.ndim)), **func_kwargs
-    )
+    return func(blocked, axis=tuple(range(image.ndim, blocked.ndim)),
+                **func_kwargs)

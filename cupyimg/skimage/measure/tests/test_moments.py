@@ -63,10 +63,8 @@ def test_moments_coords():
     mu_image = moments(image)
 
     coords = cp.asarray(
-        np.array(
-            [[r, c] for r in range(13, 17) for c in range(13, 17)],
-            dtype=cp.double,
-        )
+        np.array([[r, c] for r in range(13, 17)
+                  for c in range(13, 17)], dtype=np.double)
     )
     mu_coords = moments_coords(coords)
     assert_array_almost_equal(mu_coords, mu_image)
@@ -96,10 +94,8 @@ def test_moments_central_coords():
     mu_image = moments_central(image, (14.5, 14.5))
 
     coords = cp.asarray(
-        np.array(
-            [[r, c] for r in range(16, 20) for c in range(16, 20)],
-            dtype=cp.double,
-        )
+        np.array([[r, c] for r in range(16, 20)
+                  for c in range(16, 20)], dtype=np.double)
     )
     mu_coords = moments_coords_central(coords, (14.5, 14.5))
     assert_array_almost_equal(mu_coords, mu_image)
@@ -192,27 +188,24 @@ def test_inertia_tensor_3d():
     # Check that axis has rotated by expected amount
     pi, cos, sin = np.pi, np.cos, np.sin
     # fmt: off
-    R = cp.asarray([[cos(pi/6), -sin(pi/6), 0],   # noqa
-                    [sin(pi/6),  cos(pi/6), 0],   # noqa
-                    [        0,          0, 1]])  # noqa
+    R = cp.array([[cos(pi/6), -sin(pi/6), 0],   # noqa
+                  [sin(pi/6),  cos(pi/6), 0],   # noqa
+                  [        0,          0, 1]])  # noqa
     # fmt: on
     expected_vr = R @ v0
-    assert cp.allclose(vr, expected_vr, atol=1e-3, rtol=0.01) or cp.allclose(
-        -vr, expected_vr, atol=1e-3, rtol=0.01
-    )
+    assert (cp.allclose(vr, expected_vr, atol=1e-3, rtol=0.01) or
+            cp.allclose(-vr, expected_vr, atol=1e-3, rtol=0.01))
 
 
 def test_inertia_tensor_eigvals():
     # Floating point precision problems could make a positive
     # semidefinite matrix have an eigenvalue that is very slightly
     # negative.  Check that we have caught and fixed this problem.
-    image = cp.asarray(
-        [
-            [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
-        ]
-    )
+    # fmt: off
+    image = cp.array([[1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+                      [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1]])
+    # fmt: on
     # mu = np.array([[3, 0, 98], [0, 14, 0], [2, 0, 98]])
     eigvals = inertia_tensor_eigvals(image=image)
     assert min(eigvals) >= 0

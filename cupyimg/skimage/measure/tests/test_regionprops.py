@@ -23,20 +23,20 @@ from cupyimg.skimage.measure._regionprops import (
 )
 
 
+# fmt: off
 SAMPLE = cp.array(
-    [
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-        [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-        [1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0],
-        [0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1],
-        [0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1],
-    ]
+    [[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0],
+     [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+     [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+     [1, 0, 1, 0, 0, 1, 1, 0, 1, 1, 0, 0, 1, 1, 1, 1, 1, 0],
+     [0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1],
+     [0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1]]
 )
+# fmt: on
 INTENSITY_SAMPLE = SAMPLE.copy()
 INTENSITY_SAMPLE[1, 9:11] = 2
 
@@ -93,24 +93,26 @@ def test_ndim():
         regionprops(cp.zeros((10, 10, 10, 2), dtype=cp.int))
 
 
-# def test_feret_diameter_max():
-#     # comparator result is based on SAMPLE from manually-inspected computations
-#     comparator_result = 18
-#     test_result = regionprops(SAMPLE)[0].feret_diameter_max
-#     assert cp.abs(test_result - comparator_result) < 1
-#     # square, test that Feret diameter is sqrt(2) * square side
-#     img = cp.zeros((20, 20), dtype=cp.uint8)
-#     img[2:-2, 2:-2] = 1
-#     feret_diameter_max = regionprops(img)[0].feret_diameter_max
-#     assert np.abs(feret_diameter_max - 16 * math.sqrt(2)) < 1
+@pytest.mark.skip('feret_diameter_max not implmented on the GPU')
+def test_feret_diameter_max():
+    # comparator result is based on SAMPLE from manually-inspected computations
+    comparator_result = 18
+    test_result = regionprops(SAMPLE)[0].feret_diameter_max
+    assert cp.abs(test_result - comparator_result) < 1
+    # square, test that Feret diameter is sqrt(2) * square side
+    img = cp.zeros((20, 20), dtype=cp.uint8)
+    img[2:-2, 2:-2] = 1
+    feret_diameter_max = regionprops(img)[0].feret_diameter_max
+    assert cp.abs(feret_diameter_max - 16 * math.sqrt(2)) < 1
 
 
-# def test_feret_diameter_max_3d():
-#     img = cp.zeros((20, 20), dtype=cp.uint8)
-#     img[2:-2, 2:-2] = 1
-#     img_3d = cp.dstack((img,) * 3)
-#     feret_diameter_max = regionprops(img_3d)[0].feret_diameter_max
-#     assert cp.abs(feret_diameter_max - 16 * math.sqrt(2)) < 1
+@pytest.mark.skip('feret_diameter_max not implmented on the GPU')
+def test_feret_diameter_max_3d():
+    img = cp.zeros((20, 20), dtype=cp.uint8)
+    img[2:-2, 2:-2] = 1
+    img_3d = cp.dstack((img,) * 3)
+    feret_diameter_max = regionprops(img_3d)[0].feret_diameter_max
+    assert cp.abs(feret_diameter_max - 16 * math.sqrt(2)) < 1
 
 
 def test_area():
@@ -136,7 +138,7 @@ def test_bbox():
 
 
 def test_bbox_area():
-    padded = cp.pad(SAMPLE, 5, mode="constant")
+    padded = cp.pad(SAMPLE, 5, mode='constant')
     bbox_area = regionprops(padded)[0].bbox_area
     assert_array_almost_equal(bbox_area, SAMPLE.size)
 
@@ -173,20 +175,20 @@ def test_convex_area():
 
 def test_convex_image():
     img = regionprops(SAMPLE)[0].convex_image
-    ref = cp.asarray(
-        [
-            [0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
-            [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
-            [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
-            [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
-            [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-            [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-        ],
+    # fmt: off
+    ref = cp.array(
+        [[0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0],
+         [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+         [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0],
+         [0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0],
+         [0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+         [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+         [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+         [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]]
     )
+    # fmt: on
     assert_array_equal(img, ref)
 
 
@@ -267,17 +269,17 @@ def test_extent():
 
 def test_moments_hu():
     hu = regionprops(SAMPLE)[0].moments_hu
-    ref = cp.asarray(
-        [
-            3.27117627e-01,
-            2.63869194e-02,
-            2.35390060e-02,
-            1.23151193e-03,
-            1.38882330e-06,
-            -2.72586158e-05,
-            -6.48350653e-06,
-        ]
-    )
+    # fmt: off
+    ref = cp.array([
+        3.27117627e-01,
+        2.63869194e-02,
+        2.35390060e-02,
+        1.23151193e-03,
+        1.38882330e-06,
+        -2.72586158e-05,
+        -6.48350653e-06
+    ])
+    # fmt: on
     # bug in OpenCV caused in Central Moments calculation?
     assert_array_almost_equal(hu, ref)
 
@@ -321,23 +323,20 @@ def test_major_axis_length():
 
 
 def test_max_intensity():
-    intensity = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[
-        0
-    ].max_intensity
+    intensity = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE
+                            )[0].max_intensity
     assert_almost_equal(intensity, 2)
 
 
 def test_mean_intensity():
-    intensity = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[
-        0
-    ].mean_intensity
+    intensity = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE
+                            )[0].mean_intensity
     assert_almost_equal(intensity, 1.02777777777777)
 
 
 def test_min_intensity():
-    intensity = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[
-        0
-    ].min_intensity
+    intensity = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE
+                            )[0].min_intensity
     assert_almost_equal(intensity, 1)
 
 
@@ -395,7 +394,7 @@ def test_perimeter():
     per = regionprops(SAMPLE)[0].perimeter
     assert_almost_equal(per, 55.2487373415)
 
-    per = perimeter(SAMPLE.astype("double"), neighbourhood=8)
+    per = perimeter(SAMPLE.astype('double'), neighbourhood=8)
     assert_almost_equal(per, 46.8284271247)
 
 
@@ -403,7 +402,7 @@ def test_perimeter_crofton():
     per = regionprops(SAMPLE)[0].perimeter_crofton
     assert_almost_equal(per, 61.0800637973)
 
-    per = perimeter_crofton(SAMPLE.astype("double"), directions=2)
+    per = perimeter_crofton(SAMPLE.astype('double'), directions=2)
     assert_almost_equal(per, 64.4026493985)
 
 
@@ -413,76 +412,71 @@ def test_solidity():
 
 
 def test_weighted_moments_central():
-    wmu = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[
-        0
-    ].weighted_moments_central
+    wmu = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE
+                      )[0].weighted_moments_central
     # fmt: off
-    ref = cp.asarray(
-        [
-            [7.4000000000e01, 3.7303493627e-14, 1.2602837838e03, -7.6561796932e02],
-            [-2.1316282073e-13, -8.7837837838e01, 2.1571526662e03, -4.2385971907e03],
-            [4.7837837838e02, -1.4801314828e02, 6.6989799420e03, -9.9501164076e03],
-            [-7.5943608473e02, -1.2714707125e03, 1.5304076361e04, -3.3156729271e04],
-        ]
-    )
+    ref = cp.array(
+        [[7.4000000000e+01, 3.7303493627e-14, 1.2602837838e+03,
+          -7.6561796932e+02],
+         [-2.1316282073e-13, -8.7837837838e+01, 2.1571526662e+03,
+          -4.2385971907e+03],
+         [4.7837837838e+02, -1.4801314828e+02, 6.6989799420e+03,
+          -9.9501164076e+03],
+         [-7.5943608473e+02, -1.2714707125e+03, 1.5304076361e+04,
+          -3.3156729271e+04]])
     # fmt: on
-
     np.set_printoptions(precision=10)
     assert_array_almost_equal(wmu, ref)
 
 
 def test_weighted_centroid():
-    centroid = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[
-        0
-    ].weighted_centroid
+    centroid = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE
+                           )[0].weighted_centroid
     assert_array_almost_equal(centroid, (5.540540540540, 9.445945945945))
 
 
 def test_weighted_moments_hu():
-    whu = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[
-        0
-    ].weighted_moments_hu
-    ref = cp.asarray(
-        [
-            3.1750587329e-01,
-            2.1417517159e-02,
-            2.3609322038e-02,
-            1.2565683360e-03,
-            8.3014209421e-07,
-            -3.5073773473e-05,
-            -6.7936409056e-06,
-        ]
-    )
+    whu = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE
+                      )[0].weighted_moments_hu
+    # fmt: off
+    ref = cp.array([
+        3.1750587329e-01,
+        2.1417517159e-02,
+        2.3609322038e-02,
+        1.2565683360e-03,
+        8.3014209421e-07,
+        -3.5073773473e-05,
+        -6.7936409056e-06
+    ])
+    # fmt: on
     assert_array_almost_equal(whu, ref)
 
 
 def test_weighted_moments():
-    wm = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[
-        0
-    ].weighted_moments
-    ref = cp.asarray(
-        [
-            [7.4000000e01, 6.9900000e02, 7.8630000e03, 9.7317000e04],
-            [4.1000000e02, 3.7850000e03, 4.4063000e04, 5.7256700e05],
-            [2.7500000e03, 2.4855000e04, 2.9347700e05, 3.9007170e06],
-            [1.9778000e04, 1.7500100e05, 2.0810510e06, 2.8078871e07],
-        ]
+    wm = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE
+                     )[0].weighted_moments
+    # fmt: off
+    ref = cp.array(
+        [[7.4000000e+01, 6.9900000e+02, 7.8630000e+03, 9.7317000e+04],
+         [4.1000000e+02, 3.7850000e+03, 4.4063000e+04, 5.7256700e+05],
+         [2.7500000e+03, 2.4855000e+04, 2.9347700e+05, 3.9007170e+06],
+         [1.9778000e+04, 1.7500100e+05, 2.0810510e+06, 2.8078871e+07]]
     )
+    # fmt: on
     assert_array_almost_equal(wm, ref)
 
 
 def test_weighted_moments_normalized():
-    wnu = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[
-        0
-    ].weighted_moments_normalized
-    ref = cp.asarray(
-        [
-            [cp.nan, cp.nan, 0.2301467830, -0.0162529732],
-            [cp.nan, -0.0160405109, 0.0457932622, -0.0104598869],
-            [0.0873590903, -0.0031421072, 0.0165315478, -0.0028544152],
-            [-0.0161217406, -0.0031376984, 0.0043903193, -0.0011057191],
-        ]
+    wnu = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE
+                      )[0].weighted_moments_normalized
+    # fmt: off
+    ref = np.array(
+        [[np.nan,        np.nan, 0.2301467830, -0.0162529732],
+         [np.nan, -0.0160405109, 0.0457932622, -0.0104598869],
+         [0.0873590903, -0.0031421072, 0.0165315478, -0.0028544152],
+         [-0.0161217406, -0.0031376984, 0.0043903193, -0.0011057191]]
     )
+    # fmt: on
     assert_array_almost_equal(wnu, ref)
 
 
@@ -511,7 +505,7 @@ def test_invalid():
 
 
 def test_invalid_size():
-    wrong_intensity_sample = cp.asarray([[1], [1]])
+    wrong_intensity_sample = cp.array([[1], [1]])
     with pytest.raises(ValueError):
         regionprops(SAMPLE, wrong_intensity_sample)
 
@@ -568,15 +562,15 @@ def test_docstrings_and_props():
     region = regionprops(SAMPLE)[0]
 
     docs = _parse_docs()
-    props = [m for m in dir(region) if not m.startswith("_")]
+    props = [m for m in dir(region) if not m.startswith('_')]
 
     nr_docs_parsed = len(docs)
     nr_props = len(props)
     if has_docstrings:
         assert_equal(nr_docs_parsed, nr_props)
-        ds = docs["weighted_moments_normalized"]
-        assert "iteration" not in ds
-        assert len(ds.split("\n")) > 3
+        ds = docs['weighted_moments_normalized']
+        assert 'iteration' not in ds
+        assert len(ds.split('\n')) > 3
     else:
         assert_equal(nr_docs_parsed, 0)
 
@@ -584,69 +578,47 @@ def test_docstrings_and_props():
 def test_props_to_dict():
     regions = regionprops(SAMPLE)
     out = _props_to_dict(regions)
-    assert out == {
-        "label": cp.asarray([1]),
-        "bbox-0": cp.asarray([0]),
-        "bbox-1": cp.asarray([0]),
-        "bbox-2": cp.asarray([10]),
-        "bbox-3": cp.asarray([18]),
-    }
+    assert out == {'label': cp.array([1]),
+                   'bbox-0': cp.array([0]), 'bbox-1': cp.array([0]),
+                   'bbox-2': cp.array([10]), 'bbox-3': cp.array([18])}
 
     regions = regionprops(SAMPLE)
-    out = _props_to_dict(
-        regions, properties=("label", "area", "bbox"), separator="+"
-    )
-    assert out == {
-        "label": cp.asarray([1]),
-        "area": cp.asarray([72]),
-        "bbox+0": cp.asarray([0]),
-        "bbox+1": cp.asarray([0]),
-        "bbox+2": cp.asarray([10]),
-        "bbox+3": cp.asarray([18]),
-    }
+    out = _props_to_dict(regions, properties=('label', 'area', 'bbox'),
+                         separator='+')
+    assert out == {'label': cp.array([1]), 'area': cp.array([72]),
+                   'bbox+0': cp.array([0]), 'bbox+1': cp.array([0]),
+                   'bbox+2': cp.array([10]), 'bbox+3': cp.array([18])}
 
 
 def test_regionprops_table():
     out = regionprops_table(SAMPLE)
-    assert out == {
-        "label": cp.asarray([1]),
-        "bbox-0": cp.asarray([0]),
-        "bbox-1": cp.asarray([0]),
-        "bbox-2": cp.asarray([10]),
-        "bbox-3": cp.asarray([18]),
-    }
+    assert out == {'label': cp.array([1]),
+                   'bbox-0': cp.array([0]), 'bbox-1': cp.array([0]),
+                   'bbox-2': cp.array([10]), 'bbox-3': cp.array([18])}
 
-    out = regionprops_table(
-        SAMPLE, properties=("label", "area", "bbox"), separator="+"
-    )
-    assert out == {
-        "label": cp.asarray([1]),
-        "area": cp.asarray([72]),
-        "bbox+0": cp.asarray([0]),
-        "bbox+1": cp.asarray([0]),
-        "bbox+2": cp.asarray([10]),
-        "bbox+3": cp.asarray([18]),
-    }
+    out = regionprops_table(SAMPLE, properties=('label', 'area', 'bbox'),
+                            separator='+')
+    assert out == {'label': cp.array([1]), 'area': cp.array([72]),
+                   'bbox+0': cp.array([0]), 'bbox+1': cp.array([0]),
+                   'bbox+2': cp.array([10]), 'bbox+3': cp.array([18])}
 
 
 def test_regionprops_table_no_regions():
-    out = regionprops_table(
-        cp.zeros((2, 2), dtype=int),
-        properties=("label", "area", "bbox"),
-        separator="+",
-    )
+    out = regionprops_table(cp.zeros((2, 2), dtype=int),
+                            properties=('label', 'area', 'bbox'),
+                            separator='+')
     assert len(out) == 6
-    assert len(out["label"]) == 0
-    assert len(out["area"]) == 0
-    assert len(out["bbox+0"]) == 0
-    assert len(out["bbox+1"]) == 0
-    assert len(out["bbox+2"]) == 0
-    assert len(out["bbox+3"]) == 0
+    assert len(out['label']) == 0
+    assert len(out['area']) == 0
+    assert len(out['bbox+0']) == 0
+    assert len(out['bbox+1']) == 0
+    assert len(out['bbox+2']) == 0
+    assert len(out['bbox+3']) == 0
 
 
 def test_props_dict_complete():
     region = regionprops(SAMPLE)[0]
-    properties = [s for s in dir(region) if not s.startswith("_")]
+    properties = [s for s in dir(region) if not s.startswith('_')]
     assert set(properties) == set(PROPS.values())
 
 
@@ -655,7 +627,7 @@ def test_column_dtypes_complete():
 
 
 def test_column_dtypes_correct():
-    msg = "mismatch with expected type,"
+    msg = 'mismatch with expected type,'
     region = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[0]
     for col in COL_DTYPES:
         r = region[col]
@@ -678,22 +650,24 @@ def test_column_dtypes_correct():
             t = type(r.ravel()[0].item())
 
         if cp.issubdtype(t, cp.floating):
-            assert (
-                COL_DTYPES[col] == float
-            ), f"{col} dtype {t} {msg} {COL_DTYPES[col]}"
+            assert COL_DTYPES[col] == float, (
+                f'{col} dtype {t} {msg} {COL_DTYPES[col]}'
+            )
         elif cp.issubdtype(t, cp.integer):
-            assert (
-                COL_DTYPES[col] == int
-            ), f"{col} dtype {t} {msg} {COL_DTYPES[col]}"
+            assert COL_DTYPES[col] == int, (
+                f'{col} dtype {t} {msg} {COL_DTYPES[col]}'
+            )
         else:
-            assert False, f"{col} dtype {t} {msg} {COL_DTYPES[col]}"
+            assert False, (
+                f'{col} dtype {t} {msg} {COL_DTYPES[col]}'
+            )
 
 
 def test_deprecated_coords_argument():
-    with expected_warnings(["coordinates keyword argument"]):
-        regionprops(SAMPLE, coordinates="rc")
+    with expected_warnings(['coordinates keyword argument']):
+        regionprops(SAMPLE, coordinates='rc')
     with pytest.raises(ValueError):
-        regionprops(SAMPLE, coordinates="xy")
+        regionprops(SAMPLE, coordinates='xy')
 
 
 def pixelcount(regionmask):
@@ -719,11 +693,9 @@ def test_extra_properties():
 
 
 def test_extra_properties_intensity():
-    region = regionprops(
-        SAMPLE,
-        intensity_image=INTENSITY_SAMPLE,
-        extra_properties=(median_intensity,),
-    )[0]
+    region = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE,
+                         extra_properties=(median_intensity,)
+                         )[0]
     assert region.median_intensity == cp.median(INTENSITY_SAMPLE[SAMPLE == 1])
 
 
@@ -744,24 +716,21 @@ def test_extra_properties_nr_args():
 
 def test_extra_properties_mixed():
     # mixed properties, with and without intensity
-    region = regionprops(
-        SAMPLE,
-        intensity_image=INTENSITY_SAMPLE,
-        extra_properties=(median_intensity, pixelcount),
-    )[0]
+    region = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE,
+                         extra_properties=(median_intensity, pixelcount)
+                         )[0]
     assert region.median_intensity == cp.median(INTENSITY_SAMPLE[SAMPLE == 1])
     assert region.pixelcount == cp.sum(SAMPLE == 1)
 
 
 def test_extra_properties_table():
-    out = regionprops_table(
-        SAMPLE_MULTIPLE,
-        intensity_image=INTENSITY_SAMPLE_MULTIPLE,
-        properties=("label",),
-        extra_properties=(median_intensity, pixelcount),
-    )
-    assert_array_almost_equal(out["median_intensity"], np.array([2.0, 4.0]))
-    assert_array_equal(out["pixelcount"], np.array([10, 2]))
+    out = regionprops_table(SAMPLE_MULTIPLE,
+                            intensity_image=INTENSITY_SAMPLE_MULTIPLE,
+                            properties=('label',),
+                            extra_properties=(median_intensity, pixelcount)
+                            )
+    assert_array_almost_equal(out['median_intensity'], np.array([2.0, 4.0]))
+    assert_array_equal(out['pixelcount'], np.array([10, 2]))
 
 
 def test_multichannel():

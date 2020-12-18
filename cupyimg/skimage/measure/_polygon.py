@@ -51,8 +51,8 @@ def approximate_polygon(coords, tolerance):
         segment_dist = c0 * cp.sin(segment_angle) + r0 * cp.cos(segment_angle)
 
         # select points in-between line segment
-        segment_coords = coords[start + 1 : end, :]
-        segment_dists = dists[start + 1 : end]
+        segment_coords = coords[start + 1:end, :]
+        segment_dists = dists[start + 1:end]
 
         # check whether to take perpendicular or euclidean distance with
         # inner product of vectors
@@ -65,13 +65,12 @@ def approximate_polygon(coords, tolerance):
         # vectors points -> start and end projected on start -> end vector
         projected_lengths0 = dr0 * dr + dc0 * dc
         projected_lengths1 = -dr1 * dr - dc1 * dc
-        perp = cp.logical_and(projected_lengths0 > 0, projected_lengths1 > 0)
+        perp = cp.logical_and(projected_lengths0 > 0,
+                              projected_lengths1 > 0)
         eucl = cp.logical_not(perp)
-
-        tmp = segment_coords[perp]
         segment_dists[perp] = cp.abs(
-            tmp[:, 0] * cp.cos(segment_angle)
-            + tmp[:, 1] * cp.sin(segment_angle)
+            segment_coords[perp, 0] * cp.cos(segment_angle)
+            + segment_coords[perp, 1] * cp.sin(segment_angle)
             - segment_dist
         )
         segment_dists[eucl] = cp.minimum(
@@ -134,30 +133,27 @@ def subdivide_polygon(coords, degree=2, preserve_ends=False):
     .. [1] http://mrl.nyu.edu/publications/subdiv-course2000/coursenotes00.pdf
     """
     if degree not in _SUBDIVISION_MASKS:
-        raise ValueError(
-            "Invalid B-Spline degree. Only degree 1 - 7 is " "supported."
-        )
+        raise ValueError("Invalid B-Spline degree. Only degree 1 - 7 is "
+                         "supported.")
 
     circular = cp.all(coords[0, :] == coords[-1, :])
 
-    method = "valid"
+    method = 'valid'
     if circular:
         # remove last coordinate because of wrapping
         coords = coords[:-1, :]
         # circular convolution by wrapping boundaries
-        method = "same"
+        method = 'same'
 
     mask_even, mask_odd = _SUBDIVISION_MASKS[degree]
     # divide by total weight
-    mask_even = cp.array(mask_even, cp.float) / (2 ** degree)
-    mask_odd = cp.array(mask_odd, cp.float) / (2 ** degree)
+    mask_even = cp.array(mask_even, float) / (2 ** degree)
+    mask_odd = cp.array(mask_odd, float) / (2 ** degree)
 
-    even = signal.convolve2d(
-        coords.T, cp.atleast_2d(mask_even), mode=method, boundary="wrap"
-    )
-    odd = signal.convolve2d(
-        coords.T, cp.atleast_2d(mask_odd), mode=method, boundary="wrap"
-    )
+    even = signal.convolve2d(coords.T, cp.atleast_2d(mask_even), mode=method,
+                             boundary='wrap')
+    odd = signal.convolve2d(coords.T, cp.atleast_2d(mask_odd), mode=method,
+                            boundary='wrap')
 
     out = cp.zeros((even.shape[1] + odd.shape[1], 2))
     out[1::2] = even.T
