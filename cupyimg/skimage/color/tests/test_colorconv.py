@@ -15,12 +15,10 @@ import numpy as np
 import pytest
 from cupy.testing import assert_array_almost_equal, assert_array_equal
 from numpy.testing import assert_equal
-
-from skimage._shared.testing import TestCase
-from skimage._shared.testing import fetch
 from skimage import data
-from skimage._shared._warnings import expected_warnings
 
+from cupyimg.skimage._shared.testing import TestCase, fetch
+from cupyimg.skimage._shared._warnings import expected_warnings
 from cupyimg.skimage.util import img_as_float, img_as_ubyte, img_as_float32
 from cupyimg.skimage.color import (
     rgb2hsv,

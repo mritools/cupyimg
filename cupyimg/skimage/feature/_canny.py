@@ -13,9 +13,9 @@ Original author: Lee Kamentsky
 """
 
 import cupy as cp
-import cupyimg.scipy.ndimage as ndi
+import cupyx.scipy.ndimage as ndi
 
-from cupyimg.scipy.ndimage import generate_binary_structure, binary_erosion
+from cupyx.scipy.ndimage import generate_binary_structure, binary_erosion
 from ..filters import gaussian
 from .. import dtype_limits, img_as_float
 from .._shared.utils import check_nD

@@ -94,8 +94,9 @@ def convert_colorspace(arr, fromspace, tospace):
 
     Examples
     --------
-    >>> from skimage import data
-    >>> img = data.astronaut()
+    >>> import cupy as cp
+    >>> from cupyimg.skimage import data
+    >>> img = cp.array(data.astronaut())
     >>> img_hsv = convert_colorspace(img, 'RGB', 'HSV')
     """
     fromdict = {'rgb': lambda im: im, 'hsv': hsv2rgb, 'rgb cie': rgbcie2rgb,
@@ -157,9 +158,10 @@ def rgba2rgb(rgba, background=(1, 1, 1)):
 
     Examples
     --------
-    >>> from skimage import color
+    >>> import cupy as cp
+    >>> from cupyimg.skimage import color
     >>> from skimage import data
-    >>> img_rgba = data.logo()
+    >>> img_rgba = cp.array(data.logo())
     >>> img_rgb = color.rgba2rgb(img_rgba)
     """
     arr = cp.asarray(rgba)
@@ -218,9 +220,10 @@ def rgb2hsv(rgb):
 
     Examples
     --------
-    >>> from skimage import color
+    >>> import cupy as cp
+    >>> from cupyimg.skimage import color
     >>> from skimage import data
-    >>> img = data.astronaut()
+    >>> img = cp.array(data.astronaut())
     >>> img_hsv = color.rgb2hsv(img)
     """
     input_is_one_pixel = rgb.ndim == 1
@@ -308,8 +311,9 @@ def hsv2rgb(hsv):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> img = data.astronaut()
+    >>> img = cp.array(data.astronaut())
     >>> img_hsv = rgb2hsv(img)
     >>> img_rgb = hsv2rgb(img_hsv)
     """
@@ -620,8 +624,8 @@ def xyz2rgb(xyz):
     Examples
     --------
     >>> from skimage import data
-    >>> from skimage.color import rgb2xyz, xyz2rgb
-    >>> img = data.astronaut()
+    >>> from cupyimg.skimage.color import rgb2xyz, xyz2rgb
+    >>> img = cp.array(data.astronaut())
     >>> img_xyz = rgb2xyz(img)
     >>> img_rgb = xyz2rgb(img_xyz)
     """
@@ -664,8 +668,9 @@ def rgb2xyz(rgb):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> img = data.astronaut()
+    >>> img = cp.array(data.astronaut())
     >>> img_xyz = rgb2xyz(img)
     """
     # Follow the algorithm from http://www.easyrgb.com/index.php
@@ -702,8 +707,8 @@ def rgb2rgbcie(rgb):
     Examples
     --------
     >>> from skimage import data
-    >>> from skimage.color import rgb2rgbcie
-    >>> img = data.astronaut()
+    >>> from cupyimg.skimage.color import rgb2rgbcie
+    >>> img = cp.array(data.astronaut())
     >>> img_rgbcie = rgb2rgbcie(img)
     """
     return _convert(rgbcie_from_rgb, rgb)
@@ -734,8 +739,8 @@ def rgbcie2rgb(rgbcie):
     Examples
     --------
     >>> from skimage import data
-    >>> from skimage.color import rgb2rgbcie, rgbcie2rgb
-    >>> img = data.astronaut()
+    >>> from cupyimg.skimage.color import rgb2rgbcie, rgbcie2rgb
+    >>> img = cp.array(data.astronaut())
     >>> img_rgbcie = rgb2rgbcie(img)
     >>> img_rgb = rgbcie2rgb(img_rgbcie)
     """
@@ -776,9 +781,10 @@ def rgb2gray(rgb):
 
     Examples
     --------
-    >>> from skimage.color import rgb2gray
+    >>> import cupy as cp
+    >>> from cupyimg.skimage.color import rgb2gray
     >>> from skimage import data
-    >>> img = data.astronaut()
+    >>> img = cp.array(data.astronaut())
     >>> img_gray = rgb2gray(img)
     """
 
@@ -957,9 +963,10 @@ def xyz2lab(xyz, illuminant="D65", observer="2"):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage.color import rgb2xyz, xyz2lab
-    >>> img = data.astronaut()
+    >>> from cupyimg.skimage.color import rgb2xyz, xyz2lab
+    >>> img = cp.array(data.astronaut())
     >>> img_xyz = rgb2xyz(img)
     >>> img_lab = xyz2lab(img_xyz)
     """
@@ -1164,9 +1171,10 @@ def xyz2luv(xyz, illuminant="D65", observer="2"):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage.color import rgb2xyz, xyz2luv
-    >>> img = data.astronaut()
+    >>> from cupyimg.skimage.color import rgb2xyz, xyz2luv
+    >>> img = cp.array(data.astronaut())
     >>> img_xyz = rgb2xyz(img)
     >>> img_luv = xyz2luv(img_xyz)
     """
@@ -1361,9 +1369,10 @@ def rgb2hed(rgb):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage.color import rgb2hed
-    >>> ihc = data.immunohistochemistry()
+    >>> from cupyimg.skimage.color import rgb2hed
+    >>> ihc = cp.array(data.immunohistochemistry())
     >>> ihc_hed = rgb2hed(ihc)
     """
     return separate_stains(rgb, hed_from_rgb)
@@ -1396,9 +1405,10 @@ def hed2rgb(hed):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage.color import rgb2hed, hed2rgb
-    >>> ihc = data.immunohistochemistry()
+    >>> from cupyimg.skimage.color import rgb2hed, hed2rgb
+    >>> ihc = cp.array(data.immunohistochemistry())
     >>> ihc_hed = rgb2hed(ihc)
     >>> ihc_rgb = hed2rgb(ihc_hed)
     """
@@ -1457,9 +1467,10 @@ def separate_stains(rgb, conv_matrix):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage.color import separate_stains, hdx_from_rgb
-    >>> ihc = data.immunohistochemistry()
+    >>> from cupyimg.skimage.color import separate_stains, hdx_from_rgb
+    >>> ihc = cp.array(data.immunohistochemistry())
     >>> ihc_hdx = separate_stains(ihc, hdx_from_rgb)
     """
     rgb = _prepare_colorarray(rgb, force_copy=True)
@@ -1518,10 +1529,11 @@ def combine_stains(stains, conv_matrix):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage.color import (separate_stains, combine_stains,
-    ...                            hdx_from_rgb, rgb_from_hdx)
-    >>> ihc = data.immunohistochemistry()
+    >>> from cupyimg.skimage.color import (separate_stains, combine_stains,
+    ...                                    hdx_from_rgb, rgb_from_hdx)
+    >>> ihc = cp.array(data.immunohistochemistry())
     >>> ihc_hdx = separate_stains(ihc, hdx_from_rgb)
     >>> ihc_rgb = combine_stains(ihc_hdx, rgb_from_hdx)
     """
@@ -1565,8 +1577,8 @@ def lab2lch(lab):
     Examples
     --------
     >>> from skimage import data
-    >>> from skimage.color import rgb2lab, lab2lch
-    >>> img = data.astronaut()
+    >>> from cupyimg.skimage.color import rgb2lab, lab2lch
+    >>> img = cp.array(data.astronaut())
     >>> img_lab = rgb2lab(img)
     >>> img_lch = lab2lch(img_lab)
     """
@@ -1612,8 +1624,8 @@ def lch2lab(lch):
     Examples
     --------
     >>> from skimage import data
-    >>> from skimage.color import rgb2lab, lch2lab
-    >>> img = data.astronaut()
+    >>> from cupyimg.skimage.color import rgb2lab, lch2lab
+    >>> img = cp.array(data.astronaut())
     >>> img_lab = rgb2lab(img)
     >>> img_lch = lab2lch(img_lab)
     >>> img_lab2 = lch2lab(img_lch)

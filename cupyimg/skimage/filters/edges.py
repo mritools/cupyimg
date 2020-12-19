@@ -15,7 +15,7 @@ import numpy as np
 
 from .. import img_as_float
 from .._shared.utils import check_nD
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 
 from ..restoration.uft import laplacian
 
@@ -118,7 +118,7 @@ def _reshape_nd(arr, ndim, dim):
 
     Examples
     --------
-    >>> arr = np.random.random(7)
+    >>> arr = cp.random.random(7)
     >>> _reshape_nd(arr, 2, 0).shape
     (7, 1)
     >>> _reshape_nd(arr, 3, 1).shape
@@ -241,9 +241,10 @@ def sobel(image, mask=None, *, axis=None, mode='reflect', cval=0.0):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage import filters
-    >>> camera = data.camera()
+    >>> from cupyimg.skimage import filters
+    >>> camera = cp.array(data.camera())
     >>> edges = filters.sobel(camera)
     """
     image = img_as_float(image)
@@ -362,9 +363,10 @@ def scharr(image, mask=None, *, axis=None, mode='reflect', cval=0.0):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage import filters
-    >>> camera = data.camera()
+    >>> from cupyimg.skimage import filters
+    >>> camera = cp.array(data.camera())
     >>> edges = filters.scharr(camera)
     """
     image = img_as_float(image)
@@ -489,9 +491,10 @@ def prewitt(image, mask=None, *, axis=None, mode='reflect', cval=0.0):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage import filters
-    >>> camera = data.camera()
+    >>> from cupyimg.skimage import filters
+    >>> camera = cp.array(data.camera())
     >>> edges = filters.prewitt(camera)
     """
     image = img_as_float(image)
@@ -584,9 +587,10 @@ def roberts(image, mask=None):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> camera = data.camera()
-    >>> from skimage import filters
+    >>> camera = cp.array(data.camera())
+    >>> from cupyimg.skimage import filters
     >>> edges = filters.roberts(camera)
 
     """
@@ -744,9 +748,10 @@ def farid(image, *, mask=None):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> camera = data.camera()
-    >>> from skimage import filters
+    >>> camera = cp.array(data.camera())
+    >>> from cupyimg.skimage import filters
     >>> edges = filters.farid(camera)
     """
     check_nD(image, 2)

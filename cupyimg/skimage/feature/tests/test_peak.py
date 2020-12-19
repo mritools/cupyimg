@@ -6,9 +6,9 @@ import numpy as np
 import pytest
 from cupy.testing import assert_array_almost_equal, assert_array_equal
 from scipy import ndimage as ndimage_cpu
-from skimage._shared._warnings import expected_warnings
 
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
+from cupyimg.skimage._shared._warnings import expected_warnings
 from cupyimg.skimage.feature import peak
 
 

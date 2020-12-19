@@ -4,7 +4,7 @@ import cupy as cp
 import numpy as np
 import pytest
 from cupyimg.skimage.color.colorlabel import label2rgb
-from skimage._shared.testing import assert_no_warnings
+from cupyimg.skimage._shared.testing import assert_no_warnings
 
 from cupy.testing import assert_array_almost_equal, assert_array_equal
 

@@ -5,12 +5,10 @@ from itertools import combinations_with_replacement
 import cupy as cp
 import numpy as np
 from scipy import spatial  # TODO: use RAPIDS cuSpatial?
+from cupyx.scipy import ndimage as ndi
 
-import cupyimg.numpy as cnp
-from cupyimg.scipy import ndimage as ndi
 from .peak import peak_local_max
 from .util import _prepare_grayscale_input_nD
-
 # from ..transform import integral_image
 from .. import img_as_float
 
@@ -90,7 +88,8 @@ def structure_tensor(image, sigma=1, mode="constant", cval=0, order=None):
 
     Examples
     --------
-    >>> from skimage.feature import structure_tensor
+    >>> import cupy as cp
+    >>> from cupyimg.skimage.feature import structure_tensor
     >>> square = np.zeros((5, 5))
     >>> square[2, 2] = 1
     >>> Arr, Arc, Acc = structure_tensor(square, sigma=0.1, order="rc")
@@ -197,14 +196,14 @@ def hessian_matrix(image, sigma=1, mode="constant", cval=0, order="rc"):
         image, sigma=sigma, mode=mode, cval=cval
     )
 
-    gradients = cnp.gradient(gaussian_filtered)
+    gradients = cp.gradient(gaussian_filtered)
     axes = range(image.ndim)
 
     if order == "rc":
         axes = reversed(axes)
 
     H_elems = [
-        cnp.gradient(gradients[ax0], axis=ax1)
+        cp.gradient(gradients[ax0], axis=ax1)
         for ax0, ax1 in combinations_with_replacement(axes, 2)
     ]
 
@@ -251,7 +250,7 @@ def hessian_matrix_det(image, sigma=1, approximate=True):
     if image.ndim == 2 and approximate:
         raise NotImplementedError("approximate=True case not implemented")
         # integral = integral_image(image)
-        # return np.array(_hessian_matrix_det(integral, sigma))
+        # return cp.asarray(_hessian_matrix_det(integral, sigma))
     else:  # slower brute-force implementation for nD images
         hessian_mat_array = _symmetric_image(hessian_matrix(image, sigma))
         return cp.linalg.det(hessian_mat_array)
@@ -353,6 +352,7 @@ def structure_tensor_eigenvalues(A_elems):
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage.feature import structure_tensor
     >>> from skimage.feature import structure_tensor_eigenvalues
     >>> square = np.zeros((5, 5))
@@ -402,7 +402,9 @@ def structure_tensor_eigvals(Axx, Axy, Ayy):
 
     Examples
     --------
-    >>> from skimage.feature import structure_tensor, structure_tensor_eigvals
+    >>> import cupy as cp
+    >>> from cupyimg.skimage.feature import (structure_tensor,
+    ...                                      structure_tensor_eigvals)
     >>> square = np.zeros((5, 5))
     >>> square[2, 2] = 1
     >>> Arr, Arc, Acc = structure_tensor(square, sigma=0.1, order="rc")
@@ -444,7 +446,8 @@ def hessian_matrix_eigvals(H_elems):
     Examples
     --------
     >>> import cupy as cp
-    >>> from cupyimg.skimage.feature import hessian_matrix, hessian_matrix_eigvals
+    >>> from cupyimg.skimage.feature import (hessian_matrix,
+    ...                                      hessian_matrix_eigvals)
     >>> square = cp.zeros((5, 5))
     >>> square[2, 2] = 4
     >>> H_elems = hessian_matrix(square, sigma=0.1, order='rc')
@@ -512,8 +515,8 @@ def shape_index(image, sigma=1, mode="constant", cval=0):
 
     Examples
     --------
-    >>> from skimage.feature import shape_index
-    >>> square = np.zeros((5, 5))
+    >>> from cupyimg.skimage.feature import shape_index
+    >>> square = cp.zeros((5, 5))
     >>> square[2, 2] = 4
     >>> s = shape_index(square, sigma=0.1)
     >>> s

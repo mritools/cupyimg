@@ -2,7 +2,7 @@ import cupy as cp
 import numpy as np
 import pytest
 from numpy.testing import assert_almost_equal
-from cupyimg.scipy.ndimage import fourier_shift
+from cupyx.scipy.ndimage import fourier_shift
 from skimage.io import imread
 from skimage.data import camera, stereo_motorcycle
 from skimage._shared.testing import expected_warnings, fetch

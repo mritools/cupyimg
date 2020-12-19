@@ -1,6 +1,6 @@
 import cupy as cp
 
-from cupyimg.scipy.ndimage import uniform_filter, gaussian_filter
+from cupyx.scipy.ndimage import uniform_filter, gaussian_filter
 
 from ..util.dtype import dtype_range
 from ..util.arraycrop import crop

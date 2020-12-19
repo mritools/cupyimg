@@ -6,10 +6,10 @@ import pytest
 from cupy.testing import assert_array_equal, assert_array_almost_equal
 from numpy.testing import assert_almost_equal
 from skimage import data
-from skimage._shared._warnings import expected_warnings
 
 from cupyimg.skimage import util
 from cupyimg.skimage import exposure
+from cupyimg.skimage._shared._warnings import expected_warnings
 from cupyimg.skimage.exposure.exposure import intensity_range
 from cupyimg.skimage.color import rgb2gray
 from cupyimg.skimage.util.dtype import dtype_range

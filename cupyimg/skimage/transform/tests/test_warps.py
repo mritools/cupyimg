@@ -12,7 +12,7 @@ from skimage._shared._warnings import expected_warnings
 
 from cupyimg.skimage.feature.peak import peak_local_max
 from cupyimg.skimage.util.dtype import img_as_float
-from cupyimg.scipy.ndimage import map_coordinates
+from cupyx.scipy.ndimage import map_coordinates
 
 from cupyimg.skimage.transform._warps import (
     _stackcopy,

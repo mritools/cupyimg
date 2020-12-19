@@ -3,7 +3,7 @@ import math
 import cupy as cp
 import numpy as np
 
-import cupyimg.scipy.ndimage as ndi
+import cupyx.scipy.ndimage as ndi
 
 
 # Don't allocate STREL_* on GPU as we don't know in advance which device

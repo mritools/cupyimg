@@ -8,9 +8,9 @@ from skimage import data
 from skimage import draw
 
 # from skimage._shared.testing import test_parallel
-from skimage._shared._warnings import expected_warnings
 
 from cupyimg.skimage import img_as_float
+from cupyimg.skimage._shared._warnings import expected_warnings
 from cupyimg.skimage.color import rgb2gray
 
 from cupyimg.skimage.morphology import cube  # , octagon

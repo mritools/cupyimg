@@ -1,7 +1,7 @@
 from collections.abc import Iterable
 import cupy as cp
 import numpy as np
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 
 from ..util import img_as_float
 from .._shared.utils import warn, convert_to_float
@@ -94,7 +94,7 @@ def gaussian(image, sigma=1, output=None, mode='nearest', cval=0,
            [0.08767308, 0.12075024, 0.08767308]])
     >>> # For RGB images, each is filtered separately
     >>> from skimage.data import astronaut
-    >>> image = astronaut()
+    >>> image = cp.array(astronaut())
     >>> filtered_img = gaussian(image, sigma=1, multichannel=True)
 
     """
@@ -240,21 +240,23 @@ def difference_of_gaussians(image, low_sigma, high_sigma=None, *,
     Apply a simple Difference of Gaussians filter to a color image:
 
     >>> from skimage.data import astronaut
-    >>> from skimage.filters import difference_of_gaussians
-    >>> filtered_image = difference_of_gaussians(astronaut(), 2, 10,
+    >>> from cupyimg.skimage.filters import difference_of_gaussians
+    >>> astro = cp.asarray(astronaut())
+    >>> filtered_image = difference_of_gaussians(astro, 2, 10,
     ...                                          multichannel=True)
 
     Apply a Laplacian of Gaussian filter as approximated by the Difference
     of Gaussians filter:
 
-    >>> filtered_image = difference_of_gaussians(astronaut(), 2,
+    >>> filtered_image = difference_of_gaussians(astro, 2,
     ...                                          multichannel=True)
 
     Apply a Difference of Gaussians filter to a grayscale image using different
     sigma values for each axis:
 
     >>> from skimage.data import camera
-    >>> filtered_image = difference_of_gaussians(camera(), (2,5), (3,20))
+    >>> cam = cp.array(camera())
+    >>> filtered_image = difference_of_gaussians(cam, (2,5), (3,20))
 
     References
     ----------

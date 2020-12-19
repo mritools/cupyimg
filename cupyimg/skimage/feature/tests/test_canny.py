@@ -4,7 +4,7 @@ import cupy as cp
 from cupy.testing import assert_array_equal
 from skimage import data
 
-from cupyimg.scipy.ndimage import binary_dilation, binary_erosion
+from cupyx.scipy.ndimage import binary_dilation, binary_erosion
 from cupyimg.skimage import feature
 from cupyimg.skimage.util import img_as_float
 

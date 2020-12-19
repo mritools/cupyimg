@@ -2,9 +2,9 @@ import cupy as cp
 import numpy as np
 import pytest
 from skimage.data import camera, retina
-from skimage._shared.testing import expected_warnings
 from cupy.testing import assert_array_equal, assert_allclose, assert_array_less
 
+from cupyimg.skimage._shared.testing import expected_warnings
 from cupyimg.skimage.filters import meijering, sato, frangi, hessian
 from cupyimg.skimage.util import crop, invert
 from cupyimg.skimage.color import rgb2gray

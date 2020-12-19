@@ -146,11 +146,12 @@ def forward(data, impulse_response=None, filter_params={},
 
     Gaussian filter:
 
+    >>> import cupy as cp
     >>> def filt_func(r, c):
     ...     return cp.exp(-cp.hypot(r, c)/1)
     >>>
     >>> from skimage import data
-    >>> filtered = forward(data.coins(), filt_func)
+    >>> filtered = forward(cp.array(data.coins()), filt_func)
 
     """
     check_nD(data, 2, 'data')

@@ -5,13 +5,12 @@ import pytest
 from skimage import data
 
 from skimage.draw import disk
-from skimage._shared._warnings import expected_warnings
 
 # from cupyimg.scipy import ndimage as ndi
 from cupyimg.skimage import util
 
+from cupyimg.skimage._shared._warnings import expected_warnings
 from cupyimg.skimage.color import rgb2gray
-
 from cupyimg.skimage.exposure import histogram
 from cupyimg.skimage.filters.thresholding import (
     threshold_local,
@@ -32,7 +31,7 @@ from cupyimg.skimage.filters.thresholding import (
 
 from skimage.filters._multiotsu import (_get_multiotsu_thresh_indices_lut,
                                         _get_multiotsu_thresh_indices)
-from skimage._shared import testing
+from cupyimg.skimage._shared import testing
 from cupy.testing import assert_array_equal, assert_array_almost_equal
 
 # transfer images to GPU

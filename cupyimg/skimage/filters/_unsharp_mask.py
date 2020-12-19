@@ -1,6 +1,6 @@
 import cupy as cp
 
-from cupyimg.scipy.ndimage.filters import gaussian_filter
+from cupyx.scipy.ndimage.filters import gaussian_filter
 from .. import img_as_float
 
 

@@ -2,7 +2,7 @@ import cupy as cp
 import pytest
 from cupy.testing import assert_allclose
 from skimage.data import camera, binary_blobs
-from cupyimg.scipy.ndimage import fourier_shift
+from cupyx.scipy.ndimage import fourier_shift
 
 from cupyimg.skimage.registration._phase_cross_correlation import (
     phase_cross_correlation,

@@ -114,12 +114,13 @@ def histogram(image, nbins=256, source_range='image', normalize=False):
     Examples
     --------
     >>> import cupy as cp
-    >>> from skimage import data, exposure, img_as_float
-    >>> image = img_as_float(data.camera())
+    >>> from skimage import data
+    >>> from cupyimg.skimage import exposure, img_as_float
+    >>> image = img_as_float(cp.array(data.camera()))
     >>> cp.histogram(image, bins=2)
-    (array([93585, 168559]), array([0. , 0.5, 1. ]))
+    (array([ 93585, 168559]), array([0. , 0.5, 1. ]))
     >>> exposure.histogram(image, nbins=2)
-    (array([93585, 168559]), array([0.25, 0.75]))
+    (array([ 93585, 168559]), array([0.25, 0.75]))
     """
     sh = image.shape
     if len(sh) == 3 and sh[-1] < 4:
@@ -174,8 +175,9 @@ def cumulative_distribution(image, nbins=256):
     Examples
     --------
     >>> import cupy as cp
-    >>> from skimage import data, exposure, img_as_float
-    >>> image = img_as_float(data.camera())
+    >>> from skimage import data
+    >>> from cupyimg.skimage import exposure, img_as_float
+    >>> image = img_as_float(cp.array(data.camera()))
     >>> hi = exposure.histogram(image)
     >>> cdf = exposure.cumulative_distribution(image)
     >>> cp.alltrue(cdf[0] == cp.cumsum(hi[0])/float(image.size))
@@ -360,7 +362,7 @@ def rescale_intensity(image, in_range="image", out_range="dtype"):
     the limits allowed by the image's dtype, since `in_range` defaults to
     'image' and `out_range` defaults to 'dtype':
 
-    >>> image = cp.asarray([51, 102, 153], dtype=np.uint8)
+    >>> image = cp.array([51, 102, 153], dtype=np.uint8)
     >>> rescale_intensity(image)
     array([  0, 127, 255], dtype=uint8)
 
@@ -485,8 +487,9 @@ def adjust_gamma(image, gamma=1, gain=1):
 
     Examples
     --------
-    >>> from skimage import data, exposure, img_as_float
-    >>> image = img_as_float(data.moon())
+    >>> from skimage import data
+    >>> from cupyimg.skimage import exposure, img_as_float
+    >>> image = img_as_float(cp.array(data.moon()))
     >>> gamma_corrected = exposure.adjust_gamma(image, 2)
     >>> # Output is darker for gamma > 1
     >>> image.mean() > gamma_corrected.mean()

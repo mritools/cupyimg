@@ -56,10 +56,11 @@ def median(image, selem=None, out=None, mode='nearest', cval=0.0,
 
     Examples
     --------
+    >>> import cupy as cp
     >>> from skimage import data
-    >>> from skimage.morphology import disk
-    >>> from skimage.filters import median
-    >>> img = data.camera()
+    >>> from cupyimg.skimage.morphology import disk
+    >>> from cupyimg.skimage.filters import median
+    >>> img = cp.array(data.camera())
     >>> med = median(img, disk(5))
 
     """

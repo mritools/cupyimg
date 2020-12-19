@@ -8,8 +8,8 @@ from cupy.testing import (
     assert_array_almost_equal,
     assert_array_equal,
 )
-from skimage._shared.testing import fetch
 
+from cupyimg.skimage._shared.testing import fetch
 from cupyimg.skimage.color.delta_e import (
     deltaE_cie76,
     deltaE_ciede94,

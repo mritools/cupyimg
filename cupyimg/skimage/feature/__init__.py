@@ -1,4 +1,4 @@
-from skimage._shared.utils import deprecated
+from cupyimg.skimage._shared.utils import deprecated
 
 from ._canny import canny
 from ._daisy import daisy

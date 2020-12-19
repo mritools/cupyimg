@@ -2,7 +2,7 @@ import math
 
 import cupy as cp
 
-from cupyimg.scipy.ndimage import gaussian_filter
+from cupyx.scipy.ndimage import gaussian_filter
 from .. import img_as_float
 from .._shared.utils import check_nD
 
