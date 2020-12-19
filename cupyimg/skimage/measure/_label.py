@@ -1,7 +1,7 @@
 import cupy as cp
 import scipy.ndimage as cpu_ndi
 
-from cupyimg.scipy.ndimage.measurements import _label
+from ._label_kernels import _label
 
 
 def _get_structure(ndim, connectivity):
@@ -13,8 +13,7 @@ def _get_structure(ndim, connectivity):
     return cpu_ndi.generate_binary_structure(ndim, connectivity)
 
 
-# TODO: grlee77
-#       currently uses int32 for the labels. should add int64 option as well
+# TODO: currently uses int32 for the labels. should add int64 option as well
 def label(input, background=None, return_num=False, connectivity=None):
     r"""Label connected regions of an integer array.
 
