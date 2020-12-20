@@ -2,10 +2,12 @@ import cupy as cp
 from cupy import testing
 import numpy as np
 import pytest
-from scipy.signal import convolve2d
+from scipy import signal
+
+
 from skimage._shared.testing import fetch
 
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 from cupyimg.skimage.color import rgb2gray
 from cupyimg.skimage import restoration
 from cupyimg.skimage.restoration import uft
@@ -30,7 +32,7 @@ test_img = camera()
 
 def test_wiener():
     psf = np.ones((5, 5)) / 25
-    data = convolve2d(test_img.get(), psf, "same")
+    data = signal.convolve2d(test_img.get(), psf, "same")
     np.random.seed(0)
     data += 0.1 * data.std() * np.random.standard_normal(data.shape)
 
@@ -54,7 +56,7 @@ def test_wiener():
 
 def test_unsupervised_wiener():
     psf = np.ones((5, 5)) / 25
-    data = convolve2d(cp.asnumpy(test_img), psf, 'same')
+    data = signal.convolve2d(cp.asnumpy(test_img), psf, 'same')
     np.random.seed(0)
     data += 0.1 * data.std() * np.random.standard_normal(data.shape)
 
@@ -114,7 +116,7 @@ def test_image_shape():
 
 def test_richardson_lucy():
     psf = np.ones((5, 5)) / 25
-    data = convolve2d(cp.asnumpy(test_img), psf, 'same')
+    data = signal.convolve2d(cp.asnumpy(test_img), psf, 'same')
     np.random.seed(0)
     data += 0.1 * data.std() * np.random.standard_normal(data.shape)
 
@@ -139,7 +141,7 @@ def test_richardson_lucy_filtered(dtype_image, dtype_psf):
 
     psf = cp.ones((5, 5), dtype=dtype_psf) / 25
     data = cp.array(
-        convolve2d(cp.asnumpy(test_img_astro), cp.asnumpy(psf), 'same'),
+        signal.convolve2d(cp.asnumpy(test_img_astro), cp.asnumpy(psf), 'same'),
         dtype=dtype_image)
     deconvolved = restoration.richardson_lucy(data, psf, 5,
                                               filter_epsilon=1e-6)

@@ -30,7 +30,8 @@ def integral_image(image):
     """
     S = image
     for i in range(image.ndim):
-        S = S.cumsum(axis=i)
+        # TODO: CuPy bug? occasional test failure without explicit copy() here
+        S = S.copy().cumsum(axis=i)
     return S
 
 

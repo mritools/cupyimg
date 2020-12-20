@@ -2,7 +2,7 @@ import cupy as cp
 import numpy as np
 from skimage import data
 
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 from cupyimg.skimage import color, transform
 from cupyimg.skimage.util import img_as_uint, img_as_ubyte
 from cupyimg.skimage.morphology import grey, selem

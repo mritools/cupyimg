@@ -6,7 +6,7 @@ from skimage import data
 from cupyimg.skimage import color
 from cupyimg.skimage.util import img_as_bool
 from cupyimg.skimage.morphology import binary, grey, selem
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 
 import pytest
 

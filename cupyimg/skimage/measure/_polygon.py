@@ -1,6 +1,11 @@
 import cupy as cp
 
-from cupyimg.scipy import signal
+# from cupyx.scipy import signal
+
+# TODO: use cupyx.scipy.signal once upstream fftconvolve and
+#       choose_conv_method for > 1d has been implemented.
+import cupyimg.skimage._vendored
+signal = cupyimg.skimage._vendored
 
 
 def approximate_polygon(coords, tolerance):

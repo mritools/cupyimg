@@ -1,7 +1,7 @@
 from warnings import warn
 
 import numpy as np
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 
 
 def median(image, selem=None, out=None, mode='nearest', cval=0.0,

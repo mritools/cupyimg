@@ -7,7 +7,7 @@ import cupy as cp
 import numpy as np
 from scipy.ndimage import find_objects as cpu_find_objects
 
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 from . import _moments
 from ._regionprops_utils import euler_number, perimeter, perimeter_crofton
 

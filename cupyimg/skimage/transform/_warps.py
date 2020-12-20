@@ -1,7 +1,7 @@
 import math
 
 import numpy as np
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 import cupy as cp
 
 from ._geometric import (

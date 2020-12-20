@@ -3,7 +3,7 @@ import math
 
 import cupy as cp
 
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 from ..transform import resize
 from .._shared.utils import convert_to_float
 

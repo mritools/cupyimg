@@ -3,9 +3,14 @@ import math
 import cupy as cp
 import numpy as np
 
-from cupyimg.scipy.signal import fftconvolve
+# from cupyx.scipy import signal
 
+# TODO: use cupyx.scipy.signal once upstream fftconvolve and
+#       choose_conv_method for > 1d has been implemented.
+import cupyimg.skimage._vendored
 from .._shared.utils import check_nD
+
+signal = cupyimg.skimage._vendored
 
 
 def _window_sum_2d(image, window_shape):
@@ -157,11 +162,11 @@ def match_template(image, template, pad_input=False, mode='constant',
     template_ssd = cp.sum(template_ssd)
 
     if image.ndim == 2:
-        xcorr = fftconvolve(image, template[::-1, ::-1],
-                            mode="valid")[1:-1, 1:-1]
+        xcorr = signal.fftconvolve(image, template[::-1, ::-1],
+                                   mode="valid")[1:-1, 1:-1]
     elif image.ndim == 3:
-        xcorr = fftconvolve(image, template[::-1, ::-1, ::-1],
-                            mode="valid")[1:-1, 1:-1, 1:-1]
+        xcorr = signal.fftconvolve(image, template[::-1, ::-1, ::-1],
+                                   mode="valid")[1:-1, 1:-1, 1:-1]
 
     numerator = xcorr - image_window_sum * template_mean
 

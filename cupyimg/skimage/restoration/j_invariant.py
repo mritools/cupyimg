@@ -3,7 +3,7 @@ import functools
 
 import cupy as cp
 import numpy as np
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 
 from ..metrics import mean_squared_error
 from ..util import img_as_float

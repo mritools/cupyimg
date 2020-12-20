@@ -10,7 +10,7 @@ from itertools import combinations_with_replacement
 import cupy as cp
 import numpy as np
 
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 from cupyimg.skimage.transform import warp
 
 from ._optical_flow_utils import coarse_to_fine, get_warp_points

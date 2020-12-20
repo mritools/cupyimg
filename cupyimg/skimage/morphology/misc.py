@@ -1,7 +1,7 @@
 """Miscellaneous morphology functions."""
 import cupy as cp
 import functools
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 from .._shared.utils import warn
 from .selem import _default_selem
 

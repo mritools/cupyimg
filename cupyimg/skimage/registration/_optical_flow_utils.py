@@ -8,7 +8,7 @@ import numpy as np
 
 from cupyimg.skimage.transform import pyramid_reduce
 from cupyimg.skimage.util.dtype import _convert
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 
 
 def get_warp_points(grid, flow):

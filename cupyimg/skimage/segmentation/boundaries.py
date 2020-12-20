@@ -1,6 +1,6 @@
 import cupy as cp
 import numpy as np
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 from ..morphology import dilation, erosion, square
 from ..util import img_as_float, view_as_windows
 from ..color import gray2rgb

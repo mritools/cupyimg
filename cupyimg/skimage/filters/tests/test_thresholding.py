@@ -6,7 +6,7 @@ from skimage import data
 
 from skimage.draw import disk
 
-# from cupyimg.scipy import ndimage as ndi
+# from cupyx.scipy import ndimage as ndi
 from cupyimg.skimage import util
 
 from cupyimg.skimage._shared._warnings import expected_warnings

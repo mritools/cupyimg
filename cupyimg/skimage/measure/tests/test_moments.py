@@ -9,7 +9,7 @@ from cupy.testing import (
 )
 from numpy.testing import assert_almost_equal
 
-from cupyimg.scipy import ndimage as ndi
+from cupyx.scipy import ndimage as ndi
 from cupyimg.skimage.measure import (
     moments,
     moments_central,

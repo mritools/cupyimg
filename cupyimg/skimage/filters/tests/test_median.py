@@ -4,7 +4,7 @@ import cupy as cp
 import numpy as np
 from cupy.testing import assert_allclose
 
-from cupyimg.scipy import ndimage
+from cupyx.scipy import ndimage
 from cupyimg.skimage.filters import median
 
 # from cupyimg.skimage.filters import rank

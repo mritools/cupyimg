@@ -5,9 +5,16 @@ import math
 import cupy as cp
 import numpy as np
 import cupy.random as npr
-from cupyimg.scipy.signal import convolve
+# from cupyx.scipy.signal import convolve
+# from cupyx.scipy import signal
 
+# TODO: use cupyx.scipy.signal once upstream fftconvolve and
+#       choose_conv_method for > 1d has been implemented.
+import cupyimg.skimage._vendored
 from . import uft
+
+signal = cupyimg.skimage._vendored
+
 
 __keywords__ = "restoration, image, deconvolution"
 
@@ -370,7 +377,7 @@ def richardson_lucy(image, psf, iterations=50, clip=True,
     >>> from cupyimg.skimage import img_as_float, restoration
     >>> from skimage import data
     >>> camera = cp.asarray(img_as_float(data.camera()))
-    >>> from cupyimg.scipy.signal import convolve2d
+    >>> from cupyx.scipy.signal import convolve2d
     >>> psf = cp.ones((5, 5)) / 25
     >>> camera = convolve2d(camera, psf, 'same')
     >>> camera += 0.1 * camera.std() * cp.random.standard_normal(camera.shape)
@@ -387,12 +394,12 @@ def richardson_lucy(image, psf, iterations=50, clip=True,
     psf_mirror = cp.ascontiguousarray(psf[::-1, ::-1])
 
     for _ in range(iterations):
-        conv = convolve(im_deconv, psf, mode='same')
+        conv = signal.convolve(im_deconv, psf, mode='same')
         if filter_epsilon:
             relative_blur = cp.where(conv < filter_epsilon, 0, image / conv)
         else:
             relative_blur = image / conv
-        im_deconv *= convolve(relative_blur, psf_mirror, mode='same')
+        im_deconv *= signal.convolve(relative_blur, psf_mirror, mode='same')
 
     if clip:
         im_deconv[im_deconv > 1] = 1
