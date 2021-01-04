@@ -148,4 +148,4 @@ def test_richardson_lucy_filtered():
     deconvolved = restoration.richardson_lucy(data, psf, 5, filter_epsilon=1e-6)
 
     path = image_fetcher.fetch("restoration/tests/astronaut_rl.npy")
-    np.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3, atol=1e-6)
+    cp.testing.assert_allclose(deconvolved, np.load(path), rtol=1e-3, atol=1e-6)
