@@ -25,7 +25,7 @@ from . import _util
 from ._kernels.filters_v2 import (
     _correlate_or_convolve as _correlate_or_convolve_legacy,
 )
-from cupyimg import _misc
+from cupyimg import _misc, memoize
 from cupyimg.scipy.ndimage import _filters_core
 from cupyimg.scipy.ndimage import _filters_optimal_medians
 
@@ -495,7 +495,7 @@ def _correlate_or_convolve(
     return output
 
 
-@cupy._util.memoize(for_each_device=True)
+@memoize(for_each_device=True)
 def _get_correlate_kernel(mode, w_shape, int_type, offsets, cval):
     return _filters_core._generate_nd_kernel(
         "correlate",
@@ -1507,7 +1507,7 @@ def _min_or_max_1d(
     )
 
 
-@cupy._util.memoize(for_each_device=True)
+@memoize(for_each_device=True)
 def _get_min_or_max_kernel(
     mode,
     w_shape,
@@ -1768,7 +1768,7 @@ __device__ void sort(X *array, int size) {{
 }}"""
 
 
-@cupy._util.memoize()
+@memoize()
 def _get_shell_gap(filter_size):
     gap = 1
     while gap < filter_size:
@@ -1776,7 +1776,7 @@ def _get_shell_gap(filter_size):
     return gap
 
 
-@cupy._util.memoize(for_each_device=True)
+@memoize(for_each_device=True)
 def _get_rank_kernel(filter_size, rank, mode, w_shape, offsets, cval, int_type):
     is_median = rank == filter_size // 2
     if is_median:
