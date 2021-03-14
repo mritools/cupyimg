@@ -38,7 +38,7 @@ def binary_erosion(image, selem=None, out=None):
 
     """
     if out is None:
-        out = cp.empty(image.shape, dtype=cp.bool)
+        out = cp.empty(image.shape, dtype=cp.bool_)
     ndi.binary_erosion(image, structure=selem, output=out, border_value=True)
     return out
 
@@ -73,7 +73,7 @@ def binary_dilation(image, selem=None, out=None):
         ``[False, True]``.
     """
     if out is None:
-        out = cp.empty(image.shape, dtype=cp.bool)
+        out = cp.empty(image.shape, dtype=cp.bool_)
     ndi.binary_dilation(image, structure=selem, output=out)
     return out
 

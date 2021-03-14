@@ -403,7 +403,7 @@ def centroid(image):
     return center
 
 
-def inertia_tensor(image, mu=None):
+def inertia_tensor(image, mu=None, *, xp=cp):
     """Compute the inertia tensor of the input image.
 
     Parameters
@@ -417,6 +417,13 @@ def inertia_tensor(image, mu=None):
         (for example, `skimage.measure.regionprops`), then it is more
         efficient to pre-compute them and pass them to the inertia tensor
         call.
+
+    Additional Parameters
+    ---------------------
+    xp : {numpy, cupy}
+        This setting determines whether the tensor returned is on the host or
+        GPU. Note that this option does not exist in the scikit-image
+        implementation.
 
     Returns
     -------
@@ -432,26 +439,28 @@ def inertia_tensor(image, mu=None):
     """
     if mu is None:
         mu = moments_central(image, order=2)  # don't need higher-order moments
+    # mu and result are tiny, so faster on the CPU
+    mu = cp.asnumpy(mu)
     mu0 = mu[(0,) * image.ndim]
     # nD expression to get coordinates ([2, 0], [0, 2]) (2D),
     # ([2, 0, 0], [0, 2, 0], [0, 0, 2]) (3D), etc.
-    corners2 = tuple(2 * cp.eye(image.ndim, dtype=int))
+    corners2 = tuple(2 * np.eye(image.ndim, dtype=int))
     # See https://ocw.mit.edu/courses/aeronautics-and-astronautics/
     #             16-07-dynamics-fall-2009/lecture-notes/MIT16_07F09_Lec26.pdf
     # Iii is the sum of second-order moments of every axis *except* i, not the
     # second order moment of axis i.
     # See also https://github.com/scikit-image/scikit-image/issues/3229
-    result = cp.diag((cp.sum(mu[corners2]) - mu[corners2]) / mu0)
+    result = np.diag((np.sum(mu[corners2]) - mu[corners2]) / mu0)
 
     for dims in itertools.combinations(range(image.ndim), 2):
         mu_index = np.zeros(image.ndim, dtype=int)
         mu_index[list(dims)] = 1
         result[dims] = -mu[tuple(mu_index)] / mu0
         result.T[dims] = -mu[tuple(mu_index)] / mu0
-    return result
+    return xp.asarray(result)
 
 
-def inertia_tensor_eigvals(image, mu=None, T=None):
+def inertia_tensor_eigvals(image, mu=None, T=None, *, xp=cp):
     """Compute the eigenvalues of the inertia tensor of the image.
 
     The inertia tensor measures covariance of the image intensity along
@@ -469,6 +478,13 @@ def inertia_tensor_eigvals(image, mu=None, T=None):
         The pre-computed inertia tensor. If ``T`` is given, ``mu`` and
         ``image`` are ignored.
 
+    Additional Parameters
+    ---------------------
+    xp : {numpy, cupy}
+        This setting determines whether the tensor returned is on the host or
+        GPU. Note that this option does not exist in the scikit-image
+        implementation.
+
     Returns
     -------
     eigvals : list of float, length ``image.ndim``
@@ -481,12 +497,15 @@ def inertia_tensor_eigvals(image, mu=None, T=None):
     This is much faster if the central moments (``mu``) are provided, or,
     alternatively, one can provide the inertia tensor (``T``) directly.
     """
+    # For such tiny arrays it is best to perform the computation on the CPU.
     if T is None:
-        T = inertia_tensor(image, mu)
-    eigvals = cp.linalg.eigvalsh(T)
+        T = inertia_tensor(image, mu, xp=np)
+    else:
+        T = cp.asnumpy(T)
+    eigvals = np.linalg.eigvalsh(T)
     # Floating point precision problems could make a positive
     # semidefinite matrix have an eigenvalue that is very slightly
     # negative. This can cause problems down the line, so set values
     # very near zero to zero.
-    eigvals = cp.clip(eigvals, 0, None, out=eigvals)
-    return sorted(eigvals, reverse=True)
+    eigvals = np.clip(eigvals, 0, None, out=eigvals)
+    return xp.asarray(sorted(eigvals, reverse=True))

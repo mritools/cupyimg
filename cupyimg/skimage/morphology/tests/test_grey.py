@@ -163,7 +163,7 @@ def test_default_selem(function):
 
 def test_3d_fallback_default_selem():
     # 3x3x3 cube inside a 7x7x7 image:
-    image = cp.zeros((7, 7, 7), cp.bool)
+    image = cp.zeros((7, 7, 7), cp.bool_)
     image[2:-2, 2:-2, 2:-2] = 1
 
     opened = grey.opening(image)
@@ -180,7 +180,7 @@ grey_3d_fallback_functions = [grey.closing, grey.opening]
 @parametrize("function", grey_3d_fallback_functions)
 def test_3d_fallback_cube_selem(function):
     # 3x3x3 cube inside a 7x7x7 image:
-    image = cp.zeros((7, 7, 7), cp.bool)
+    image = cp.zeros((7, 7, 7), cp.bool_)
     image[2:-2, 2:-2, 2:-2] = 1
 
     cube = cp.ones((3, 3, 3), dtype=cp.uint8)

@@ -30,22 +30,20 @@ def test_single():
 
 
 def test_vectorized_integrate():
-    r0 = np.asarray([12, 0, 0, 10, 0, 10, 30])
-    c0 = np.asarray([10, 0, 10, 0, 0, 10, 31])
-    r1 = np.asarray([23, 19, 19, 19, 0, 10, 49])
-    c1 = np.asarray([19, 19, 19, 19, 0, 10, 49])
-
-    expected = np.array(
-        [
-            x[12:24, 10:20].sum(),
-            x[:20, :20].sum(),
-            x[:20, 10:20].sum(),
-            x[10:20, :20].sum(),
-            x[0, 0],
-            x[10, 10],
-            x[30:, 31:].sum(),
-        ]
-    )
+    r0 = np.array([12, 0, 0, 10, 0, 10, 30])
+    c0 = np.array([10, 0, 10, 0, 0, 10, 31])
+    r1 = np.array([23, 19, 19, 19, 0, 10, 49])
+    c1 = np.array([19, 19, 19, 19, 0, 10, 49])
+    # fmt: off
+    x_cpu = cp.asnumpy(x)
+    expected = np.array([x_cpu[12:24, 10:20].sum(),
+                         x_cpu[:20, :20].sum(),
+                         x_cpu[:20, 10:20].sum(),
+                         x_cpu[10:20, :20].sum(),
+                         x_cpu[0, 0],
+                         x_cpu[10, 10],
+                         x_cpu[30:, 31:].sum()])
+    # fmt: on
     start_pts = [(r0[i], c0[i]) for i in range(len(r0))]
     end_pts = [(r1[i], c1[i]) for i in range(len(r0))]
     assert_array_equal(expected, integrate(s, start_pts, end_pts))

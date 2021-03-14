@@ -167,17 +167,19 @@ def test_masked_registration_padfield_data():
         moving_mask = moving_image != 0
 
         # Note that shifts in x and y and shifts in cols and rows
-        shift_y, shift_x = masked_register_translation(
-            fixed_image,
-            moving_image,
-            fixed_mask,
-            moving_mask,
-            overlap_ratio=0.1,
+        shift_y, shift_x = cp.asnumpy(
+            masked_register_translation(
+                fixed_image,
+                moving_image,
+                fixed_mask,
+                moving_mask,
+                overlap_ratio=0.1,
+            )
         )
         # Note: by looking at the test code from Padfield's
         # MaskedFFTRegistrationCode repository, the
         # shifts were not xi and yi, but xi and -yi
-        cp.testing.assert_array_equal((shift_x, shift_y), (-xi, yi))
+        np.testing.assert_array_equal((shift_x, shift_y), (-xi, yi))
 
 
 def test_cross_correlate_masked_output_shape():
@@ -250,7 +252,7 @@ def test_cross_correlate_masked_output_range():
 
     # No assert array less or equal, so we add an eps
     # Also could not find an `assert_array_greater`, Use (-xcorr) instead
-    eps = np.finfo(np.float).eps
+    eps = np.finfo(np.float64).eps
     cp.testing.assert_array_less(xcorr, 1 + eps)
     cp.testing.assert_array_less(-xcorr, 1 + eps)
 
@@ -333,7 +335,10 @@ def test_cross_correlate_masked_autocorrelation_trivial_masks():
         arr1, arr1, m1, m2, axes=(0, 1), mode="same", overlap_ratio=0
     ).real
     max_index = cp.unravel_index(cp.argmax(xcorr), xcorr.shape)
+    max_index = tuple(map(int, max_index))
 
     # Autocorrelation should have maximum in center of array
-    assert_almost_equal(float(xcorr.max()), 1)
-    cp.testing.assert_array_equal(max_index, cp.asarray(arr1.shape) / 2)
+    # CuPy Backend: uint8 inputs will be processed in float32, so reduce
+    #               decimal to 5
+    assert_almost_equal(float(xcorr.max()), 1, decimal=5)
+    np.testing.assert_array_equal(max_index, np.array(arr1.shape) / 2)

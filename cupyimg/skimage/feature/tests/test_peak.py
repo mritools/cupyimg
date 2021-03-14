@@ -23,7 +23,7 @@ class TestPeakLocalMax:
         assert peak_indices.size == 0
         with expected_warnings(["indices argument is deprecated"]):
             peaks = peak.peak_local_max(trivial, min_distance=1, indices=False)
-        assert (peaks.astype(cp.bool) == trivial).all()
+        assert (peaks.astype(cp.bool_) == trivial).all()
 
     def test_noisy_peaks(self):
         peak_locations = [(7, 7), (7, 13), (13, 7), (13, 13)]
@@ -229,7 +229,7 @@ class TestPeakLocalMax:
         nd_image[2, 2, 2] = 1
         with expected_warnings(["indices argument is deprecated"]):
             peaks = peak.peak_local_max(nd_image, min_distance=1, indices=False)
-        assert (peaks == nd_image.astype(cp.bool)).all()
+        assert (peaks == nd_image.astype(cp.bool_)).all()
 
     def test_ndarray_exclude_border(self):
         nd_image = cp.zeros((5, 5, 5))

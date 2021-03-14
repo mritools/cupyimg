@@ -289,8 +289,8 @@ def intensity_range(image, range_values="image", clip_negative=False):
         range_values = image.dtype.type
 
     if range_values == "image":
-        i_min = np.min(image)
-        i_max = np.max(image)
+        i_min = image.min().item()
+        i_max = image.max().item()
     elif range_values in DTYPE_RANGE:
         i_min, i_max = DTYPE_RANGE[range_values]
         if clip_negative:

@@ -171,7 +171,7 @@ def test_equalize_masked():
 def check_cdf_slope(cdf):
     """Slope of cdf which should equal 1 for an equalized histogram."""
     norm_intensity = np.linspace(0, 1, len(cdf))
-    slope, intercept = np.polyfit(norm_intensity, cdf.get(), 1)
+    slope, intercept = np.polyfit(norm_intensity, cp.asnumpy(cdf), 1)
     assert 0.9 < slope < 1.1
 
 
@@ -186,7 +186,7 @@ def check_cdf_slope(cdf):
 def test_intensity_range_uint8(test_input, expected):
     image = cp.asarray([0, 1], dtype=np.uint8)
     out = intensity_range(image, range_values=test_input)
-    assert_array_equal(out, expected)
+    assert_array_equal(out, cp.array(expected))
 
 
 @pytest.mark.parametrize(
@@ -248,7 +248,7 @@ def test_rescale_out_range():
     """
     image = cp.asarray([-10, 0, 10], dtype=np.int8)
     out = exposure.rescale_intensity(image, out_range=(0, 127))
-    assert out.dtype == np.float_
+    assert out.dtype == float
     assert_array_almost_equal(out, [0, 63.5, 127])
 
 
@@ -339,7 +339,7 @@ def test_rescale_float_output():
     image = cp.asarray([-128, 0, 127], dtype=np.int8)
     output_image = exposure.rescale_intensity(image, out_range=(0, 255))
     cp.testing.assert_array_equal(output_image, [0, 128, 255])
-    assert output_image.dtype == np.float_
+    assert output_image.dtype == float
 
 
 def test_rescale_raises_on_incorrect_out_range():
@@ -361,8 +361,8 @@ def test_adapthist_grayscale():
         img, kernel_size=(57, 51), clip_limit=0.01, nbins=128
     )
     assert img.shape == adapted.shape
-    assert_almost_equal(peak_snr(img, adapted).get(), 100.140, 3)
-    assert_almost_equal(norm_brightness_err(img, adapted).get(), 0.0529, 3)
+    assert_almost_equal(float(peak_snr(img, adapted)), 100.140, 3)
+    assert_almost_equal(float(norm_brightness_err(img, adapted)), 0.0529, 3)
 
 
 def test_adapthist_color():
@@ -378,8 +378,10 @@ def test_adapthist_color():
     assert adapted.max() == 1.0
     assert img.shape == adapted.shape
     full_scale = exposure.rescale_intensity(img)
-    assert_almost_equal(peak_snr(full_scale, adapted).get(), 109.393, 1)
-    assert_almost_equal(norm_brightness_err(full_scale, adapted).get(), 0.02, 2)
+    assert_almost_equal(float(peak_snr(full_scale, adapted)), 109.393, 1)
+    assert_almost_equal(
+        float(norm_brightness_err(full_scale, adapted)), 0.02, 2
+    )
     return data, adapted
 
 
@@ -393,9 +395,9 @@ def test_adapthist_alpha():
     img = img[:, :, :3]
     full_scale = exposure.rescale_intensity(img)
     assert img.shape == adapted.shape
-    assert_almost_equal(peak_snr(full_scale, adapted).get(), 109.393, 2)
+    assert_almost_equal(float(peak_snr(full_scale, adapted)), 109.393, 2)
     assert_almost_equal(
-        norm_brightness_err(full_scale, adapted).get(), 0.0248, 3
+        float(norm_brightness_err(full_scale, adapted)), 0.0248, 3
     )
 
 

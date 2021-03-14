@@ -85,7 +85,7 @@ def test_denoise_tv_chambolle_3d():
     """Apply the TV denoising algorithm on a 3D image representing a sphere."""
     x, y, z = cp.ogrid[0:40, 0:40, 0:40]
     mask = (x - 22) ** 2 + (y - 20) ** 2 + (z - 17) ** 2 < 8 ** 2
-    mask = 100 * mask.astype(np.float)
+    mask = 100 * mask.astype(np.float64)
     mask += 60
     mask += 20 * cp.random.rand(*mask.shape)
     mask[mask < 0] = 0

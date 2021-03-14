@@ -32,7 +32,7 @@ def test_find_boundaries():
 
 
 def test_find_boundaries_bool():
-    image = cp.zeros((5, 5), dtype=cp.bool)
+    image = cp.zeros((5, 5), dtype=cp.bool_)
     image[2:5, 2:5] = True
 
     ref = cp.asarray(
@@ -43,7 +43,7 @@ def test_find_boundaries_bool():
             [False, True, True, False, False],
             [False, True, True, False, False],
         ],
-        dtype=cp.bool,
+        dtype=cp.bool_,
     )
     result = find_boundaries(image)
     assert_array_equal(result, ref)
@@ -95,7 +95,7 @@ def test_mark_boundaries():
 
 
 def test_mark_boundaries_bool():
-    image = cp.zeros((10, 10), dtype=cp.bool)
+    image = cp.zeros((10, 10), dtype=cp.bool_)
     label_image = cp.zeros((10, 10), dtype=cp.uint8)
     label_image[2:7, 2:7] = 1
 
