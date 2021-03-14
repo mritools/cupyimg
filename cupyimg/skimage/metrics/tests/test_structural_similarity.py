@@ -91,8 +91,9 @@ def test_structural_similarity_grad(seed):
 
 def test_structural_similarity_dtype():
     N = 30
-    X = cp.random.rand(N, N)
-    Y = cp.random.rand(N, N)
+    rstate = cp.random.RandomState(1234)
+    X = rstate.rand(N, N)
+    Y = rstate.rand(N, N)
 
     S1 = structural_similarity(X, Y)
 
@@ -160,7 +161,7 @@ def test_structural_similarity_multichannel_chelsea():
     # multichannel result should be mean of the individual channel results
     mssim = structural_similarity(Xc, Yc, multichannel=True)
     mssim_sep = [
-        structural_similarity(Yc[..., c], Xc[..., c])
+        float(structural_similarity(Yc[..., c], Xc[..., c]))
         for c in range(Xc.shape[-1])
     ]
     assert_almost_equal(mssim, np.mean(mssim_sep))

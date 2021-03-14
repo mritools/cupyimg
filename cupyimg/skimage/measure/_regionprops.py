@@ -515,7 +515,7 @@ class RegionProperties:
 
     @property
     def weighted_centroid(self):
-        ctr = self.weighted_local_centroid
+        ctr = cp.asnumpy(self.weighted_local_centroid)
         return tuple(idx + slc.start for idx, slc in zip(ctr, self.slice))
 
     @property
@@ -620,10 +620,15 @@ class RegionProperties:
 
         for key in PROP_VALS:
             try:
-                # so that NaNs are equal
-                cp.testing.assert_array_equal(
-                    getattr(self, key, None), getattr(other, key, None)
-                )
+                v1 = getattr(self, key, None)
+                v2 = getattr(other, key, None)
+                if isinstance(v1, tuple):
+                    np.testing.assert_equal(v1, v2)
+                else:
+                    # so that NaNs are equal
+                    cp.testing.assert_array_equal(
+                        getattr(self, key, None), getattr(other, key, None)
+                    )
             except AssertionError:
                 return False
 
@@ -1192,7 +1197,7 @@ def regionprops(
         raise TypeError("Only 2-D and 3-D images supported.")
 
     if not cp.issubdtype(label_image.dtype, cp.integer):
-        if cp.issubdtype(label_image.dtype, cp.bool):
+        if cp.issubdtype(label_image.dtype, cp.bool_):
             raise TypeError(
                 "Non-integer image types are ambiguous: "
                 "use skimage.measure.label to label the connected"

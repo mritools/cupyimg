@@ -331,6 +331,6 @@ def _calibrate_denoiser_search(
 
             loss = mean_squared_error(image[mask], masked_denoised[mask])
 
-        losses.append(loss)
+        losses.append(float(loss))
 
     return parameters_tested, losses

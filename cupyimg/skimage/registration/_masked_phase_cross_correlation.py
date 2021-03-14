@@ -72,7 +72,7 @@ def _masked_phase_cross_correlation(
                 "Input images have different shapes, moving_mask must "
                 "be explicitely set."
             )
-        moving_mask = cp.array(reference_mask, dtype=cp.bool, copy=True)
+        moving_mask = cp.array(reference_mask, dtype=cp.bool_, copy=True)
 
     # We need masks to be of the same size as their respective images
     for (im, mask) in [
@@ -170,11 +170,11 @@ def cross_correlate_masked(
 
     if arr1.dtype.kind == "c" or arr2.dtype.kind == "c":
         raise ValueError("complex-valued arr1, arr2 are not supported")
-    fixed_image = cp.asarray(arr1, dtype=np.float)
-    fixed_mask = cp.asarray(m1, dtype=np.bool)
-    moving_image = cp.asarray(arr2, dtype=np.float)
-    moving_mask = cp.asarray(m2, dtype=np.bool)
-    eps = np.finfo(np.float).eps
+    fixed_image = cp.asarray(arr1, dtype=np.float64)
+    fixed_mask = cp.asarray(m1, dtype=np.bool_)
+    moving_image = cp.asarray(arr2, dtype=np.float64)
+    moving_mask = cp.asarray(m2, dtype=np.bool_)
+    eps = np.finfo(np.float64).eps
 
     # Array dimensions along non-transformation axes should be equal.
     all_axes = set(range(fixed_image.ndim))
@@ -284,7 +284,7 @@ def cross_correlate_masked(
     cp.clip(out, a_min=-1, a_max=1, out=out)
 
     # Apply overlap ratio threshold
-    number_px_threshold = overlap_ratio * cp.max(
+    number_px_threshold = overlap_ratio * np.max(
         number_overlap_masked_px, axis=axes, keepdims=True
     )
     out[number_overlap_masked_px < number_px_threshold] = 0.0

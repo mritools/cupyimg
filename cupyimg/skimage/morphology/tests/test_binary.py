@@ -105,7 +105,7 @@ def test_default_selem(function):
 
 def test_3d_fallback_default_selem():
     # 3x3x3 cube inside a 7x7x7 image:
-    image = cp.zeros((7, 7, 7), cp.bool)
+    image = cp.zeros((7, 7, 7), cp.bool_)
     image[2:-2, 2:-2, 2:-2] = 1
 
     opened = binary.binary_opening(image)
@@ -122,7 +122,7 @@ binary_3d_fallback_functions = [binary.binary_opening, binary.binary_closing]
 @pytest.mark.parametrize("function", binary_3d_fallback_functions)
 def test_3d_fallback_cube_selem(function):
     # 3x3x3 cube inside a 7x7x7 image:
-    image = cp.zeros((7, 7, 7), cp.bool)
+    image = cp.zeros((7, 7, 7), cp.bool_)
     image[2:-2, 2:-2, 2:-2] = 1
 
     cube = cp.ones((3, 3, 3), dtype=cp.uint8)
@@ -162,8 +162,8 @@ def test_binary_output_2d():
     binary.binary_opening(image, out=int_opened)
     binary.binary_closing(image, out=int_closed)
 
-    np.testing.assert_equal(bin_opened.dtype, cp.bool)
-    np.testing.assert_equal(bin_closed.dtype, cp.bool)
+    np.testing.assert_equal(bin_opened.dtype, cp.bool_)
+    np.testing.assert_equal(bin_closed.dtype, cp.bool_)
 
     np.testing.assert_equal(int_opened.dtype, cp.uint8)
     np.testing.assert_equal(int_closed.dtype, cp.uint8)
@@ -183,8 +183,8 @@ def test_binary_output_3d():
     binary.binary_opening(image, out=int_opened)
     binary.binary_closing(image, out=int_closed)
 
-    np.testing.assert_equal(bin_opened.dtype, cp.bool)
-    np.testing.assert_equal(bin_closed.dtype, cp.bool)
+    np.testing.assert_equal(bin_opened.dtype, cp.bool_)
+    np.testing.assert_equal(bin_closed.dtype, cp.bool_)
 
     np.testing.assert_equal(int_opened.dtype, cp.uint8)
     np.testing.assert_equal(int_closed.dtype, cp.uint8)

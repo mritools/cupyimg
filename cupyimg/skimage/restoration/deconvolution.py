@@ -277,9 +277,9 @@ def unsupervised_wiener(
     # The Fourier transform may change the image.size attribute, so we
     # store it.
     if is_real:
-        data_spectrum = uft.urfft2(image.astype(np.float))
+        data_spectrum = uft.urfft2(image.astype(np.float64))
     else:
-        data_spectrum = uft.ufft2(image.astype(np.float))
+        data_spectrum = uft.ufft2(image.astype(np.float64))
 
     # Gibbs sampling
     for iteration in range(params["max_iter"]):

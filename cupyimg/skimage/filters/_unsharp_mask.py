@@ -118,7 +118,7 @@ def unsharp_mask(
     """
     vrange = None  # Range for valid values; used for clipping.
     if preserve_range:
-        fimg = image.astype(np.float)
+        fimg = image.astype(np.float64)
     else:
         fimg = img_as_float(image)
         negative = cp.any(fimg < 0)
@@ -128,7 +128,7 @@ def unsharp_mask(
             vrange = [0.0, 1.0]
 
     if multichannel:
-        result = cp.empty_like(fimg, dtype=np.float)
+        result = cp.empty_like(fimg, dtype=np.float64)
         for channel in range(image.shape[-1]):
             result[..., channel] = _unsharp_mask_single_channel(
                 fimg[..., channel], radius, amount, vrange

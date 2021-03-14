@@ -424,11 +424,11 @@ def white_tophat(image, selem=None, out=None):
         out = cp.empty_like(image)
     # work-around for NumPy deprecation warning for arithmetic
     # operations on bool arrays
-    if isinstance(image, cp.ndarray) and image.dtype == cp.bool:
+    if isinstance(image, cp.ndarray) and image.dtype == cp.bool_:
         image_ = image.view(dtype=cp.uint8)
     else:
         image_ = image
-    if isinstance(out, cp.ndarray) and out.dtype == cp.bool:
+    if isinstance(out, cp.ndarray) and out.dtype == cp.bool_:
         out_ = out.view(dtype=cp.uint8)
     else:
         out_ = out

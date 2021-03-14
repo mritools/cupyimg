@@ -84,7 +84,7 @@ class TestColorconv(TestCase):
     # ftm: off
     img_rgba = cp.asarray(
         [[[0, 0.5, 1, 0], [0, 0.5, 1, 1], [0, 0.5, 1, 0.5]]]
-    ).astype(np.float)
+    ).astype(np.float64)
 
     colbars = cp.asarray(
         [
@@ -92,7 +92,7 @@ class TestColorconv(TestCase):
             [1, 1, 1, 1, 0, 0, 0, 0],
             [1, 0, 1, 0, 1, 0, 1, 0],
         ]
-    ).astype(np.float)
+    ).astype(np.float64)
     colbars_array = cp.swapaxes(colbars.reshape(3, 4, 2), 0, 2)
     colbars_point75 = colbars * 0.75
     colbars_point75_array = cp.swapaxes(colbars_point75.reshape(3, 4, 2), 0, 2)
@@ -134,7 +134,7 @@ class TestColorconv(TestCase):
         # ftm: off
         expected = cp.asarray(
             [[[1, 1, 1], [0, 0.5, 1], [0.5, 0.75, 1]]]
-        ).astype(np.float)
+        ).astype(np.float64)
         # ftm: on
         self.assertEqual(rgb.shape, expected.shape)
         assert_array_almost_equal(rgb, expected)
@@ -376,7 +376,7 @@ class TestColorconv(TestCase):
         )
 
     def test_rgb2gray(self):
-        x = cp.asarray([1, 1, 1]).reshape((1, 1, 3)).astype(np.float)
+        x = cp.asarray([1, 1, 1]).reshape((1, 1, 3)).astype(np.float64)
         g = rgb2gray(x)
         assert_array_almost_equal(g, 1)
 
@@ -469,7 +469,7 @@ class TestColorconv(TestCase):
                     lab2xyz(lab_array_I_obs, I, obs), self.xyz_array, decimal=3
                 )
         for I in ["a", "e"]:
-            fname = "lab_array_{0}_2.npy".format(I, obs)
+            fname = "lab_array_{0}_2.npy".format(I)
             if have_fetch:
                 lab_array_I_obs = np.load(fetch("color/tests/data/" + fname))
             else:
@@ -609,10 +609,10 @@ class TestColorconv(TestCase):
                 )
         for I in ["a", "e"]:
             if have_fetch:
-                fname = "color/tests/data/luv_array_{0}_2.npy".format(I, obs)
+                fname = "color/tests/data/luv_array_{0}_2.npy".format(I)
                 luv_array_I_obs = np.load(fetch(fname))
             else:
-                fname = "luv_array_{0}_2.npy".format(I, obs)
+                fname = "luv_array_{0}_2.npy".format(I)
                 luv_array_I_obs = np.load(
                     os.path.join(os.path.dirname(__file__), "data", fname)
                 )

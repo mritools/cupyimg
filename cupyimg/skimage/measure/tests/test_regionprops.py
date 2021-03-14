@@ -80,7 +80,7 @@ def test_dtype():
     with pytest.raises(TypeError):
         regionprops(cp.zeros((10, 10), dtype=cp.double))
     with pytest.raises(TypeError):
-        regionprops(cp.zeros((10, 10), dtype=np.bool))
+        regionprops(cp.zeros((10, 10), dtype=np.bool_))
 
 
 def test_ndim():
@@ -157,13 +157,13 @@ def test_moments_central():
 def test_centroid():
     centroid = regionprops(SAMPLE)[0].centroid
     # determined with MATLAB
-    assert_array_almost_equal(centroid, (5.66666666666666, 9.444444444444444))
+    assert_almost_equal(centroid, (5.66666666666666, 9.444444444444444))
 
 
 def test_centroid_3d():
     centroid = regionprops(SAMPLE_3D)[0].centroid
     # determined by mean along axis 1 of SAMPLE_3D.nonzero()
-    assert_array_almost_equal(centroid, (1.66666667, 1.55555556, 1.55555556))
+    assert_almost_equal(centroid, (1.66666667, 1.55555556, 1.55555556))
 
 
 def test_convex_area():
@@ -435,7 +435,7 @@ def test_weighted_centroid():
     centroid = regionprops(SAMPLE, intensity_image=INTENSITY_SAMPLE)[
         0
     ].weighted_centroid
-    assert_array_almost_equal(centroid, (5.540540540540, 9.445945945945))
+    assert_almost_equal(centroid, (5.540540540540, 9.445945945945))
 
 
 def test_weighted_moments_hu():

@@ -74,7 +74,7 @@ def test_calibrate_denoiser_extra_output():
         for denoiser_kwargs in parameters_tested
     ]
 
-    ground_truth_losses = [mse(img, test_img) for img in all_denoised]
+    ground_truth_losses = [float(mse(img, test_img)) for img in all_denoised]
     assert np.argmin(losses) == np.argmin(ground_truth_losses)
 
 
