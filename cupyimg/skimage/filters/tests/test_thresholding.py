@@ -314,6 +314,7 @@ def test_li_camera_image():
 
 
 def test_li_coins_image():
+    pytest.importorskip("fast_upfirdn")
     image = util.img_as_ubyte(coinsd)
     threshold = threshold_li(image)
     ce_actual = _cross_entropy(image, threshold)
@@ -333,6 +334,7 @@ def test_li_coins_image_as_float():
 
 
 def test_li_astro_image():
+    pytest.importorskip("fast_upfirdn")
     image = util.img_as_ubyte(astronautd)
     threshold = threshold_li(image)
     ce_actual = _cross_entropy(image, threshold)

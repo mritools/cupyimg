@@ -8,6 +8,7 @@ from cupyimg.scipy.signal import upfirdn
 
 
 signal = pytest.importorskip("scipy.signal")
+pytest.importorskip("fast_upfirdn")
 
 
 @pytest.mark.parametrize(

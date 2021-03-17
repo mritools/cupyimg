@@ -9,7 +9,7 @@ from cupy.testing import (
     assert_array_equal,
     assert_array_almost_equal,
 )
-from fast_upfirdn import upfirdn_modes
+
 from numpy.testing import assert_, assert_equal
 
 from cupyimg.scipy import signal as signal_cp
@@ -29,6 +29,12 @@ from cupyimg.scipy.signal import (
 )
 from cupyimg.scipy.ndimage import correlate1d
 
+try:
+    from fast_upfirdn import upfirdn_modes
+except ImportError:
+    pass
+
+pytest.importorskip("fast_upfirdn")
 signal = pytest.importorskip("scipy.signal")
 
 

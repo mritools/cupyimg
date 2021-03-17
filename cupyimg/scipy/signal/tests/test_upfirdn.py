@@ -39,11 +39,16 @@ from cupy.testing import assert_allclose
 import pytest
 from pytest import raises as assert_raises
 
-from fast_upfirdn import upfirdn_modes, upfirdn_out_len as _output_len
-
+try:
+    from fast_upfirdn import upfirdn_modes, upfirdn_out_len as _output_len
+except ImportError:
+    pass
 
 from cupyimg.scipy.signal import upfirdn
 from scipy.signal import firwin, lfilter
+
+
+pytest.importorskip("fast_upfirdn")
 
 
 def _pad_test(x, npre, npost, mode):
