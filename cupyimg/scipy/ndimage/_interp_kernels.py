@@ -7,10 +7,12 @@ from cupyimg.scipy.ndimage import _spline_prefilter_core
 from cupyimg.scipy.ndimage import _spline_kernel_weights
 from cupyimg.scipy.ndimage import _util
 
+math_constants_preamble = r"""
+// workaround for HIP: line begins with #include
+#include <cupy/math_constants.h>
+"""
 spline_weights_inline = _spline_kernel_weights.spline_weights_inline
 boundary_ops = _util._generate_boundary_condition_ops
-
-math_constants_preamble = "#include <math_constants.h>\n"
 
 
 def _get_coord_map(ndim, nprepad=0):
