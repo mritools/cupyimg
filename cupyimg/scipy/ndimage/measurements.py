@@ -1,7 +1,6 @@
 import warnings
 
 import cupy
-from cupy import core
 import numpy
 
 from cupyimg import _misc
@@ -154,7 +153,7 @@ Elementwise kernels for use by label
 
 
 def _kernel_init():
-    return core.ElementwiseKernel(
+    return cupy.ElementwiseKernel(
         "X x",
         "Y y",
         "if (x == 0) { y = -1; } else { y = i; }",
@@ -231,13 +230,13 @@ def _kernel_connect(greyscale_mode=False, int_t="int"):
         x_condition=x_condition, int_t=int_t
     )
 
-    return core.ElementwiseKernel(
+    return cupy.ElementwiseKernel(
         in_params, "raw Y y", code, "cupyimg_nd_label_connect",
     )
 
 
 def _kernel_count():
-    return core.ElementwiseKernel(
+    return cupy.ElementwiseKernel(
         "",
         "raw Y y, raw int32 count",
         """
@@ -252,7 +251,7 @@ def _kernel_count():
 
 
 def _kernel_labels():
-    return core.ElementwiseKernel(
+    return cupy.ElementwiseKernel(
         "",
         "raw Y y, raw int32 count, raw int32 labels",
         """
@@ -265,7 +264,7 @@ def _kernel_labels():
 
 
 def _kernel_finalize():
-    return core.ElementwiseKernel(
+    return cupy.ElementwiseKernel(
         "int32 maxlabel",
         "raw int32 labels, raw Y y",
         """
@@ -306,7 +305,7 @@ def _safely_castable_to_int(dt):
     return safe
 
 
-_ndimage_variance_kernel = core.ElementwiseKernel(
+_ndimage_variance_kernel = cupy.ElementwiseKernel(
     "T input, R labels, raw X index, uint64 size, raw float64 mean",
     "raw float64 out",
     """
@@ -320,7 +319,7 @@ _ndimage_variance_kernel = core.ElementwiseKernel(
 )
 
 
-_ndimage_sum_kernel = core.ElementwiseKernel(
+_ndimage_sum_kernel = cupy.ElementwiseKernel(
     "T input, R labels, raw X index, uint64 size",
     "raw float64 out",
     """
@@ -346,7 +345,7 @@ def _ndimage_sum_kernel_2(input, labels, index, sum_val, batch_size=4):
     return sum_val
 
 
-_ndimage_mean_kernel = core.ElementwiseKernel(
+_ndimage_mean_kernel = cupy.ElementwiseKernel(
     "T input, R labels, raw X index, uint64 size",
     "raw float64 out, raw uint64 count",
     """
@@ -825,10 +824,16 @@ def _select(
     if find_positions:
         positions = positions.ravel()
 
-    using_cub = (
-        core._accelerator.ACCELERATOR_CUB
-        in cupy.core.get_routine_accelerators()
-    )
+    if hasattr(cupy, "_core"):
+        using_cub = (
+            cupy._core._accelerator.ACCELERATOR_CUB
+            in cupy._core.get_routine_accelerators()
+        )
+    else:
+        using_cub = (
+            cupy.core._accelerator.ACCELERATOR_CUB
+            in cupy.core.get_routine_accelerators()
+        )
 
     if using_cub:
         # Cutoff values below were determined empirically for relatively large

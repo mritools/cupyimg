@@ -1,5 +1,4 @@
 import cupy
-import cupy.core.internal
 import numpy
 
 from cupyimg import memoize

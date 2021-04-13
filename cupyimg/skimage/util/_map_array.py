@@ -1,12 +1,11 @@
 import cupy as cp
-from cupy import core
 
 
 # Note: scikit-image Cython code uses unordered_map, but here we use a simple
 #       for loop over in_vals. On my hardware, for large arrays, when
 #       nvals < 2900 or so, the GPU implementation is faster. For small nvals
 #       (e.g. 10-100) it is much faster.
-_map_array = core.ElementwiseKernel(
+_map_array = cp.ElementwiseKernel(
     in_params="raw X x, raw X in_vals, raw Y out_vals, int32 nvals",
     out_params="Y y",
     operation="""

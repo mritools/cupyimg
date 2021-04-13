@@ -6,7 +6,6 @@ import numpy
 import cupy
 from cupyimg import numpy as cnp
 
-from cupy import core
 
 __all__ = ["histogram", "histogram2d", "histogramdd"]
 
@@ -20,7 +19,7 @@ __device__ long long atomicAdd(long long *address, long long val) {
 }"""
 
 # TODO(unno): use searchsorted
-_histogram_kernel = core.ElementwiseKernel(
+_histogram_kernel = cupy.ElementwiseKernel(
     "S x, raw T bins, int32 n_bins",
     "raw U y",
     """
@@ -44,7 +43,7 @@ _histogram_kernel = core.ElementwiseKernel(
 )
 
 
-_weighted_histogram_kernel = core.ElementwiseKernel(
+_weighted_histogram_kernel = cupy.ElementwiseKernel(
     "S x, raw T bins, int32 n_bins, raw W weights",
     "raw Y y",
     """

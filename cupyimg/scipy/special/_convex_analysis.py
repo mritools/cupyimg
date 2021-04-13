@@ -1,4 +1,7 @@
-from cupy import core
+try:
+    from cupy import _core
+except ImportError:
+    from cupy import core as _core
 
 
 _float_preamble = """
@@ -74,7 +77,7 @@ double __device__ pseudo_huber(double delta, double r) {
 """
 
 
-entr = core.create_ufunc(
+entr = _core.create_ufunc(
     "cupyx_scipy_entr",
     ("f->f", "d->d"),
     "out0 = out0_type(entr(in0));",
@@ -87,7 +90,7 @@ entr = core.create_ufunc(
 )
 
 
-kl_div = core.create_ufunc(
+kl_div = _core.create_ufunc(
     "cupyx_scipy_kl_div",
     ("ff->f", "dd->d"),
     "out0 = out0_type(kl_div(in0, in1));",
@@ -100,7 +103,7 @@ kl_div = core.create_ufunc(
 )
 
 
-rel_entr = core.create_ufunc(
+rel_entr = _core.create_ufunc(
     "cupyx_scipy_rel_entr",
     ("ff->f", "dd->d"),
     "out0 = out0_type(rel_entr(in0, in1));",
@@ -113,7 +116,7 @@ rel_entr = core.create_ufunc(
 )
 
 
-huber = core.create_ufunc(
+huber = _core.create_ufunc(
     "cupyx_scipy_huber",
     ("ff->f", "dd->d"),
     "out0 = out0_type(huber(in0, in1));",
@@ -126,7 +129,7 @@ huber = core.create_ufunc(
 )
 
 
-pseudo_huber = core.create_ufunc(
+pseudo_huber = _core.create_ufunc(
     "cupyx_scipy_pseudo_huber",
     ("ff->f", "dd->d"),
     "out0 = out0_type(pseudo_huber(in0, in1));",
