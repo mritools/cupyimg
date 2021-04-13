@@ -1,3 +1,24 @@
+# :warning: IMPORTANT UPDATE (April 13, 2021) :warning:
+
+Development of the `cupyimg.skimage` module in this repository has moved to a
+new open source RAPIDS project called [cuCIM] that was created by a
+collaboration between [Quansight] and [NVIDIA]. The
+`cucim.skimage` module there is an updated equivalent of `cupyimg.skimage`.
+The new repository has continuous integration testing on GPUs and generates
+binary packages via conda-forge. It also involves incorporation of additional
+image I/O functionality in a separate `cucim.clara` module.
+
+Nearly all functions in `cupyimg.numpy` and `cupyimg.scipy` have been ported
+upstream to CuPy where they will be avaialbe in CuPy 9.0 (scheduled for release
+in late April, 2021).
+
+Please migrate to using cuCIM and/or upstream CuPy in the coming weeks as this
+repository will eventually be archived.
+
+
+-----------
+# Original Readme Content
+
 
 # cupyimg: n-d signal and image processing on the GPU
 
@@ -517,3 +538,6 @@ related: [4058](https://github.com/cupy/cupy/pull/4058), [4059](https://github.c
 [RAPIDS]: https://rapids.ai
 [SciPy]: https://scipy.org
 [scikit-image]: https://scikit-image.org
+[NVIDIA]: https://www.nvidia.com
+[Quansight]: https://www.quansight.com/
+[cuCIM]: https://github.com/rapidsai/cucim
