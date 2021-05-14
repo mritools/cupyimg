@@ -9,8 +9,7 @@ binary packages via conda-forge. It also involves incorporation of additional
 image I/O functionality in a separate `cucim.clara` module.
 
 Nearly all functions in `cupyimg.numpy` and `cupyimg.scipy` have been ported
-upstream to CuPy where they will be avaialbe in CuPy 9.0 (scheduled for release
-in late April, 2021).
+upstream to CuPy and are now available in CuPy >= 9.0.
 
 Please migrate to using cuCIM and/or upstream CuPy in the coming weeks as this
 repository will eventually be archived.
